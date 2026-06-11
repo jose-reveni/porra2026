@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Porra Mundial 2026 · Reveni</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#022f36;--bg2:#001a1f;--teal:#003C46;--surface:#063a44;--surface2:#0a4a56;
+  --mint:#7afcd0;--mint2:#49d6bb;--mint-soft:#defff0;--line:rgba(122,252,208,.15);
+  --text:#e2f6ef;--muted:#86b1aa;--gold:#ffd27a;--red:#ff7a7a;--maxw:1060px;
+}
+html{scroll-behavior:smooth}
+body{background:radial-gradient(1200px 800px at 75% -10%,#0a4a56 0%,var(--bg) 45%,var(--bg2) 100%);
+  color:var(--text);font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+h1,h2,h3,.disp{font-family:'Space Grotesk','Inter',system-ui,sans-serif;font-weight:700;letter-spacing:-.01em;line-height:1.05}
+a{color:inherit}
+.mint{color:var(--mint)}.muted{color:var(--muted)}
+/* NAV */
+nav.rail{position:fixed;top:0;left:0;height:100vh;width:188px;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
+  border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(0,26,31,.6),transparent);backdrop-filter:blur(6px);z-index:40}
+nav.rail .brand{color:var(--mint);height:26px;margin-bottom:18px;display:block}
+nav.rail .brand svg{height:26px;width:auto}
+.langtoggle{display:flex;gap:4px;margin-bottom:16px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.langtoggle button{flex:1;border:0;background:transparent;color:var(--muted);font:600 .78rem 'Space Grotesk',sans-serif;
+  padding:6px 0;border-radius:7px;cursor:pointer;letter-spacing:.05em;transition:.18s}
+.langtoggle button.on{background:var(--mint);color:#012}
+nav.rail a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:var(--muted);
+  text-decoration:none;font-size:.82rem;font-weight:600;transition:.2s}
+nav.rail a .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.5;transition:.2s}
+nav.rail a:hover{color:var(--text);background:rgba(122,252,208,.05)}
+nav.rail a.active{color:var(--mint);background:rgba(122,252,208,.1)}
+nav.rail a.active .dot{opacity:1;box-shadow:0 0 10px var(--mint)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px 0 calc(188px + 40px)}
+/* HERO */
+header.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding-top:40px}
+.hero .eyebrow{color:var(--mint);font-weight:700;letter-spacing:.22em;text-transform:uppercase;font-size:.78rem;margin-bottom:18px}
+.hero h1{font-size:clamp(2.6rem,8vw,5.6rem);background:linear-gradient(120deg,#fff 10%,var(--mint) 90%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px}
+.hero .lead{font-size:clamp(1rem,2vw,1.3rem);color:var(--muted);max-width:620px;margin-bottom:42px}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:920px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 22px;min-width:0}
+.chip .big{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .big{font-family:'Space Grotesk';font-size:2rem;font-weight:700;color:var(--mint)}
+.chip .lab{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px}
+.scrollcue{position:absolute;bottom:26px;left:0;color:var(--muted);font-size:.8rem;display:flex;align-items:center;gap:8px;animation:bob 1.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+/* SECTIONS */
+section.sec{padding:74px 0;border-top:1px solid var(--line)}
+.sec-head{margin-bottom:34px}
+.kicker{font-family:'Space Grotesk';color:var(--mint);font-weight:700;font-size:.9rem;letter-spacing:.1em;margin-bottom:8px}
+.sec h2{font-size:clamp(1.8rem,4vw,2.9rem)}
+.sec .sub{color:var(--muted);max-width:640px;margin-top:10px;font-size:1.02rem}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px}
+.card.glow{box-shadow:0 0 0 1px rgba(122,252,208,.2),0 20px 60px rgba(122,252,208,.08)}
+.card h3{font-size:1.05rem;margin-bottom:4px}
+.card .k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.big-num{font-family:'Space Grotesk';font-size:2.4rem;font-weight:700;color:var(--mint);line-height:1}
+/* BARS */
+.bar-row{display:grid;grid-template-columns:30px minmax(84px,170px) 1fr 54px;align-items:center;gap:14px;padding:7px 0}
+.bar-rank{font-family:'Space Grotesk';color:var(--muted);font-size:.95rem;text-align:right;font-weight:700}
+.bar-name{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-co{display:flex;flex-direction:column;gap:3px;min-width:0}
+.bar-track{height:13px;background:rgba(255,255,255,.06);border-radius:8px;overflow:hidden}
+.bar-fill{height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,var(--mint2),var(--mint));transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.bar-fill.cool{background:linear-gradient(90deg,#2b6f7f,#4a9aa8)}
+.bar-fill.gold{background:linear-gradient(90deg,#caa24a,var(--gold))}
+.bar-val{font-family:'Space Grotesk';font-weight:700;text-align:right;font-size:.95rem}
+/* PODIUM */
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:end;margin-bottom:30px}
+.pod{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;text-align:center;position:relative}
+.pod .medal{font-size:1.6rem}.pod .nm{font-weight:700;font-size:1.1rem;margin:6px 0 2px}
+.pod .sc{font-family:'Space Grotesk';font-size:2rem;font-weight:700;color:var(--mint)}
+.pod.p1{transform:translateY(-12px);box-shadow:0 0 0 1px rgba(122,252,208,.25),0 18px 50px rgba(122,252,208,.1)}
+/* HEADLINE pair cards */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:26px}
+.duo .card{display:flex;flex-direction:column;gap:6px}
+.duo .names{font-family:'Space Grotesk';font-size:1.5rem;font-weight:700}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  padding:4px 9px;border-radius:999px;background:rgba(122,252,208,.12);color:var(--mint);width:fit-content}
+.tag.warm{background:rgba(255,210,122,.14);color:var(--gold)}
+.tag.cool{background:rgba(120,180,200,.14);color:#9cd0dd}
+/* MATRIX */
+.matrix-wrap{overflow-x:auto;padding-bottom:8px}
+.matrix{display:inline-grid;gap:2px;margin-top:8px}
+.mcell{width:19px;height:19px;border-radius:3px;background:var(--surface2);cursor:default}
+.mlabel{font-size:.62rem;color:var(--muted);display:flex;align-items:center}
+.mlabel.row{justify-content:flex-end;padding-right:6px;white-space:nowrap}
+.mlabel.col{writing-mode:vertical-rl;transform:rotate(180deg);justify-content:flex-end;padding-bottom:6px;height:64px}
+.mdiag{background:repeating-linear-gradient(45deg,#063a44,#063a44 3px,#0a4a56 3px,#0a4a56 6px)}
+#mtip{position:fixed;pointer-events:none;z-index:90;background:#001a1f;border:1px solid var(--line);
+  border-radius:10px;padding:8px 12px;font-size:.82rem;opacity:0;transition:opacity .12s;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.legend{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:.78rem;color:var(--muted)}
+.legend .scale{height:10px;width:140px;border-radius:6px;background:linear-gradient(90deg,var(--surface2),var(--mint))}
+/* match distribution */
+.match-row{padding:14px 0;border-bottom:1px solid var(--line)}
+.match-row:last-child{border:0}
+.match-top{display:flex;justify-content:space-between;gap:10px;font-weight:600;margin-bottom:8px;font-size:.96rem}
+.dist{display:flex;height:24px;border-radius:7px;overflow:hidden;font-size:.72rem;font-weight:700}
+.dist span{display:flex;align-items:center;justify-content:center;color:#012;min-width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.dist .s1{background:var(--mint)}.dist .sx{background:#7fa8b2}.dist .s2{background:var(--gold)}
+.modal-pill{color:var(--muted);font-size:.84rem;margin-top:6px}
+/* chips teams */
+.teamchip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);
+  border-radius:999px;padding:7px 13px;font-size:.9rem;font-weight:600;margin:4px 4px 0 0}
+.teamchip .n{color:var(--muted);font-family:'Space Grotesk';font-weight:700}
+/* group cards */
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.gcard .gl{font-family:'Space Grotesk';color:var(--muted);font-size:.8rem;letter-spacing:.1em}
+.gcard .fav{font-size:1.15rem;font-weight:700;margin:4px 0 10px;display:flex;align-items:center;gap:8px}
+/* fichas */
+.search{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);color:var(--text);
+  border-radius:12px;padding:11px 15px;font-size:.95rem;margin-bottom:20px;font-family:inherit}
+.search:focus{outline:none;border-color:var(--mint)}
+.ficha{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;transition:.2s}
+.ficha:hover{border-color:rgba(122,252,208,.4);transform:translateY(-3px)}
+.ficha .fh{display:flex;justify-content:space-between;align-items:start;margin-bottom:10px}
+.ficha .fn{font-size:1.2rem;font-weight:700}
+.ficha .rk{font-family:'Space Grotesk';font-size:.8rem;color:var(--muted)}
+.ficha .lab{font-size:.8rem;margin:2px 0 12px}
+.fstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.84rem}
+.fstats .v{font-family:'Space Grotesk';font-weight:700;color:var(--mint)}
+.fline{font-size:.82rem;color:var(--muted);margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.fline b{color:var(--text)}
+/* premios */
+.award{background:linear-gradient(160deg,var(--surface2),var(--surface));border:1px solid var(--line);
+  border-radius:18px;padding:22px;text-align:center}
+.award .em{font-size:2.4rem}.award .ti{font-weight:700;margin:8px 0 2px}
+.award .wn{font-family:'Space Grotesk';font-size:1.5rem;font-weight:700;color:var(--mint)}
+.award .dt{font-size:.82rem;color:var(--muted);margin-top:2px}
+/* teaser */
+.teaser{text-align:center;padding:46px 22px}
+.teaser .em{font-size:3rem}
+/* reveal */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .65s ease,transform .65s ease}
+.reveal.in{opacity:1;transform:none}
+footer{border-top:1px solid var(--line);padding:36px 0 60px;color:var(--muted);font-size:.82rem}
+footer .brand{color:var(--mint);height:20px;display:inline-block;vertical-align:middle;margin-right:8px}
+footer .brand svg{height:20px;width:auto}
+@media(max-width:900px){
+  nav.rail{flex-direction:row;width:100%;height:auto;top:auto;bottom:0;padding:8px;overflow-x:auto;gap:2px;
+    border-right:0;border-top:1px solid var(--line)}
+  nav.rail .brand{display:none}
+  nav.rail a{font-size:.7rem;padding:7px 9px}nav.rail a .dot{display:none}
+  .langtoggle{margin-bottom:0;flex:0 0 auto;order:-1}
+  .wrap{padding:0 18px 70px}
+  .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium{grid-template-columns:1fr}
+  .chips{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>window.__PORRA__={"es2en": {"México": "Mexico", "Sudáfrica": "South Africa", "Corea del Sur": "South Korea", "Rep. Checa": "Czech Rep.", "Canadá": "Canada", "Bosnia": "Bosnia-Herz.", "Catar": "Qatar", "Suiza": "Switzerland", "Brasil": "Brazil", "Marruecos": "Morocco", "Haití": "Haiti", "Escocia": "Scotland", "EE. UU.": "USA", "Paraguay": "Paraguay", "Australia": "Australia", "Turquía": "Turkey", "Alemania": "Germany", "Curazao": "Curacao", "Costa de Marfil": "Ivory Coast", "Ecuador": "Ecuador", "Países Bajos": "Netherlands", "Japón": "Japan", "Suecia": "Sweden", "Túnez": "Tunisia", "Bélgica": "Belgium", "Egipto": "Egypt", "Irán": "Iran", "Nueva Zelanda": "New Zealand", "España": "Spain", "Cabo Verde": "Cape Verde", "Uruguay": "Uruguay", "Arabia Saudí": "Saudi Arabia", "Francia": "France", "Senegal": "Senegal", "Irak": "Iraq", "Noruega": "Norway", "Argentina": "Argentina", "Argelia": "Algeria", "Austria": "Austria", "Jordania": "Jordan", "Portugal": "Portugal", "RD Congo": "DR Congo", "Uzbekistán": "Uzbekistan", "Colombia": "Colombia", "Inglaterra": "England", "Croacia": "Croatia", "Ghana": "Ghana", "Panamá": "Panama"}, "hero": {"participants": 28, "matches": 72, "groups": 12, "total_goals": 5216, "avg_goals_match": 2.59, "top_scoreline": {"score": "2-1", "count": 328, "pct": 16.3}, "has_results": false}, "rebeldia": [{"name": "Cami", "index": 100.0, "sign": 0.497, "score": 0.629}, {"name": "Gon", "index": 59.2, "sign": 0.392, "score": 0.448}, {"name": "Lucía", "index": 53.3, "sign": 0.335, "score": 0.519}, {"name": "July", "index": 52.7, "sign": 0.359, "score": 0.456}, {"name": "Meg", "index": 41.9, "sign": 0.321, "score": 0.432}, {"name": "Juanorro", "index": 41.1, "sign": 0.324, "score": 0.417}, {"name": "Pano", "index": 40.3, "sign": 0.327, "score": 0.401}, {"name": "Emilio", "index": 39.4, "sign": 0.287, "score": 0.484}, {"name": "Hugo", "index": 39.2, "sign": 0.288, "score": 0.481}, {"name": "Jaime", "index": 34.0, "sign": 0.335, "score": 0.317}, {"name": "Juanin", "index": 24.5, "sign": 0.289, "score": 0.326}, {"name": "Almu", "index": 23.5, "sign": 0.283, "score": 0.329}, {"name": "Ben", "index": 23.1, "sign": 0.311, "score": 0.259}, {"name": "Paibol", "index": 21.4, "sign": 0.297, "score": 0.276}, {"name": "Tere", "index": 21.3, "sign": 0.249, "score": 0.386}, {"name": "Nadia", "index": 21.0, "sign": 0.284, "score": 0.3}, {"name": "Cillian", "index": 19.9, "sign": 0.292, "score": 0.27}, {"name": "Jose", "index": 16.1, "sign": 0.254, "score": 0.318}, {"name": "Irene", "index": 16.0, "sign": 0.268, "score": 0.284}, {"name": "Manu", "index": 13.7, "sign": 0.269, "score": 0.26}, {"name": "Adri", "index": 7.4, "sign": 0.263, "score": 0.208}, {"name": "Fer", "index": 5.1, "sign": 0.25, "score": 0.214}, {"name": "Toño", "index": 5.1, "sign": 0.275, "score": 0.155}, {"name": "Kike", "index": 5.0, "sign": 0.25, "score": 0.212}, {"name": "Andy", "index": 4.8, "sign": 0.263, "score": 0.181}, {"name": "Mile", "index": 3.5, "sign": 0.266, "score": 0.16}, {"name": "Matt", "index": 0.5, "sign": 0.243, "score": 0.182}, {"name": "Pablo", "index": 0.0, "sign": 0.247, "score": 0.168}], "matrix": {"names": ["Matt", "Fer", "Pano", "Tere", "Nadia", "Jose", "Lucía", "Kike", "Paibol", "Pablo", "Almu", "Juanorro", "Cillian", "July", "Toño", "Juanin", "Meg", "Irene", "Andy", "Adri", "Ben", "Gon", "Mile", "Cami", "Hugo", "Jaime", "Emilio", "Manu"], "sim": [[0.0, 37.5, 25.0, 37.5, 27.8, 33.3, 13.9, 44.4, 26.4, 54.2, 33.3, 29.2, 37.5, 19.4, 38.9, 25.0, 18.1, 27.8, 48.6, 45.8, 31.9, 29.2, 50.0, 12.5, 16.7, 30.6, 27.8, 41.7], [37.5, 0.0, 29.2, 25.0, 30.6, 22.2, 15.3, 45.8, 43.1, 50.0, 33.3, 12.5, 33.3, 19.4, 44.4, 20.8, 20.8, 19.4, 44.4, 40.3, 40.3, 22.2, 40.3, 13.9, 26.4, 30.6, 18.1, 41.7], [25.0, 29.2, 0.0, 15.3, 15.3, 13.9, 6.9, 23.6, 20.8, 27.8, 20.8, 20.8, 25.0, 19.4, 33.3, 23.6, 22.2, 16.7, 27.8, 29.2, 19.4, 23.6, 25.0, 12.5, 13.9, 22.2, 16.7, 20.8], [37.5, 25.0, 15.3, 0.0, 30.6, 18.1, 13.9, 36.1, 20.8, 33.3, 22.2, 20.8, 15.3, 15.3, 26.4, 19.4, 26.4, 23.6, 27.8, 25.0, 22.2, 19.4, 31.9, 8.3, 22.2, 25.0, 16.7, 25.0], [27.8, 30.6, 15.3, 30.6, 0.0, 23.6, 16.7, 37.5, 20.8, 34.7, 27.8, 25.0, 29.2, 19.4, 38.9, 33.3, 20.8, 27.8, 40.3, 19.4, 29.2, 12.5, 34.7, 12.5, 20.8, 23.6, 20.8, 34.7], [33.3, 22.2, 13.9, 18.1, 23.6, 0.0, 16.7, 22.2, 11.1, 15.3, 22.2, 22.2, 16.7, 27.8, 19.4, 22.2, 16.7, 36.1, 16.7, 25.0, 33.3, 20.8, 26.4, 13.9, 12.5, 20.8, 15.3, 19.4], [13.9, 15.3, 6.9, 13.9, 16.7, 16.7, 0.0, 19.4, 15.3, 12.5, 16.7, 15.3, 16.7, 18.1, 15.3, 16.7, 15.3, 18.1, 18.1, 15.3, 12.5, 11.1, 15.3, 8.3, 16.7, 18.1, 12.5, 9.7], [44.4, 45.8, 23.6, 36.1, 37.5, 22.2, 19.4, 0.0, 41.7, 58.3, 36.1, 12.5, 37.5, 18.1, 51.4, 25.0, 25.0, 29.2, 55.6, 47.2, 40.3, 15.3, 45.8, 8.3, 23.6, 40.3, 19.4, 34.7], [26.4, 43.1, 20.8, 20.8, 20.8, 11.1, 15.3, 41.7, 0.0, 38.9, 31.9, 20.8, 37.5, 22.2, 41.7, 23.6, 19.4, 25.0, 38.9, 37.5, 43.1, 29.2, 40.3, 16.7, 20.8, 44.4, 18.1, 31.9], [54.2, 50.0, 27.8, 33.3, 34.7, 15.3, 12.5, 58.3, 38.9, 0.0, 44.4, 18.1, 37.5, 18.1, 61.1, 29.2, 15.3, 30.6, 58.3, 52.8, 40.3, 27.8, 61.1, 8.3, 23.6, 33.3, 23.6, 47.2], [33.3, 33.3, 20.8, 22.2, 27.8, 22.2, 16.7, 36.1, 31.9, 44.4, 0.0, 15.3, 37.5, 15.3, 41.7, 16.7, 18.1, 19.4, 34.7, 31.9, 29.2, 23.6, 34.7, 11.1, 19.4, 30.6, 19.4, 22.2], [29.2, 12.5, 20.8, 20.8, 25.0, 22.2, 15.3, 12.5, 20.8, 18.1, 15.3, 0.0, 20.8, 9.7, 23.6, 26.4, 19.4, 15.3, 18.1, 20.8, 16.7, 19.4, 25.0, 16.7, 16.7, 18.1, 23.6, 22.2], [37.5, 33.3, 25.0, 15.3, 29.2, 16.7, 16.7, 37.5, 37.5, 37.5, 37.5, 20.8, 0.0, 22.2, 50.0, 25.0, 16.7, 19.4, 37.5, 38.9, 27.8, 23.6, 40.3, 11.1, 22.2, 29.2, 15.3, 33.3], [19.4, 19.4, 19.4, 15.3, 19.4, 27.8, 18.1, 18.1, 22.2, 18.1, 15.3, 9.7, 22.2, 0.0, 16.7, 16.7, 9.7, 26.4, 19.4, 20.8, 22.2, 19.4, 16.7, 12.5, 15.3, 19.4, 9.7, 18.1], [38.9, 44.4, 33.3, 26.4, 38.9, 19.4, 15.3, 51.4, 41.7, 61.1, 41.7, 23.6, 50.0, 16.7, 0.0, 34.7, 23.6, 29.2, 58.3, 56.9, 45.8, 23.6, 63.9, 11.1, 25.0, 36.1, 16.7, 40.3], [25.0, 20.8, 23.6, 19.4, 33.3, 22.2, 16.7, 25.0, 23.6, 29.2, 16.7, 26.4, 25.0, 16.7, 34.7, 0.0, 25.0, 29.2, 29.2, 29.2, 31.9, 15.3, 31.9, 11.1, 16.7, 16.7, 18.1, 26.4], [18.1, 20.8, 22.2, 26.4, 20.8, 16.7, 15.3, 25.0, 19.4, 15.3, 18.1, 19.4, 16.7, 9.7, 23.6, 25.0, 0.0, 13.9, 16.7, 22.2, 23.6, 15.3, 22.2, 15.3, 18.1, 19.4, 13.9, 23.6], [27.8, 19.4, 16.7, 23.6, 27.8, 36.1, 18.1, 29.2, 25.0, 30.6, 19.4, 15.3, 19.4, 26.4, 29.2, 29.2, 13.9, 0.0, 26.4, 30.6, 23.6, 23.6, 31.9, 12.5, 16.7, 16.7, 16.7, 22.2], [48.6, 44.4, 27.8, 27.8, 40.3, 16.7, 18.1, 55.6, 38.9, 58.3, 34.7, 18.1, 37.5, 19.4, 58.3, 29.2, 16.7, 26.4, 0.0, 45.8, 40.3, 23.6, 56.9, 9.7, 16.7, 30.6, 16.7, 48.6], [45.8, 40.3, 29.2, 25.0, 19.4, 25.0, 15.3, 47.2, 37.5, 52.8, 31.9, 20.8, 38.9, 20.8, 56.9, 29.2, 22.2, 30.6, 45.8, 0.0, 38.9, 30.6, 56.9, 12.5, 16.7, 29.2, 18.1, 33.3], [31.9, 40.3, 19.4, 22.2, 29.2, 33.3, 12.5, 40.3, 43.1, 40.3, 29.2, 16.7, 27.8, 22.2, 45.8, 31.9, 23.6, 23.6, 40.3, 38.9, 0.0, 20.8, 50.0, 19.4, 13.9, 43.1, 12.5, 45.8], [29.2, 22.2, 23.6, 19.4, 12.5, 20.8, 11.1, 15.3, 29.2, 27.8, 23.6, 19.4, 23.6, 19.4, 23.6, 15.3, 15.3, 23.6, 23.6, 30.6, 20.8, 0.0, 23.6, 16.7, 8.3, 19.4, 12.5, 25.0], [50.0, 40.3, 25.0, 31.9, 34.7, 26.4, 15.3, 45.8, 40.3, 61.1, 34.7, 25.0, 40.3, 16.7, 63.9, 31.9, 22.2, 31.9, 56.9, 56.9, 50.0, 23.6, 0.0, 15.3, 19.4, 33.3, 19.4, 48.6], [12.5, 13.9, 12.5, 8.3, 12.5, 13.9, 8.3, 8.3, 16.7, 8.3, 11.1, 16.7, 11.1, 12.5, 11.1, 11.1, 15.3, 12.5, 9.7, 12.5, 19.4, 16.7, 15.3, 0.0, 6.9, 18.1, 9.7, 12.5], [16.7, 26.4, 13.9, 22.2, 20.8, 12.5, 16.7, 23.6, 20.8, 23.6, 19.4, 16.7, 22.2, 15.3, 25.0, 16.7, 18.1, 16.7, 16.7, 16.7, 13.9, 8.3, 19.4, 6.9, 0.0, 25.0, 8.3, 16.7], [30.6, 30.6, 22.2, 25.0, 23.6, 20.8, 18.1, 40.3, 44.4, 33.3, 30.6, 18.1, 29.2, 19.4, 36.1, 16.7, 19.4, 16.7, 30.6, 29.2, 43.1, 19.4, 33.3, 18.1, 25.0, 0.0, 16.7, 31.9], [27.8, 18.1, 16.7, 16.7, 20.8, 15.3, 12.5, 19.4, 18.1, 23.6, 19.4, 23.6, 15.3, 9.7, 16.7, 18.1, 13.9, 16.7, 16.7, 18.1, 12.5, 12.5, 19.4, 9.7, 8.3, 16.7, 0.0, 18.1], [41.7, 41.7, 20.8, 25.0, 34.7, 19.4, 9.7, 34.7, 31.9, 47.2, 22.2, 22.2, 33.3, 18.1, 40.3, 26.4, 23.6, 22.2, 48.6, 33.3, 45.8, 25.0, 48.6, 12.5, 16.7, 31.9, 18.1, 0.0]]}, "twins": [{"name": "Matt", "twin": "Pablo", "pct": 54.2}, {"name": "Fer", "twin": "Pablo", "pct": 50.0}, {"name": "Pano", "twin": "Toño", "pct": 33.3}, {"name": "Tere", "twin": "Matt", "pct": 37.5}, {"name": "Nadia", "twin": "Andy", "pct": 40.3}, {"name": "Jose", "twin": "Irene", "pct": 36.1}, {"name": "Lucía", "twin": "Kike", "pct": 19.4}, {"name": "Kike", "twin": "Pablo", "pct": 58.3}, {"name": "Paibol", "twin": "Jaime", "pct": 44.4}, {"name": "Pablo", "twin": "Toño", "pct": 61.1}, {"name": "Almu", "twin": "Pablo", "pct": 44.4}, {"name": "Juanorro", "twin": "Matt", "pct": 29.2}, {"name": "Cillian", "twin": "Toño", "pct": 50.0}, {"name": "July", "twin": "Jose", "pct": 27.8}, {"name": "Toño", "twin": "Mile", "pct": 63.9}, {"name": "Juanin", "twin": "Toño", "pct": 34.7}, {"name": "Meg", "twin": "Tere", "pct": 26.4}, {"name": "Irene", "twin": "Jose", "pct": 36.1}, {"name": "Andy", "twin": "Pablo", "pct": 58.3}, {"name": "Adri", "twin": "Toño", "pct": 56.9}, {"name": "Ben", "twin": "Mile", "pct": 50.0}, {"name": "Gon", "twin": "Adri", "pct": 30.6}, {"name": "Mile", "twin": "Toño", "pct": 63.9}, {"name": "Cami", "twin": "Ben", "pct": 19.4}, {"name": "Hugo", "twin": "Fer", "pct": 26.4}, {"name": "Jaime", "twin": "Paibol", "pct": 44.4}, {"name": "Emilio", "twin": "Matt", "pct": 27.8}, {"name": "Manu", "twin": "Andy", "pct": 48.6}], "best_pair": {"a": "Toño", "b": "Mile", "pct": 63.9}, "worst_pair": {"a": "Cami", "b": "Emilio", "dist": 1.99}, "style": [{"name": "Matt", "avg_goals": 2.68, "pct_draws": 19.4, "pct_blowouts": 16.7, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}}, {"name": "Fer", "avg_goals": 2.26, "pct_draws": 16.7, "pct_blowouts": 11.1, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}}, {"name": "Pano", "avg_goals": 2.47, "pct_draws": 25.0, "pct_blowouts": 20.8, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-1", "flags": "🇧🇷🇭🇹", "goals": 6}}, {"name": "Tere", "avg_goals": 2.69, "pct_draws": 8.3, "pct_blowouts": 16.7, "biggest": {"home": "Países Bajos", "away": "Suecia", "home_en": "Netherlands", "away_en": "Sweden", "score": "3-2", "flags": "🇳🇱🇸🇪", "goals": 5}}, {"name": "Nadia", "avg_goals": 2.81, "pct_draws": 4.2, "pct_blowouts": 18.1, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-0", "flags": "🇧🇷🇭🇹", "goals": 5}}, {"name": "Jose", "avg_goals": 3.0, "pct_draws": 0.0, "pct_blowouts": 0.0, "biggest": {"home": "México", "away": "Sudáfrica", "home_en": "Mexico", "away_en": "South Africa", "score": "2-1", "flags": "🇲🇽🇿🇦", "goals": 3}}, {"name": "Lucía", "avg_goals": 3.15, "pct_draws": 22.2, "pct_blowouts": 16.7, "biggest": {"home": "Curazao", "away": "Costa de Marfil", "home_en": "Curacao", "away_en": "Ivory Coast", "score": "2-4", "flags": "🇨🇼🇨🇮", "goals": 6}}, {"name": "Kike", "avg_goals": 2.5, "pct_draws": 16.7, "pct_blowouts": 16.7, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}}, {"name": "Paibol", "avg_goals": 2.04, "pct_draws": 26.4, "pct_blowouts": 2.8, "biggest": {"home": "Rep. Checa", "away": "México", "home_en": "Czech Rep.", "away_en": "Mexico", "score": "1-2", "flags": "🇨🇿🇲🇽", "goals": 3}}, {"name": "Pablo", "avg_goals": 2.42, "pct_draws": 25.0, "pct_blowouts": 19.4, "biggest": {"home": "México", "away": "Corea del Sur", "home_en": "Mexico", "away_en": "South Korea", "score": "2-2", "flags": "🇲🇽🇰🇷", "goals": 4}}, {"name": "Almu", "avg_goals": 2.38, "pct_draws": 25.0, "pct_blowouts": 6.9, "biggest": {"home": "Bélgica", "away": "Irán", "home_en": "Belgium", "away_en": "Iran", "score": "3-2", "flags": "🇧🇪🇮🇷", "goals": 5}}, {"name": "Juanorro", "avg_goals": 2.86, "pct_draws": 22.2, "pct_blowouts": 16.7, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "6-1", "flags": "🇩🇪🇨🇼", "goals": 7}}, {"name": "Cillian", "avg_goals": 2.54, "pct_draws": 31.9, "pct_blowouts": 15.3, "biggest": {"home": "España", "away": "Arabia Saudí", "home_en": "Spain", "away_en": "Saudi Arabia", "score": "4-1", "flags": "🇪🇸🇸🇦", "goals": 5}}, {"name": "July", "avg_goals": 2.61, "pct_draws": 22.2, "pct_blowouts": 6.9, "biggest": {"home": "Suiza", "away": "Bosnia", "home_en": "Switzerland", "away_en": "Bosnia-Herz.", "score": "3-2", "flags": "🇨🇭🇧🇦", "goals": 5}}, {"name": "Toño", "avg_goals": 2.29, "pct_draws": 27.8, "pct_blowouts": 13.9, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}}, {"name": "Juanin", "avg_goals": 2.69, "pct_draws": 18.1, "pct_blowouts": 12.5, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-0", "flags": "🇧🇷🇭🇹", "goals": 5}}, {"name": "Meg", "avg_goals": 2.28, "pct_draws": 19.4, "pct_blowouts": 13.9, "biggest": {"home": "Canadá", "away": "Catar", "home_en": "Canada", "away_en": "Qatar", "score": "3-1", "flags": "🇨🇦🇶🇦", "goals": 4}}, {"name": "Irene", "avg_goals": 2.69, "pct_draws": 8.3, "pct_blowouts": 12.5, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "7-0", "flags": "🇩🇪🇨🇼", "goals": 7}}, {"name": "Andy", "avg_goals": 2.53, "pct_draws": 23.6, "pct_blowouts": 18.1, "biggest": {"home": "Francia", "away": "Irak", "home_en": "France", "away_en": "Iraq", "score": "5-0", "flags": "🇫🇷🇮🇶", "goals": 5}}, {"name": "Adri", "avg_goals": 2.44, "pct_draws": 22.2, "pct_blowouts": 13.9, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}}, {"name": "Ben", "avg_goals": 2.54, "pct_draws": 18.1, "pct_blowouts": 13.9, "biggest": {"home": "Marruecos", "away": "Haití", "home_en": "Morocco", "away_en": "Haiti", "score": "3-1", "flags": "🇲🇦🇭🇹", "goals": 4}}, {"name": "Gon", "avg_goals": 2.46, "pct_draws": 26.4, "pct_blowouts": 9.7, "biggest": {"home": "Rep. Checa", "away": "México", "home_en": "Czech Rep.", "away_en": "Mexico", "score": "3-2", "flags": "🇨🇿🇲🇽", "goals": 5}}, {"name": "Mile", "avg_goals": 2.5, "pct_draws": 26.4, "pct_blowouts": 16.7, "biggest": {"home": "Ecuador", "away": "Curazao", "home_en": "Ecuador", "away_en": "Curacao", "score": "4-1", "flags": "🇪🇨🇨🇼", "goals": 5}}, {"name": "Cami", "avg_goals": 2.72, "pct_draws": 34.7, "pct_blowouts": 6.9, "biggest": {"home": "Brasil", "away": "Marruecos", "home_en": "Brazil", "away_en": "Morocco", "score": "4-2", "flags": "🇧🇷🇲🇦", "goals": 6}}, {"name": "Hugo", "avg_goals": 2.81, "pct_draws": 11.1, "pct_blowouts": 20.8, "biggest": {"home": "Brasil", "away": "Marruecos", "home_en": "Brazil", "away_en": "Morocco", "score": "3-3", "flags": "🇧🇷🇲🇦", "goals": 6}}, {"name": "Jaime", "avg_goals": 2.32, "pct_draws": 26.4, "pct_blowouts": 8.3, "biggest": {"home": "Marruecos", "away": "Haití", "home_en": "Morocco", "away_en": "Haiti", "score": "3-1", "flags": "🇲🇦🇭🇹", "goals": 4}}, {"name": "Emilio", "avg_goals": 3.15, "pct_draws": 12.5, "pct_blowouts": 23.6, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "6-0", "flags": "🇩🇪🇨🇼", "goals": 6}}, {"name": "Manu", "avg_goals": 2.6, "pct_draws": 12.5, "pct_blowouts": 18.1, "biggest": {"home": "Suiza", "away": "Bosnia", "home_en": "Switzerland", "away_en": "Bosnia-Herz.", "score": "3-1", "flags": "🇨🇭🇧🇦", "goals": 4}}], "common_scorelines": [{"score": "2-1", "count": 328, "pct": 16.3}, {"score": "1-1", "count": 326, "pct": 16.2}, {"score": "2-0", "count": 290, "pct": 14.4}, {"score": "0-2", "count": 211, "pct": 10.5}, {"score": "1-2", "count": 209, "pct": 10.4}, {"score": "3-0", "count": 119, "pct": 5.9}, {"score": "1-0", "count": 98, "pct": 4.9}, {"score": "3-1", "count": 77, "pct": 3.8}], "lobo": [{"name": "Cami", "count": 28}, {"name": "Lucía", "count": 18}, {"name": "Emilio", "count": 17}, {"name": "Gon", "count": 12}, {"name": "Hugo", "count": 12}, {"name": "July", "count": 11}, {"name": "Juanorro", "count": 9}, {"name": "Meg", "count": 8}, {"name": "Irene", "count": 8}, {"name": "Pano", "count": 7}, {"name": "Jose", "count": 6}, {"name": "Almu", "count": 6}, {"name": "Juanin", "count": 6}, {"name": "Tere", "count": 5}, {"name": "Ben", "count": 5}, {"name": "Jaime", "count": 4}, {"name": "Nadia", "count": 3}, {"name": "Cillian", "count": 3}, {"name": "Andy", "count": 3}, {"name": "Manu", "count": 3}, {"name": "Matt", "count": 2}, {"name": "Fer", "count": 2}, {"name": "Adri", "count": 2}, {"name": "Mile", "count": 2}, {"name": "Kike", "count": 1}, {"name": "Paibol", "count": 0}, {"name": "Pablo", "count": 0}, {"name": "Toño", "count": 0}], "unique_examples": [{"name": "Irene", "home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "flags": "🇩🇪🇨🇼", "score": "7-0", "spice": 14}, {"name": "Juanorro", "home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "flags": "🇩🇪🇨🇼", "score": "6-1", "spice": 12}, {"name": "Lucía", "home": "España", "away": "Cabo Verde", "home_en": "Spain", "away_en": "Cape Verde", "flags": "🇪🇸🇨🇻", "score": "5-0", "spice": 10}, {"name": "Emilio", "home": "Portugal", "away": "Uzbekistán", "home_en": "Portugal", "away_en": "Uzbekistan", "flags": "🇵🇹🇺🇿", "score": "5-1", "spice": 10}, {"name": "Lucía", "home": "Panamá", "away": "Inglaterra", "home_en": "Panama", "away_en": "England", "flags": "🇵🇦🏴󠁧󠁢󠁥󠁮󠁧󠁿", "score": "1-5", "spice": 10}, {"name": "Irene", "home": "Panamá", "away": "Inglaterra", "home_en": "Panama", "away_en": "England", "flags": "🇵🇦🏴󠁧󠁢󠁥󠁮󠁧󠁿", "score": "0-5", "spice": 10}, {"name": "Cami", "home": "Brasil", "away": "Marruecos", "home_en": "Brazil", "away_en": "Morocco", "flags": "🇧🇷🇲🇦", "score": "4-2", "spice": 8}, {"name": "Juanorro", "home": "Haití", "away": "Escocia", "home_en": "Haiti", "away_en": "Scotland", "flags": "🇭🇹🏴󠁧󠁢󠁳󠁣󠁴󠁿", "score": "0-4", "spice": 8}, {"name": "Lucía", "home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "flags": "🇧🇷🇭🇹", "score": "4-1", "spice": 8}, {"name": "Emilio", "home": "Paraguay", "away": "Australia", "home_en": "Paraguay", "away_en": "Australia", "flags": "🇵🇾🇦🇺", "score": "4-1", "spice": 8}, {"name": "Irene", "home": "Ecuador", "away": "Curazao", "home_en": "Ecuador", "away_en": "Curacao", "flags": "🇪🇨🇨🇼", "score": "4-0", "spice": 8}, {"name": "Mile", "home": "Ecuador", "away": "Curazao", "home_en": "Ecuador", "away_en": "Curacao", "flags": "🇪🇨🇨🇼", "score": "4-1", "spice": 8}], "group_consensus": [{"group": "A", "favorite": "México", "flag": "🇲🇽", "agreement": 82.1, "dist": {"México": 23, "Corea del Sur": 3, "Rep. Checa": 2}}, {"group": "B", "favorite": "Suiza", "flag": "🇨🇭", "agreement": 75.0, "dist": {"Suiza": 21, "Canadá": 5, "Catar": 2}}, {"group": "C", "favorite": "Brasil", "flag": "🇧🇷", "agreement": 85.7, "dist": {"Brasil": 24, "Marruecos": 3, "Escocia": 1}}, {"group": "D", "favorite": "Turquía", "flag": "🇹🇷", "agreement": 53.6, "dist": {"Turquía": 15, "EE. UU.": 11, "Australia": 1, "Paraguay": 1}}, {"group": "E", "favorite": "Alemania", "flag": "🇩🇪", "agreement": 96.4, "dist": {"Alemania": 27, "Ecuador": 1}}, {"group": "F", "favorite": "Países Bajos", "flag": "🇳🇱", "agreement": 71.4, "dist": {"Países Bajos": 20, "Túnez": 6, "Suecia": 1, "Japón": 1}}, {"group": "G", "favorite": "Bélgica", "flag": "🇧🇪", "agreement": 100.0, "dist": {"Bélgica": 28}}, {"group": "H", "favorite": "España", "flag": "🇪🇸", "agreement": 96.4, "dist": {"España": 27, "Uruguay": 1}}, {"group": "I", "favorite": "Francia", "flag": "🇫🇷", "agreement": 96.4, "dist": {"Francia": 27, "Noruega": 1}}, {"group": "J", "favorite": "Argentina", "flag": "🇦🇷", "agreement": 92.9, "dist": {"Argentina": 26, "Austria": 2}}, {"group": "K", "favorite": "Portugal", "flag": "🇵🇹", "agreement": 96.4, "dist": {"Portugal": 27, "Colombia": 1}}, {"group": "L", "favorite": "Inglaterra", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "agreement": 92.9, "dist": {"Inglaterra": 26, "Croacia": 2}}], "most_respected": [{"team": "Bélgica", "flag": "🇧🇪", "count": 84}, {"team": "Alemania", "flag": "🇩🇪", "count": 83}, {"team": "Francia", "flag": "🇫🇷", "count": 83}, {"team": "Portugal", "flag": "🇵🇹", "count": 83}, {"team": "España", "flag": "🇪🇸", "count": 82}, {"team": "Argentina", "flag": "🇦🇷", "count": 81}, {"team": "Inglaterra", "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "count": 81}, {"team": "Brasil", "flag": "🇧🇷", "count": 80}, {"team": "México", "flag": "🇲🇽", "count": 78}, {"team": "Suiza", "flag": "🇨🇭", "count": 77}, {"team": "Países Bajos", "flag": "🇳🇱", "count": 76}, {"team": "Turquía", "flag": "🇹🇷", "count": 65}], "least_respected": [{"team": "Haití", "flag": "🇭🇹", "count": 1}, {"team": "Curazao", "flag": "🇨🇼", "count": 2}, {"team": "Irak", "flag": "🇮🇶", "count": 2}, {"team": "Cabo Verde", "flag": "🇨🇻", "count": 4}, {"team": "Jordania", "flag": "🇯🇴", "count": 5}, {"team": "Panamá", "flag": "🇵🇦", "count": 5}, {"team": "Sudáfrica", "flag": "🇿🇦", "count": 6}, {"team": "Uzbekistán", "flag": "🇺🇿", "count": 8}], "polarizing": [{"group": "D", "favorite": "Turquía", "flag": "🇹🇷", "agreement": 53.6, "dist": {"Turquía": 15, "EE. UU.": 11, "Australia": 1, "Paraguay": 1}}, {"group": "F", "favorite": "Países Bajos", "flag": "🇳🇱", "agreement": 71.4, "dist": {"Países Bajos": 20, "Túnez": 6, "Suecia": 1, "Japón": 1}}, {"group": "B", "favorite": "Suiza", "flag": "🇨🇭", "agreement": 75.0, "dist": {"Suiza": 21, "Canadá": 5, "Catar": 2}}, {"group": "A", "favorite": "México", "flag": "🇲🇽", "agreement": 82.1, "dist": {"México": 23, "Corea del Sur": 3, "Rep. Checa": 2}}, {"group": "C", "favorite": "Brasil", "flag": "🇧🇷", "agreement": 85.7, "dist": {"Brasil": 24, "Marruecos": 3, "Escocia": 1}}], "top_thirds": [{"team": "Escocia", "flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "count": 22}, {"team": "Bosnia", "flag": "🇧🇦", "count": 17}, {"team": "Rep. Checa", "flag": "🇨🇿", "count": 16}, {"team": "Senegal", "flag": "🇸🇳", "count": 16}, {"team": "Costa de Marfil", "flag": "🇨🇮", "count": 15}, {"team": "Ghana", "flag": "🇬🇭", "count": 15}, {"team": "Argelia", "flag": "🇩🇿", "count": 14}, {"team": "Suecia", "flag": "🇸🇪", "count": 10}, {"team": "Japón", "flag": "🇯🇵", "count": 10}, {"team": "Paraguay", "flag": "🇵🇾", "count": 9}], "divisive": [{"code": "GI-M4", "group": "I", "home": "Noruega", "away": "Senegal", "home_en": "Norway", "away_en": "Senegal", "home_flag": "🇳🇴", "away_flag": "🇸🇳", "outcome_dist": {"X": 11, "1": 12, "2": 5}, "outcome_agreement": 0.42857142857142855, "top_outcome": "1", "modal_scoreline": "1-1", "modal_scoreline_share": 0.39285714285714285, "median": "1-1", "n": 28}, {"code": "GF-M5", "group": "F", "home": "Japón", "away": "Suecia", "home_en": "Japan", "away_en": "Sweden", "home_flag": "🇯🇵", "away_flag": "🇸🇪", "outcome_dist": {"1": 12, "2": 3, "X": 13}, "outcome_agreement": 0.4642857142857143, "top_outcome": "X", "modal_scoreline": "2-1", "modal_scoreline_share": 0.35714285714285715, "median": "1-1", "n": 28}, {"code": "GD-M5", "group": "D", "home": "Turquía", "away": "EE. UU.", "home_en": "Turkey", "away_en": "USA", "home_flag": "🇹🇷", "away_flag": "🇺🇸", "outcome_dist": {"X": 10, "1": 13, "2": 5}, "outcome_agreement": 0.4642857142857143, "top_outcome": "1", "modal_scoreline": "2-1", "modal_scoreline_share": 0.39285714285714285, "median": "1-1", "n": 28}, {"code": "GE-M2", "group": "E", "home": "Costa de Marfil", "away": "Ecuador", "home_en": "Ivory Coast", "away_en": "Ecuador", "home_flag": "🇨🇮", "away_flag": "🇪🇨", "outcome_dist": {"X": 13, "2": 10, "1": 5}, "outcome_agreement": 0.4642857142857143, "top_outcome": "X", "modal_scoreline": "1-1", "modal_scoreline_share": 0.42857142857142855, "median": "1-1", "n": 28}, {"code": "GD-M6", "group": "D", "home": "Paraguay", "away": "Australia", "home_en": "Paraguay", "away_en": "Australia", "home_flag": "🇵🇾", "away_flag": "🇦🇺", "outcome_dist": {"X": 14, "1": 12, "2": 2}, "outcome_agreement": 0.5, "top_outcome": "X", "modal_scoreline": "1-1", "modal_scoreline_share": 0.4642857142857143, "median": "1-1", "n": 28}, {"code": "GG-M2", "group": "", "home": "Irán", "away": "Nueva Zelanda", "home_en": "Iran", "away_en": "New Zealand", "home_flag": "🇮🇷", "away_flag": "🇳🇿", "outcome_dist": {"1": 15, "X": 10, "2": 3}, "outcome_agreement": 0.5357142857142857, "top_outcome": "1", "modal_scoreline": "1-0", "modal_scoreline_share": 0.25, "median": "1-0", "n": 28}], "unanimous": [{"code": "GB-M2", "group": "B", "home": "Catar", "away": "Suiza", "home_en": "Qatar", "away_en": "Switzerland", "home_flag": "🇶🇦", "away_flag": "🇨🇭", "outcome_dist": {"2": 26, "1": 1, "X": 1}, "outcome_agreement": 0.9285714285714286, "top_outcome": "2", "modal_scoreline": "0-2", "modal_scoreline_share": 0.6785714285714286, "median": "0-2", "n": 28}, {"code": "GL-M4", "group": "L", "home": "Panamá", "away": "Croacia", "home_en": "Panama", "away_en": "Croatia", "home_flag": "🇵🇦", "away_flag": "🇭🇷", "outcome_dist": {"2": 28}, "outcome_agreement": 1.0, "top_outcome": "2", "modal_scoreline": "0-2", "modal_scoreline_share": 0.6428571428571429, "median": "0-2", "n": 28}, {"code": "GC-M2", "group": "C", "home": "Haití", "away": "Escocia", "home_en": "Haiti", "away_en": "Scotland", "home_flag": "🇭🇹", "away_flag": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "outcome_dist": {"2": 27, "1": 1}, "outcome_agreement": 0.9642857142857143, "top_outcome": "2", "modal_scoreline": "0-2", "modal_scoreline_share": 0.6071428571428571, "median": "0-2", "n": 28}, {"code": "GH-M2", "group": "H", "home": "Uruguay", "away": "Arabia Saudí", "home_en": "Uruguay", "away_en": "Saudi Arabia", "home_flag": "🇺🇾", "away_flag": "🇸🇦", "outcome_dist": {"1": 26, "X": 2}, "outcome_agreement": 0.9285714285714286, "top_outcome": "1", "modal_scoreline": "2-0", "modal_scoreline_share": 0.6071428571428571, "median": "2-0", "n": 28}, {"code": "GE-M5", "group": "E", "home": "Ecuador", "away": "Alemania", "home_en": "Ecuador", "away_en": "Germany", "home_flag": "🇪🇨", "away_flag": "🇩🇪", "outcome_dist": {"2": 23, "X": 4, "1": 1}, "outcome_agreement": 0.8214285714285714, "top_outcome": "2", "modal_scoreline": "1-2", "modal_scoreline_share": 0.6071428571428571, "median": "1-2", "n": 28}, {"code": "GG-M6", "group": "", "home": "Egipto", "away": "Irán", "home_en": "Egypt", "away_en": "Iran", "home_flag": "🇪🇬", "away_flag": "🇮🇷", "outcome_dist": {"X": 18, "1": 9, "2": 1}, "outcome_agreement": 0.6428571428571429, "top_outcome": "X", "modal_scoreline": "1-1", "modal_scoreline_share": 0.6071428571428571, "median": "1-1", "n": 28}], "cards": [{"name": "Matt", "rebel_rank": 27, "rebel_index": 0.5, "avg_goals": 2.68, "pct_draws": 19.4, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}, "twin": "Pablo", "twin_pct": 54.2, "lobo": 2, "label": "borrego"}, {"name": "Fer", "rebel_rank": 22, "rebel_index": 5.1, "avg_goals": 2.26, "pct_draws": 16.7, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}, "twin": "Pablo", "twin_pct": 50.0, "lobo": 2, "label": "borrego"}, {"name": "Pano", "rebel_rank": 7, "rebel_index": 40.3, "avg_goals": 2.47, "pct_draws": 25.0, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-1", "flags": "🇧🇷🇭🇹", "goals": 6}, "twin": "Toño", "twin_pct": 33.3, "lobo": 7, "label": "equilibrado"}, {"name": "Tere", "rebel_rank": 15, "rebel_index": 21.3, "avg_goals": 2.69, "pct_draws": 8.3, "biggest": {"home": "Países Bajos", "away": "Suecia", "home_en": "Netherlands", "away_en": "Sweden", "score": "3-2", "flags": "🇳🇱🇸🇪", "goals": 5}, "twin": "Matt", "twin_pct": 37.5, "lobo": 5, "label": "borrego"}, {"name": "Nadia", "rebel_rank": 16, "rebel_index": 21.0, "avg_goals": 2.81, "pct_draws": 4.2, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-0", "flags": "🇧🇷🇭🇹", "goals": 5}, "twin": "Andy", "twin_pct": 40.3, "lobo": 3, "label": "borrego"}, {"name": "Jose", "rebel_rank": 18, "rebel_index": 16.1, "avg_goals": 3.0, "pct_draws": 0.0, "biggest": {"home": "México", "away": "Sudáfrica", "home_en": "Mexico", "away_en": "South Africa", "score": "2-1", "flags": "🇲🇽🇿🇦", "goals": 3}, "twin": "Irene", "twin_pct": 36.1, "lobo": 6, "label": "goleador"}, {"name": "Lucía", "rebel_rank": 3, "rebel_index": 53.3, "avg_goals": 3.15, "pct_draws": 22.2, "biggest": {"home": "Curazao", "away": "Costa de Marfil", "home_en": "Curacao", "away_en": "Ivory Coast", "score": "2-4", "flags": "🇨🇼🇨🇮", "goals": 6}, "twin": "Kike", "twin_pct": 19.4, "lobo": 18, "label": "goleador"}, {"name": "Kike", "rebel_rank": 24, "rebel_index": 5.0, "avg_goals": 2.5, "pct_draws": 16.7, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}, "twin": "Pablo", "twin_pct": 58.3, "lobo": 1, "label": "borrego"}, {"name": "Paibol", "rebel_rank": 14, "rebel_index": 21.4, "avg_goals": 2.04, "pct_draws": 26.4, "biggest": {"home": "Rep. Checa", "away": "México", "home_en": "Czech Rep.", "away_en": "Mexico", "score": "1-2", "flags": "🇨🇿🇲🇽", "goals": 3}, "twin": "Jaime", "twin_pct": 44.4, "lobo": 0, "label": "borrego"}, {"name": "Pablo", "rebel_rank": 28, "rebel_index": 0.0, "avg_goals": 2.42, "pct_draws": 25.0, "biggest": {"home": "México", "away": "Corea del Sur", "home_en": "Mexico", "away_en": "South Korea", "score": "2-2", "flags": "🇲🇽🇰🇷", "goals": 4}, "twin": "Toño", "twin_pct": 61.1, "lobo": 0, "label": "borrego"}, {"name": "Almu", "rebel_rank": 12, "rebel_index": 23.5, "avg_goals": 2.38, "pct_draws": 25.0, "biggest": {"home": "Bélgica", "away": "Irán", "home_en": "Belgium", "away_en": "Iran", "score": "3-2", "flags": "🇧🇪🇮🇷", "goals": 5}, "twin": "Pablo", "twin_pct": 44.4, "lobo": 6, "label": "borrego"}, {"name": "Juanorro", "rebel_rank": 6, "rebel_index": 41.1, "avg_goals": 2.86, "pct_draws": 22.2, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "6-1", "flags": "🇩🇪🇨🇼", "goals": 7}, "twin": "Matt", "twin_pct": 29.2, "lobo": 9, "label": "equilibrado"}, {"name": "Cillian", "rebel_rank": 17, "rebel_index": 19.9, "avg_goals": 2.54, "pct_draws": 31.9, "biggest": {"home": "España", "away": "Arabia Saudí", "home_en": "Spain", "away_en": "Saudi Arabia", "score": "4-1", "flags": "🇪🇸🇸🇦", "goals": 5}, "twin": "Toño", "twin_pct": 50.0, "lobo": 3, "label": "borrego"}, {"name": "July", "rebel_rank": 4, "rebel_index": 52.7, "avg_goals": 2.61, "pct_draws": 22.2, "biggest": {"home": "Suiza", "away": "Bosnia", "home_en": "Switzerland", "away_en": "Bosnia-Herz.", "score": "3-2", "flags": "🇨🇭🇧🇦", "goals": 5}, "twin": "Jose", "twin_pct": 27.8, "lobo": 11, "label": "equilibrado"}, {"name": "Toño", "rebel_rank": 23, "rebel_index": 5.1, "avg_goals": 2.29, "pct_draws": 27.8, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}, "twin": "Mile", "twin_pct": 63.9, "lobo": 0, "label": "borrego"}, {"name": "Juanin", "rebel_rank": 11, "rebel_index": 24.5, "avg_goals": 2.69, "pct_draws": 18.1, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "5-0", "flags": "🇧🇷🇭🇹", "goals": 5}, "twin": "Toño", "twin_pct": 34.7, "lobo": 6, "label": "borrego"}, {"name": "Meg", "rebel_rank": 5, "rebel_index": 41.9, "avg_goals": 2.28, "pct_draws": 19.4, "biggest": {"home": "Canadá", "away": "Catar", "home_en": "Canada", "away_en": "Qatar", "score": "3-1", "flags": "🇨🇦🇶🇦", "goals": 4}, "twin": "Tere", "twin_pct": 26.4, "lobo": 8, "label": "equilibrado"}, {"name": "Irene", "rebel_rank": 19, "rebel_index": 16.0, "avg_goals": 2.69, "pct_draws": 8.3, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "7-0", "flags": "🇩🇪🇨🇼", "goals": 7}, "twin": "Jose", "twin_pct": 36.1, "lobo": 8, "label": "borrego"}, {"name": "Andy", "rebel_rank": 25, "rebel_index": 4.8, "avg_goals": 2.53, "pct_draws": 23.6, "biggest": {"home": "Francia", "away": "Irak", "home_en": "France", "away_en": "Iraq", "score": "5-0", "flags": "🇫🇷🇮🇶", "goals": 5}, "twin": "Pablo", "twin_pct": 58.3, "lobo": 3, "label": "borrego"}, {"name": "Adri", "rebel_rank": 21, "rebel_index": 7.4, "avg_goals": 2.44, "pct_draws": 22.2, "biggest": {"home": "Brasil", "away": "Haití", "home_en": "Brazil", "away_en": "Haiti", "score": "4-0", "flags": "🇧🇷🇭🇹", "goals": 4}, "twin": "Toño", "twin_pct": 56.9, "lobo": 2, "label": "borrego"}, {"name": "Ben", "rebel_rank": 13, "rebel_index": 23.1, "avg_goals": 2.54, "pct_draws": 18.1, "biggest": {"home": "Marruecos", "away": "Haití", "home_en": "Morocco", "away_en": "Haiti", "score": "3-1", "flags": "🇲🇦🇭🇹", "goals": 4}, "twin": "Mile", "twin_pct": 50.0, "lobo": 5, "label": "borrego"}, {"name": "Gon", "rebel_rank": 2, "rebel_index": 59.2, "avg_goals": 2.46, "pct_draws": 26.4, "biggest": {"home": "Rep. Checa", "away": "México", "home_en": "Czech Rep.", "away_en": "Mexico", "score": "3-2", "flags": "🇨🇿🇲🇽", "goals": 5}, "twin": "Adri", "twin_pct": 30.6, "lobo": 12, "label": "equilibrado"}, {"name": "Mile", "rebel_rank": 26, "rebel_index": 3.5, "avg_goals": 2.5, "pct_draws": 26.4, "biggest": {"home": "Ecuador", "away": "Curazao", "home_en": "Ecuador", "away_en": "Curacao", "score": "4-1", "flags": "🇪🇨🇨🇼", "goals": 5}, "twin": "Toño", "twin_pct": 63.9, "lobo": 2, "label": "borrego"}, {"name": "Cami", "rebel_rank": 1, "rebel_index": 100.0, "avg_goals": 2.72, "pct_draws": 34.7, "biggest": {"home": "Brasil", "away": "Marruecos", "home_en": "Brazil", "away_en": "Morocco", "score": "4-2", "flags": "🇧🇷🇲🇦", "goals": 6}, "twin": "Ben", "twin_pct": 19.4, "lobo": 28, "label": "rebelde"}, {"name": "Hugo", "rebel_rank": 9, "rebel_index": 39.2, "avg_goals": 2.81, "pct_draws": 11.1, "biggest": {"home": "Brasil", "away": "Marruecos", "home_en": "Brazil", "away_en": "Morocco", "score": "3-3", "flags": "🇧🇷🇲🇦", "goals": 6}, "twin": "Fer", "twin_pct": 26.4, "lobo": 12, "label": "equilibrado"}, {"name": "Jaime", "rebel_rank": 10, "rebel_index": 34.0, "avg_goals": 2.32, "pct_draws": 26.4, "biggest": {"home": "Marruecos", "away": "Haití", "home_en": "Morocco", "away_en": "Haiti", "score": "3-1", "flags": "🇲🇦🇭🇹", "goals": 4}, "twin": "Paibol", "twin_pct": 44.4, "lobo": 4, "label": "equilibrado"}, {"name": "Emilio", "rebel_rank": 8, "rebel_index": 39.4, "avg_goals": 3.15, "pct_draws": 12.5, "biggest": {"home": "Alemania", "away": "Curazao", "home_en": "Germany", "away_en": "Curacao", "score": "6-0", "flags": "🇩🇪🇨🇼", "goals": 6}, "twin": "Matt", "twin_pct": 27.8, "lobo": 17, "label": "goleador"}, {"name": "Manu", "rebel_rank": 20, "rebel_index": 13.7, "avg_goals": 2.6, "pct_draws": 12.5, "biggest": {"home": "Suiza", "away": "Bosnia", "home_en": "Switzerland", "away_en": "Bosnia-Herz.", "score": "3-1", "flags": "🇨🇭🇧🇦", "goals": 4}, "twin": "Andy", "twin_pct": 48.6, "lobo": 3, "label": "borrego"}], "awards": {"rebelde": {"name": "Cami", "index": 100.0, "sign": 0.497, "score": 0.629}, "borrego": {"name": "Pablo", "index": 0.0, "sign": 0.247, "score": 0.168}, "gemelas": {"a": "Toño", "b": "Mile", "pct": 63.9}, "opuestos": {"a": "Cami", "b": "Emilio", "dist": 1.99}, "goleador": {"name": "Lucía", "avg": 3.15}, "cerrojo": {"name": "Paibol", "avg": 2.04}, "empate": {"name": "Cami", "pct": 34.7}, "lobo": {"name": "Cami", "count": 28}}, "live": null};</script>
+<script>
+const D = window.__PORRA__;
+const N = D.hero.participants;
+const ES2EN = D.es2en || {};
+const logo = `<svg width="123" height="33" viewBox="0 0 123 33" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M38.4694 13.1725C38.8704 12.5048 39.4038 12.0055 40.0715 11.7048C40.7051 11.404 41.5392 11.2376 42.5397 11.2376C42.8405 11.2376 43.1734 11.2376 43.4741 11.2716C43.7748 11.3057 44.1418 11.3378 44.5749 11.3719V7.10109C44.3744 7.06704 44.1739 7.03489 43.9413 7.00084C43.7086 6.9668 43.4079 6.9668 43.1072 6.9668C41.6716 6.9668 40.5046 7.36777 39.6043 8.20188C38.6699 9.03599 37.9701 10.3713 37.4689 12.1719H37.3686V7.33373H33.1641V26.3839H37.4008V18.51C37.4008 17.2428 37.501 16.1741 37.6675 15.2738C37.8339 14.4057 38.1006 13.7059 38.4676 13.1725H38.4694Z" fill="currentColor"/>
+<path d="M53.6516 26.8227C55.7529 26.8227 57.5554 26.3214 59.0572 25.2887C60.559 24.2882 61.6257 22.8526 62.3275 20.9839L58.7243 19.8491C58.2912 21.0501 57.6576 21.9504 56.8556 22.5178C56.0215 23.0852 54.9869 23.386 53.7537 23.386C52.1858 23.386 50.9507 22.8848 50.0163 21.8842C49.082 20.8836 48.5486 19.5162 48.4483 17.7477H62.0948C62.1289 16.4464 62.0286 15.2794 61.7941 14.1786C61.5614 13.0778 61.2267 12.0773 60.7935 11.1751C60.0937 9.8076 59.0913 8.73896 57.8581 8.00509C56.623 7.27123 55.1553 6.9043 53.4549 6.9043C50.7521 6.9043 48.5164 7.83865 46.782 9.70735C45.0476 11.6082 44.1794 14.0122 44.1794 16.9476C44.1794 19.8831 45.0476 22.3854 46.748 24.1539C48.4502 25.9223 50.7521 26.8227 53.6535 26.8227H53.6516ZM57.2547 12.6428C57.4212 13.0097 57.5554 13.4107 57.6557 13.7777C57.7559 14.1446 57.79 14.5777 57.8221 15.0449H48.5145C48.715 13.5431 49.2484 12.3761 50.1166 11.542C50.9847 10.7079 52.0855 10.3069 53.4189 10.3069C54.3193 10.3069 55.0872 10.5074 55.7548 10.9084C56.4225 11.3415 56.9218 11.9089 57.2566 12.6428H57.2547Z" fill="currentColor"/>
+<path d="M75.9881 7.33691L71.0497 22.4511L65.8124 7.33691H61.4092L68.5152 26.3871H73.4196L80.2929 7.33691H75.9881Z" fill="currentColor"/>
+<path d="M88.9345 26.8227C91.0359 26.8227 92.8384 26.3214 94.3402 25.2887C95.8419 24.2882 96.9087 22.8526 97.6104 20.9839L94.0073 19.8491C93.5742 21.0501 92.9405 21.9504 92.1386 22.5178C91.3045 23.0852 90.2699 23.386 89.0367 23.386C87.4687 23.386 86.2336 22.8848 85.2993 21.8842C84.3649 20.8836 83.8315 19.5162 83.7313 17.7477H97.3778C97.4118 16.4464 97.3116 15.2794 97.077 14.1786C96.8444 13.0778 96.5096 12.0773 96.0765 11.1751C95.3767 9.8076 94.3742 8.73896 93.141 8.00509C91.9059 7.27123 90.4382 6.9043 88.7378 6.9043C86.035 6.9043 83.7994 7.83865 82.065 9.70735C80.3306 11.6082 79.4624 14.0122 79.4624 16.9476C79.4624 19.8831 80.3306 22.3854 82.0309 24.1539C83.7332 25.9223 86.035 26.8227 88.9364 26.8227H88.9345ZM92.5377 12.6428C92.7041 13.0097 92.8384 13.4107 92.9386 13.7777C93.0389 14.1446 93.0729 14.5777 93.1051 15.0449H83.7975C83.998 13.5431 84.5314 12.3761 85.3995 11.542C86.2677 10.7079 87.3685 10.3069 88.7019 10.3069C89.6022 10.3069 90.3701 10.5074 91.0378 10.9084C91.7055 11.3415 92.2048 11.9089 92.5396 12.6428H92.5377Z" fill="currentColor"/>
+<path d="M99.1265 26.3886H103.363V16.7463C103.363 14.7773 103.796 13.2093 104.664 12.0745C105.499 10.9396 106.7 10.3722 108.201 10.3722C109.569 10.3722 110.604 10.8054 111.237 11.6735C111.871 12.5417 112.171 13.9413 112.171 15.8441V26.3867H116.408V14.7092C116.408 12.1728 115.841 10.2379 114.74 8.9045C113.639 7.60321 112.037 6.93555 109.936 6.93555C108.5 6.93555 107.201 7.30248 106.066 8.07039C104.931 8.8383 104.031 9.90505 103.363 11.2725H103.297V7.33463H99.1265V26.3848V26.3886Z" fill="currentColor"/>
+<path d="M118.353 26.3871H122.624V7.33691H118.353V26.3871Z" fill="currentColor"/>
+<path d="M120.503 4.9933C119.124 4.9933 118.007 3.87548 118.007 2.49665C118.007 1.11782 119.126 0 120.503 0C121.88 0 123 1.11782 123 2.49665C123 3.87548 121.882 4.9933 120.503 4.9933Z" fill="currentColor"/>
+<path d="M22.5045 13.9541V10.9752C22.5045 3.61652 6.51196 1.31641 3.70146 1.31641C2.14449 1.31641 1.21401 2.45631 1.21401 3.5582V6.53709C1.21401 9.77496 7.97465 10.4994 9.86182 14.537C7.74684 20.5286 0 24.5055 0 27.6925V30.6706C0 31.84 0.995253 32.8279 2.17317 32.8279C8.02982 32.8286 22.5045 21.2478 22.5045 13.9541Z" fill="currentColor"/>
+<path d="M3.70567 2.87207C6.55282 2.87207 20.9535 5.2828 20.9535 10.9757C20.9535 17.2908 7.15626 28.2952 2.17739 28.2952C1.85062 28.2952 1.55981 28.008 1.55981 27.693C1.55981 25.5853 11.6983 19.2081 11.6983 12.916C11.6983 7.30034 2.77396 5.49209 2.77396 3.55867C2.77355 3.2374 3.12323 2.87207 3.70567 2.87207Z" fill="white"/>
+</svg>
+`;
+let LANG = 'es';
+let wrap = null;
+
+function L(es, en){ return LANG === 'es' ? es : en; }
+function team(es){ return LANG === 'es' ? es : (ES2EN[es] || es); }
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmt(v){
+  let [a,b] = String(v).split('.');
+  const th = LANG==='es' ? '.' : ',', dp = LANG==='es' ? ',' : '.';
+  a = a.replace(/\B(?=(\d{3})+(?!\d))/g, th);
+  return b !== undefined ? a + dp + b : a;
+}
+function pf(x){ let s = String(x); if (LANG==='es') s = s.replace('.', ','); return s + '%'; }
+function animateCount(node){
+  const to = parseFloat(node.dataset.count), dec = parseInt(node.dataset.decimals||'0'), suf = node.dataset.suffix||'';
+  const dur = 900, t0 = performance.now();
+  (function step(t){ let p = Math.min(1,(t-t0)/dur); p = 1-Math.pow(1-p,3);
+    node.textContent = fmt((to*p).toFixed(dec)) + suf; if (p<1) requestAnimationFrame(step); })(t0);
+}
+function el(t,c,h){ const e = document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e; }
+
+const NAV = [
+  ['inicio','Inicio','Home'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],
+  ['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['partidos','Partidos','Matches'],
+  ['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards'],
+  ['aciertos','En directo','Live'],
+];
+const LABELS = {
+  goleador:['🥅 Goleador','🥅 Goal machine'], cerrojo:['🔒 Cerrojo','🔒 Parked bus'],
+  empate:['🤝 Amigo del empate','🤝 Draw lover'], rebelde:['🐺 Rebelde','🐺 Maverick'],
+  borrego:['🐑 Borrego','🐑 Sheep'], equilibrado:['⚖️ Equilibrado','⚖️ Balanced'],
+};
+function labelOf(k){ const x = LABELS[k] || LABELS.equilibrado; return L(x[0], x[1]); }
+
+/* ---- NAV (built once, labels re-rendered on language change) ---- */
+const rail = el('nav','rail');
+document.body.appendChild(rail);
+function renderRail(){
+  rail.innerHTML = `<a class="brand" href="#inicio">${logo}</a>` +
+    `<div class="langtoggle"><button data-l="es">ES</button><button data-l="en">EN</button></div>` +
+    NAV.map(([id,es,en]) => `<a href="#${id}" data-id="${id}"><span class="dot"></span>${L(es,en)}</a>`).join('');
+  const on = rail.querySelector('[data-l="'+LANG+'"]'); if (on) on.classList.add('on');
+}
+rail.addEventListener('click', e => {
+  const b = e.target.closest('button[data-l]');
+  if (b && b.dataset.l !== LANG){ LANG = b.dataset.l; rebuild(); }
+});
+
+/* shared tooltip for the matrix */
+const tip = el('div'); tip.id = 'mtip'; document.body.appendChild(tip);
+
+function section(id, kicker, title, sub){
+  const s = el('section','sec'); s.id = id;
+  s.appendChild(el('div','sec-head reveal',
+    `<div class="kicker">${kicker}</div><h2>${title}</h2>${sub?`<p class="sub">${sub}</p>`:''}`));
+  wrap.appendChild(s); return s;
+}
+
+/* ---- HERO ---- */
+function chip(val, lab, dec){
+  return `<div class="chip reveal"><div class="big" data-count="${val}"${dec?` data-decimals="${dec}"`:''}>0</div><div class="lab">${lab}</div></div>`;
+}
+function chipText(val, lab){
+  return `<div class="chip reveal"><div class="big">${val}</div><div class="lab">${lab}</div></div>`;
+}
+function buildHero(){
+  const h = el('header','hero'); h.id = 'inicio';
+  const ts = D.hero.top_scoreline, bp = D.best_pair;
+  h.innerHTML = `
+    <div class="eyebrow reveal">${L('Reveni · Porra Mundial 2026','Reveni · World Cup 2026 Pool')}</div>
+    <h1 class="reveal">${L('La quiniela,<br>bajo el microscopio.','The pool,<br>under the microscope.')}</h1>
+    <p class="lead reveal">${L(
+      'Hemos analizado las '+N+' quinielas de la porra del Mundial: quién se la juega, quién va a lo seguro, quién piensa igual que quién y qué partidos nos parten en dos.',
+      'We crunched all '+N+' predictions in the office World Cup pool: who gambles, who plays it safe, who thinks like who, and which matches split us in two.')}</p>
+    <div class="chips">
+      ${chip(N, L('Participantes','Players'))}
+      ${chip(D.hero.matches, L('Partidos de grupos','Group matches'))}
+      ${chip(D.hero.groups, L('Grupos','Groups'))}
+      ${chip(N*D.hero.matches, L('Marcadores analizados','Predictions analysed'))}
+      ${chip(D.hero.total_goals, L('Goles apostados','Goals predicted'))}
+      ${chip(D.hero.avg_goals_match, L('Goles/partido de media','Avg goals per match'), 1)}
+      ${chipText(ts?ts.score:'–', L('Marcador estrella','Star scoreline')+' ('+pf(ts?ts.pct:0)+')')}
+      ${chipText(pf(bp.pct), L('Máx. afinidad','Top affinity')+' · '+esc(bp.a)+' & '+esc(bp.b))}
+    </div>
+    <div class="scrollcue">${L('desliza para empezar','scroll to start')} ↓</div>`;
+  wrap.appendChild(h);
+}
+
+/* ---- REBELDÍA ---- */
+function buildRebeldia(){
+  const s = section('rebeldia', L('01 · La estrella','01 · The star'),
+    L('El ranking de rebeldía 🐺','The maverick ranking 🐺'),
+    L('Combina dos cosas en cada partido: cuántas veces eliges el signo (1/X/2) en minoría, y cuánto se aleja tu marcador del marcador típico del grupo. 100 = el más inconformista. 0 = el más borrego.',
+      'Two things per match: how often you back the (1/X/2) outcome in the minority, and how far your scoreline sits from the group typical one. 100 = the biggest maverick. 0 = the biggest sheep.'));
+  const R = D.rebeldia, max = R[0].index || 100;
+  const pod = el('div','podium reveal');
+  const order = [1,0,2], medals = ['🥈','🥇','🥉'];
+  order.forEach((oi,k) => { const r = R[oi]; if(!r) return;
+    pod.appendChild(el('div','pod '+(oi===0?'p1':''),
+      `<div class="medal">${medals[k]}</div><div class="nm">${esc(r.name)}</div>
+       <div class="sc" data-count="${r.index}" data-decimals="1">0</div><div class="k">${L('índice','index')}</div>`)); });
+  s.appendChild(pod);
+  const list = el('div','reveal');
+  R.forEach((r,i) => {
+    const badge = i===0?'🐺 ':(i===R.length-1?'🐑 ':'');
+    const cls = i===R.length-1?'gold':'';
+    list.appendChild(el('div','bar-row',
+      `<div class="bar-rank">${i+1}</div><div class="bar-name">${badge}${esc(r.name)}</div>
+       <div class="bar-track"><div class="bar-fill ${cls}" data-w="${(r.index/max*100).toFixed(1)}"></div></div>
+       <div class="bar-val" data-count="${r.index}" data-decimals="1">0</div>`));
+  });
+  s.appendChild(list);
+}
+
+/* ---- AFINIDAD ---- */
+function buildAfinidad(){
+  const s = section('gemelas', L('02 · Afinidad','02 · Affinity'),
+    L('¿Quién piensa como quién? 💞','Who thinks like who? 💞'),
+    L('Comparamos las quinielas marcador a marcador. Cuanto más brillante el cuadro, más coinciden esas dos personas en el resultado exacto.',
+      'We compare predictions scoreline by scoreline. The brighter the cell, the more those two people match on the exact result.'));
+  const bp = D.best_pair, wp = D.worst_pair;
+  const duo = el('div','duo reveal');
+  duo.innerHTML = `
+    <div class="card glow"><span class="tag">${L('💞 Almas gemelas','💞 Soulmates')}</span>
+      <div class="names">${esc(bp.a)} & ${esc(bp.b)}</div>
+      <div class="muted">${bp.pct}% ${L('de marcadores','of scorelines')} <b class="mint">${L('idénticos','identical')}</b>${bp.pct>=100?L(' — sí, los 72. 👀 ¿alguien ha copiado?',' — yes, all 72. 👀 did someone copy?'):''}</div></div>
+    <div class="card"><span class="tag cool">${L('🧊 Polos opuestos','🧊 Opposites')}</span>
+      <div class="names">${esc(wp.a)} & ${esc(wp.b)}</div>
+      <div class="muted">${L('los que más se contradicen (distancia media '+wp.dist+' goles por partido)','the most contradictory pair (avg distance '+wp.dist+' goals per match)')}</div></div>`;
+  s.appendChild(duo);
+  const names = D.matrix.names, sim = D.matrix.sim;
+  let mx = 0; for(let i=0;i<N;i++) for(let j=0;j<N;j++) if(i!==j) mx = Math.max(mx, sim[i][j]);
+  const wrapm = el('div','matrix-wrap reveal');
+  const grid = el('div','matrix');
+  grid.style.gridTemplateColumns = `120px repeat(${N},19px)`;
+  grid.appendChild(el('div','mlabel'));
+  names.forEach(n => grid.appendChild(el('div','mlabel col', esc(n))));
+  for(let i=0;i<N;i++){
+    grid.appendChild(el('div','mlabel row', esc(names[i])));
+    for(let j=0;j<N;j++){
+      if(i===j){ grid.appendChild(el('div','mcell mdiag')); continue; }
+      const v = sim[i][j], a = mx ? Math.max(.05, v/mx) : 0;
+      const c = el('div','mcell');
+      c.style.background = `rgba(122,252,208,${a.toFixed(3)})`;
+      c.dataset.t = `${esc(names[i])} ↔ ${esc(names[j])} · ${v}% ${L('idénticos','identical')}`;
+      grid.appendChild(c);
+    }
+  }
+  wrapm.appendChild(grid);
+  wrapm.appendChild(el('div','legend',`<span>${L('menos afín','less alike')}</span><span class="scale"></span><span>${L('más afín','more alike')}</span>`));
+  s.appendChild(wrapm);
+  grid.addEventListener('mouseover', e => { const t = e.target.dataset.t; if(t){ tip.textContent = t; tip.style.opacity = 1; } });
+  grid.addEventListener('mousemove', e => { tip.style.left = (e.clientX+14)+'px'; tip.style.top = (e.clientY+14)+'px'; });
+  grid.addEventListener('mouseout', () => { tip.style.opacity = 0; });
+}
+
+/* ---- ESTILO ---- */
+function buildEstilo(){
+  const s = section('estilo', L('03 · Estilo','03 · Style'),
+    L('Goleadores vs cerrojos 🥅','Goal-fests vs parked buses 🥅'),
+    L('Media de goles que cada uno mete en sus marcadores, qué marcadores se repiten más en toda la porra y quién es el rey del empate.',
+      'Average goals in everyone scorelines, the most repeated results across the pool, and who loves a draw.'));
+  const st = D.style.slice().sort((a,b) => b.avg_goals-a.avg_goals);
+  const gol = st[0], cer = st[st.length-1];
+  const emp = D.style.slice().sort((a,b) => b.pct_draws-a.pct_draws)[0];
+  const duo = el('div','grid g3 reveal');
+  duo.innerHTML = `
+    <div class="card glow"><span class="k">${L('🥅 El goleador','🥅 The goal machine')}</span><h3>${esc(gol.name)}</h3>
+      <div class="big-num">${gol.avg_goals}</div><div class="muted">${L('goles de media por partido','avg goals per match')}</div></div>
+    <div class="card"><span class="k">${L('🔒 El cerrojo','🔒 The parked bus')}</span><h3>${esc(cer.name)}</h3>
+      <div class="big-num">${cer.avg_goals}</div><div class="muted">${L('el más tacaño con los goles','the stingiest with goals')}</div></div>
+    <div class="card"><span class="k">${L('🤝 Amigo del empate','🤝 Draw lover')}</span><h3>${esc(emp.name)}</h3>
+      <div class="big-num">${pf(emp.pct_draws)}</div><div class="muted">${L('de sus partidos, en tablas','of their matches drawn')}</div></div>`;
+  s.appendChild(duo);
+  const list = el('div','reveal'); list.style.marginTop = '22px';
+  const mxg = st[0].avg_goals;
+  list.appendChild(el('div','k', L('Media de goles por quiniela','Average goals per prediction')));
+  st.forEach((r,i) => list.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${i+1}</div><div class="bar-name">${esc(r.name)}</div>
+     <div class="bar-track"><div class="bar-fill" data-w="${(r.avg_goals/mxg*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${r.avg_goals}" data-decimals="2">0</div>`)));
+  s.appendChild(list);
+  const cs = el('div','card reveal'); cs.style.marginTop = '22px';
+  cs.innerHTML = `<span class="k">${L('Marcadores más apostados (de las '+fmt(N*D.hero.matches)+' apuestas)','Most-predicted scorelines (out of '+fmt(N*D.hero.matches)+' bets)')}</span>`;
+  const mxc = D.common_scorelines[0].count;
+  D.common_scorelines.forEach(c => cs.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${c.score}</div><div class="bar-name muted">${pf(c.pct)}</div>
+     <div class="bar-track"><div class="bar-fill" data-w="${(c.count/mxc*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${c.count}">0</div>`)));
+  s.appendChild(cs);
+}
+
+/* ---- FAVORITOS ---- */
+function buildFavoritos(){
+  const s = section('favoritos', L('04 · Favoritos','04 · Favourites'),
+    L('Los favoritos del torneo 🏆','Tournament favourites 🏆'),
+    L('El consenso de la oficina: a quién ve todo el mundo ganando su grupo, qué selecciones se respetan más y qué grupo nos tiene más divididos.',
+      'The office consensus: who everyone sees topping their group, the most respected teams, and the group that divides us most.'));
+  const gc = D.group_consensus.slice().sort((a,b) => b.agreement-a.agreement);
+  const grid = el('div','grid g4 reveal');
+  gc.forEach(g => grid.appendChild(el('div','gcard',
+    `<div class="gl">${L('GRUPO','GROUP')} ${g.group}</div>
+     <div class="fav">${g.flag} ${esc(team(g.favorite))}</div>
+     <div class="bar-track"><div class="bar-fill" data-w="${g.agreement}"></div></div>
+     <div class="muted" style="font-size:.8rem;margin-top:6px">${pf(g.agreement)} ${L('lo ve primero','see them top')}</div>`)));
+  s.appendChild(grid);
+  const mr = el('div','card reveal'); mr.style.marginTop = '22px';
+  mr.innerHTML = `<span class="k">${L('Selecciones más respetadas (prestigio: 1.º=3, 2.º=2, 3.º=1)','Most respected teams (prestige: 1st=3, 2nd=2, 3rd=1)')}</span>`;
+  const mxr = D.most_respected[0].count;
+  D.most_respected.forEach((t,i) => mr.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${i+1}</div><div class="bar-name">${t.flag} ${esc(team(t.team))}</div>
+     <div class="bar-track"><div class="bar-fill gold" data-w="${(t.count/mxr*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${t.count}">0</div>`)));
+  s.appendChild(mr);
+  const two = el('div','grid g2 reveal'); two.style.marginTop = '22px';
+  const pol = D.polarizing.slice(0,4).map(p => {
+    const top = Object.entries(p.dist).slice(0,3).map(([t,c]) => `${esc(team(t))} (${c})`).join(' · ');
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${L('Grupo','Group')} ${p.group}</b> — ${pf(p.agreement)} ${L('de acuerdo','agreement')}<br><span class="muted" style="font-size:.84rem">${top}</span></div>`;
+  }).join('');
+  const th = D.top_thirds.slice(0,10).map(t => `<span class="teamchip">${t.flag} ${esc(team(t.team))} <span class="n">${t.count}</span></span>`).join('');
+  two.innerHTML = `
+    <div class="card"><span class="k">${L('🔥 Los grupos que más nos dividen','🔥 The groups that divide us most')}</span><div style="margin-top:10px">${pol}</div></div>
+    <div class="card"><span class="k">${L('🎟️ Terceros más elegidos para colarse','🎟️ Most-picked third places')}</span><div style="margin-top:10px">${th}</div></div>`;
+  s.appendChild(two);
+}
+
+/* ---- PARTIDOS ---- */
+function buildPartidos(){
+  const s = section('partidos', L('05 · Partidos','05 · Matches'),
+    L('Los partidos que nos parten en dos 🔪','The matches that split us 🔪'),
+    L('Dónde hay guerra de pronósticos (poco acuerdo en el 1/X/2) y dónde casi todos ponemos lo mismo.',
+      'Where there is a prediction war (little agreement on 1/X/2) and where we nearly all agree.'));
+  function matchBlock(m){
+    const o = m.outcome_dist, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
+    const p = k => tot ? Math.round((o[k]||0)/tot*100) : 0;
+    return `<div class="match-row">
+      <div class="match-top"><span>${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</span>
+        <span class="muted">${pf(Math.round(m.outcome_agreement*100))} ${L('acuerdo','agree')}</span></div>
+      <div class="dist">
+        <span class="s1" style="width:${p('1')}%">${p('1')?p('1')+'%':''}</span>
+        <span class="sx" style="width:${p('X')}%">${p('X')?'X '+p('X')+'%':''}</span>
+        <span class="s2" style="width:${p('2')}%">${p('2')?p('2')+'%':''}</span></div>
+      <div class="modal-pill">${L('marcador más repetido','most common scoreline')}: <b class="mint">${m.modal_scoreline}</b> (${pf(Math.round(m.modal_scoreline_share*100))})</div>
+    </div>`;
+  }
+  const two = el('div','grid g2 reveal');
+  two.innerHTML = `
+    <div class="card"><span class="k">${L('😵‍💫 Máxima guerra de pronósticos','😵‍💫 Maximum disagreement')}</span><div style="margin-top:8px">${D.divisive.map(matchBlock).join('')}</div></div>
+    <div class="card"><span class="k">${L('🤖 Casi unanimidad','🤖 Near unanimity')}</span><div style="margin-top:8px">${D.unanimous.map(matchBlock).join('')}</div></div>`;
+  s.appendChild(two);
+}
+
+/* ---- LOBO SOLITARIO ---- */
+function buildLobo(){
+  const s = section('lobo', L('06 · Atrevimiento','06 · Boldness'),
+    L('Lobo solitario 🐺','Lone wolf 🐺'),
+    L('Marcadores que solo apostó UNA persona en todo el grupo. El que más tiene, es el que más se aleja del rebaño.',
+      'Scorelines only ONE person predicted in the whole pool. The more you have, the further from the flock you roam.'));
+  const mx = D.lobo[0].count;
+  const list = el('div','reveal');
+  D.lobo.forEach((r,i) => list.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'🐺 ':''}${esc(r.name)}</div>
+     <div class="bar-track"><div class="bar-fill" data-w="${(r.count/mx*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${r.count}">0</div>`)));
+  s.appendChild(list);
+  const ex = el('div','card reveal'); ex.style.marginTop = '22px';
+  ex.innerHTML = `<span class="k">${L('Apuestas en solitario más salvajes','Wildest solo calls')}</span><div style="margin-top:10px">` +
+    D.unique_examples.map(e => `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
+      <b>${esc(e.name)}</b> <span class="muted">${L('es el único que firmó','is the only one who called')}</span> ${e.flags} <b class="mint">${esc(team(e.home))} ${e.score} ${esc(team(e.away))}</b></div>`).join('') + '</div>';
+  s.appendChild(ex);
+}
+
+/* ---- FICHAS ---- */
+function buildFichas(){
+  const s = section('fichas', L('07 · Uno a uno','07 · One by one'),
+    L('La ficha de cada uno 🪪',"Everyone's card 🪪"),
+    L('Resumen por persona: su puesto en rebeldía, su estilo, su gemelo y su apuesta más loca. Busca tu nombre.',
+      'A summary per person: their maverick rank, style, twin and wildest bet. Search your name.'));
+  const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  s.appendChild(inp);
+  const grid = el('div','grid g3 reveal');
+  D.cards.slice().sort((a,b) => a.rebel_rank-b.rebel_rank).forEach(c => {
+    const big = c.biggest ? `${c.biggest.flags} ${esc(team(c.biggest.home))} ${c.biggest.score} ${esc(team(c.biggest.away))}` : '–';
+    const card = el('div','ficha'); card.dataset.name = c.name.toLowerCase();
+    card.innerHTML = `
+      <div class="fh"><div><div class="fn">${esc(c.name)}</div><div class="lab">${labelOf(c.label)}</div></div>
+        <div class="rk">#${c.rebel_rank}<br>${L('rebeldía','maverick')}</div></div>
+      <div class="fstats">
+        <div>${L('Índice rebeldía','Maverick index')}<br><span class="v">${c.rebel_index}</span></div>
+        <div>${L('Goles/partido','Goals/match')}<br><span class="v">${c.avg_goals}</span></div>
+        <div>${L('% empates','% draws')}<br><span class="v">${pf(c.pct_draws)}</span></div>
+        <div>${L('Apuestas únicas','Unique bets')}<br><span class="v">${c.lobo}</span></div>
+      </div>
+      <div class="fline">${L('👯 Gemelo:','👯 Twin:')} <b>${esc(c.twin)}</b> (${pf(c.twin_pct)})</div>
+      <div class="fline">${L('🎲 Su locura:','🎲 Wildest bet:')} <b>${big}</b></div>`;
+    grid.appendChild(card);
+  });
+  s.appendChild(grid);
+  inp.addEventListener('input', () => { const q = inp.value.toLowerCase().trim();
+    grid.querySelectorAll('.ficha').forEach(f => { f.style.display = f.dataset.name.includes(q) ? '' : 'none'; }); });
+}
+
+/* ---- PREMIOS ---- */
+function buildPremios(){
+  const s = section('premios', L('08 · Palmarés','08 · Awards'),
+    L('El palmarés de la porra 🏅',"The pool's hall of fame 🏅"),
+    L('Los títulos honoríficos de esta edición.',"This edition's honorary titles."));
+  const a = D.awards;
+  const items = [
+    ['🐺', L('El Rebelde','The Maverick'), a.rebelde.name, L('índice '+a.rebelde.index+'/100','index '+a.rebelde.index+'/100')],
+    ['🐑', L('El Borrego','The Sheep'), a.borrego.name, L('el más previsible ('+a.borrego.index+'/100)','most predictable ('+a.borrego.index+'/100)')],
+    ['💞', L('Almas Gemelas','Soulmates'), a.gemelas.a+' & '+a.gemelas.b, L(a.gemelas.pct+'% idénticos',a.gemelas.pct+'% identical')],
+    ['🧊', L('Polos Opuestos','Opposites'), a.opuestos.a+' & '+a.opuestos.b, L('distancia '+a.opuestos.dist,'distance '+a.opuestos.dist)],
+    ['🥅', L('El Goleador','The Goal Machine'), a.goleador.name, L(a.goleador.avg+' goles/partido',a.goleador.avg+' goals/match')],
+    ['🔒', L('El Cerrojo','The Parked Bus'), a.cerrojo.name, L(a.cerrojo.avg+' goles/partido',a.cerrojo.avg+' goals/match')],
+    ['🤝', L('Rey del Empate','Draw King'), a.empate.name, L(a.empate.pct+'% en tablas',a.empate.pct+'% drawn')],
+    ['🎯', L('Lobo Solitario','Lone Wolf'), a.lobo.name, L(a.lobo.count+' apuestas únicas',a.lobo.count+' unique bets')],
+  ];
+  const grid = el('div','grid g4 reveal');
+  items.forEach(([em,ti,wn,dt]) => grid.appendChild(el('div','award',
+    `<div class="em">${em}</div><div class="ti">${ti}</div><div class="wn">${esc(wn)}</div><div class="dt">${dt}</div>`)));
+  s.appendChild(grid);
+}
+
+/* ---- ACIERTOS ---- */
+function buildAciertos(){
+  const s = section('aciertos', L('09 · En directo','09 · Live'),
+    L('Aciertos en directo ⚽','Live scoring ⚽'),
+    L('Cuando empiece a rodar el balón y rellenes los resultados reales en el Excel, aquí saldrá el ranking de aciertos.',
+      'Once the ball starts rolling and you fill in the real results in the Excel, the scoring ranking appears here.'));
+  if(!D.live){
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">⚽️</div><h3 style="margin:10px 0 6px">${L('El Mundial aún no ha empezado',"The World Cup hasn't kicked off yet")}</h3>
+       <p class="muted">${L('Rellena los marcadores reales en la pestaña <b>Real results</b> del Excel y vuelve a generar el dashboard: aparecerá aquí el ranking de aciertos (signo +2, marcador exacto +4).','Fill in the real scores in the <b>Real results</b> tab of the Excel and regenerate the dashboard: the scoring ranking shows up here (correct outcome +2, exact score +4).')}</p>`));
+    return;
+  }
+  const t = D.live.table, mx = t[0].pts || 1;
+  s.appendChild(el('div','muted reveal', `${D.live.played} ${L('partidos jugados','matches played')}`));
+  const list = el('div','reveal');
+  t.forEach((r,i) => list.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'👑 ':''}${esc(r.name)} <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.sign} ${L('signos','outcomes')})</span></div>
+     <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${r.pts}">0</div>`)));
+  s.appendChild(list);
+}
+
+/* ---- FOOTER ---- */
+function buildFooter(){
+  const f = el('footer');
+  f.innerHTML = `<span class="brand">${logo}</span> ${L('Porra Mundial 2026 · análisis de '+N+' quinielas · generado el 11/06/2026.','World Cup 2026 Pool · analysis of '+N+' predictions · generated on 11/06/2026.')}
+    <br><span style="opacity:.6">${L('Hecho con cariño para la oficina. Tipografía corporativa real: Garnett (de pago); aquí usamos Space Grotesk + Inter como sustitutas libres.','Made with love for the office. Real brand typeface: Garnett (paid); here we use Space Grotesk + Inter as free stand-ins.')}</span>`;
+  wrap.appendChild(f);
+}
+
+/* ---- OBSERVERS ---- */
+function observeAll(){
+  const io = new IntersectionObserver((es,o) => { es.forEach(e => { if(e.isIntersecting){
+    e.target.classList.add('in');
+    e.target.querySelectorAll && e.target.querySelectorAll('[data-count]').forEach(animateCount);
+    e.target.querySelectorAll && e.target.querySelectorAll('.bar-fill').forEach(b => { b.style.width = (b.dataset.w||0)+'%'; });
+    o.unobserve(e.target);
+  }}); }, {threshold:.12});
+  wrap.querySelectorAll('.reveal').forEach(n => io.observe(n));
+  const navlinks = {}; rail.querySelectorAll('a[data-id]').forEach(a => navlinks[a.dataset.id] = a);
+  const navio = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting){
+    Object.values(navlinks).forEach(a => a.classList.remove('active'));
+    if(navlinks[e.target.id]) navlinks[e.target.id].classList.add('active');
+  }}); }, {rootMargin:'-45% 0px -50% 0px'});
+  wrap.querySelectorAll('header.hero,section.sec').forEach(sec => navio.observe(sec));
+}
+
+/* ---- BUILD / REBUILD ---- */
+function rebuild(){
+  if(wrap) wrap.remove();
+  wrap = el('div','wrap'); document.body.appendChild(wrap);
+  renderRail();
+  buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
+  buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildAciertos(); buildFooter();
+  observeAll();
+}
+rebuild();
+</script>
+</body>
+</html>
