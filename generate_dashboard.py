@@ -20,6 +20,7 @@ import json
 import sys
 import statistics
 from collections import Counter, defaultdict
+from datetime import date as _date
 from pathlib import Path
 
 import openpyxl
@@ -38,6 +39,45 @@ NAME_ROW = 6                     # fila con los nombres reales
 GROUP_MATCH_ROWS = range(7, 79)  # 72 partidos de fase de grupos
 QUALIFIER_ROWS = range(80, 116)  # 1st/2nd/3rd de cada grupo (A..L)
 THIRDS_ROWS = range(117, 125)    # 8 mejores terceros
+
+MATCH_DATES = {
+    "GA-M1": "2026-06-11", "GA-M2": "2026-06-11",
+    "GA-M3": "2026-06-18", "GA-M4": "2026-06-18",
+    "GA-M5": "2026-06-24", "GA-M6": "2026-06-24",
+    "GB-M1": "2026-06-12", "GB-M2": "2026-06-13",
+    "GB-M3": "2026-06-18", "GB-M4": "2026-06-18",
+    "GB-M5": "2026-06-24", "GB-M6": "2026-06-24",
+    "GC-M1": "2026-06-13", "GC-M2": "2026-06-13",
+    "GC-M3": "2026-06-19", "GC-M4": "2026-06-19",
+    "GC-M5": "2026-06-24", "GC-M6": "2026-06-24",
+    "GD-M1": "2026-06-12", "GD-M2": "2026-06-13",
+    "GD-M3": "2026-06-19", "GD-M4": "2026-06-19",
+    "GD-M5": "2026-06-25", "GD-M6": "2026-06-25",
+    "GE-M1": "2026-06-14", "GE-M2": "2026-06-14",
+    "GE-M3": "2026-06-20", "GE-M4": "2026-06-20",
+    "GE-M5": "2026-06-25", "GE-M6": "2026-06-25",
+    "GF-M1": "2026-06-14", "GF-M2": "2026-06-14",
+    "GF-M3": "2026-06-20", "GF-M4": "2026-06-20",
+    "GF-M5": "2026-06-25", "GF-M6": "2026-06-25",
+    "GG-M1": "2026-06-15", "GG-M2": "2026-06-15",
+    "GG-M3": "2026-06-21", "GG-M4": "2026-06-21",
+    "GG-M5": "2026-06-26", "GG-M6": "2026-06-26",
+    "GH-M1": "2026-06-15", "GH-M2": "2026-06-15",
+    "GH-M3": "2026-06-21", "GH-M4": "2026-06-21",
+    "GH-M5": "2026-06-26", "GH-M6": "2026-06-26",
+    "GI-M1": "2026-06-16", "GI-M2": "2026-06-16",
+    "GI-M3": "2026-06-22", "GI-M4": "2026-06-22",
+    "GI-M5": "2026-06-26", "GI-M6": "2026-06-26",
+    "GJ-M1": "2026-06-16", "GJ-M2": "2026-06-16",
+    "GJ-M3": "2026-06-22", "GJ-M4": "2026-06-22",
+    "GJ-M5": "2026-06-27", "GJ-M6": "2026-06-27",
+    "GK-M1": "2026-06-17", "GK-M2": "2026-06-17",
+    "GK-M3": "2026-06-23", "GK-M4": "2026-06-23",
+    "GK-M5": "2026-06-27", "GK-M6": "2026-06-27",
+    "GL-M1": "2026-06-17", "GL-M2": "2026-06-17",
+    "GL-M3": "2026-06-23", "GL-M4": "2026-06-23",
+    "GL-M5": "2026-06-27", "GL-M6": "2026-06-27",
+}
 
 # Traducción EN -> ES (reconocible) + bandera
 TEAMS = {
@@ -130,6 +170,7 @@ def parse_workbook(path):
             "home": team_es(home_en), "away": team_es(away_en),
             "home_flag": team_flag(home_en), "away_flag": team_flag(away_en),
             "picks": picks,
+            "date": MATCH_DATES.get(code, ""),
         })
 
     # Clasificados por grupo (1/2/3)
@@ -504,6 +545,8 @@ def compute(data):
     if data["results"]:
         live = compute_live(data, matches)
 
+    today = compute_today(data, matches)
+
     return {
         "es2en": ES2EN,
         "hero": hero,
@@ -526,6 +569,7 @@ def compute(data):
         "cards": cards,
         "awards": awards,
         "live": live,
+        "today": today,
     }
 
 
@@ -581,6 +625,40 @@ def compute_live(data, matches):
         key=lambda x: -x["pts"],
     )
     return {"played": played, "table": table}
+
+
+def compute_today(data, matches):
+    names = data["names"]
+    all_matches = []
+    for m in matches:
+        picks = []
+        for i, (h, a) in enumerate(m["picks"]):
+            picks.append({"name": names[i], "home": h, "away": a})
+        o1 = sum(1 for h, a in m["picks"] if h is not None and h > a)
+        ox = sum(1 for h, a in m["picks"] if h is not None and h == a)
+        o2 = sum(1 for h, a in m["picks"] if h is not None and h < a)
+        cnt = Counter(f"{h}-{a}" for h, a in m["picks"] if h is not None)
+        modal = cnt.most_common(1)
+        modal_sl = modal[0][0] if modal else "–"
+        modal_pct = round(modal[0][1] / len(m["picks"]) * 100, 1) if modal else 0
+        unique_picks = [(n, f"{h}-{a}") for n, (h, a) in zip(names, m["picks"])
+                        if h is not None and cnt.get(f"{h}-{a}", 0) == 1]
+        most_unique = None
+        if unique_picks:
+            best = max(unique_picks, key=lambda x: sum(int(g) for g in x[1].split("-")) + abs(int(x[1].split("-")[0]) - int(x[1].split("-")[1])))
+            most_unique = {"name": best[0], "score": best[1]}
+        all_matches.append({
+            "code": m["code"], "group": m["group"], "date": m["date"],
+            "home_en": m["home_en"], "away_en": m["away_en"],
+            "home": m["home"], "away": m["away"],
+            "home_flag": m["home_flag"], "away_flag": m["away_flag"],
+            "picks": picks,
+            "outcome_dist": {"1": o1, "X": ox, "2": o2},
+            "modal_scoreline": modal_sl,
+            "modal_scoreline_share": modal_pct / 100,
+            "most_unique_pick": most_unique,
+        })
+    return {"matches": all_matches}
 
 
 # --------------------------------------------------------------------------
@@ -735,6 +813,27 @@ footer .brand svg{height:20px;width:auto}
   .chips{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.today-date{font-family:'Space Grotesk';font-size:1.1rem;color:var(--mint);margin-bottom:22px;letter-spacing:.04em}
+.today-match{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;margin-bottom:20px}
+.today-match .tm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.today-match .tm-teams{font-family:'Space Grotesk';font-size:1.3rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.today-match .tm-group{font-size:.78rem;color:var(--muted);background:rgba(122,252,208,.08);padding:4px 10px;border-radius:8px;letter-spacing:.06em}
+.today-match .tm-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.today-match .tm-stat{background:rgba(0,0,0,.15);border-radius:12px;padding:12px;text-align:center}
+.today-match .tm-stat .val{font-family:'Space Grotesk';font-size:1.3rem;font-weight:700;color:var(--mint)}
+.today-match .tm-stat .lab{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.today-picks{margin-top:14px}
+.today-picks .tp-title{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.today-picks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+.tp-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(0,0,0,.12);border-radius:8px;font-size:.82rem}
+.tp-item .tp-name{color:var(--text);font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-item .tp-score{color:var(--mint);font-family:'Space Grotesk';font-weight:700;white-space:nowrap}
+.no-today{text-align:center;padding:46px 22px}
+.no-today .em{font-size:3rem}
+.no-today .next{margin-top:22px;text-align:left}
+.no-today .next-match{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.no-today .next-date{color:var(--muted);font-size:.78rem;min-width:80px}
+@media(max-width:560px){.today-match .tm-stats{grid-template-columns:1fr}.today-picks-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
 """
 
 JS = r"""
@@ -764,7 +863,7 @@ function animateCount(node){
 function el(t,c,h){ const e = document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e; }
 
 const NAV = [
-  ['inicio','Inicio','Home'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],
+  ['hoy','Hoy','Today'],['inicio','Inicio','Home'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],
   ['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['partidos','Partidos','Matches'],
   ['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards'],
   ['aciertos','En directo','Live'],
@@ -828,6 +927,64 @@ function buildHero(){
     </div>
     <div class="scrollcue">${L('desliza para empezar','scroll to start')} ↓</div>`;
   wrap.appendChild(h);
+}
+
+/* ---- HOY ---- */
+function buildHoy(){
+  const s = section('hoy', L('⚽ Hoy','⚽ Today'),
+    L('Los partidos de hoy','Today\'s matches'),
+    L('Qué se juega hoy y qué ha puesto cada uno.','What\'s on today and what everyone predicted.'));
+  const allM = D.today.matches || [];
+  const now = new Date();
+  const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const todayMatches = allM.filter(m => m.date === todayStr);
+  if(!todayMatches.length){
+    const upcoming = allM.filter(m => m.date > todayStr).sort((a,b) => a.date.localeCompare(b.date)).slice(0,6);
+    let nextHtml = '';
+    if(upcoming.length){
+      const grouped = {};
+      upcoming.forEach(m => { if(!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
+      nextHtml = '<div class="next">' + Object.entries(grouped).map(([dt, ms]) =>
+        ms.map(m => `<div class="next-match"><span class="next-date">${dt.slice(5)}</span>${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>`).join('')
+      ).join('') + '</div>';
+    }
+    s.appendChild(el('div','card no-today reveal',
+      `<div class="em">📅</div><h3 style="margin:10px 0 6px">${L('Hoy no hay partidos','No matches today')}</h3>
+       <p class="muted">${L('Próximos partidos:','Upcoming matches:')}</p>${nextHtml}`));
+    return;
+  }
+  const dateObj = new Date(todayStr + 'T12:00:00');
+  const opts = {weekday:'long', day:'numeric', month:'long', year:'numeric'};
+  const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', opts);
+  s.appendChild(el('div','today-date reveal', dateStr.charAt(0).toUpperCase() + dateStr.slice(1)));
+  todayMatches.forEach(m => {
+    const o = m.outcome_dist, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
+    const pct = k => tot ? Math.round((o[k]||0)/tot*100) : 0;
+    const uniqueHtml = m.most_unique_pick
+      ? `<span class="muted">${L('🔥 El más atrevido:','🔥 Boldest call:')}</span> <b>${esc(m.most_unique_pick.name)}</b> <span class="mint">${m.most_unique_pick.score}</span>`
+      : '';
+    const picksHtml = m.picks.map(p =>
+      `<div class="tp-item"><span class="tp-name">${esc(p.name)}</span><span class="tp-score">${p.home!=null?p.home+'-'+p.away:'–'}</span></div>`
+    ).join('');
+    s.appendChild(el('div','today-match reveal',
+      `<div class="tm-head">
+        <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
+        <span class="tm-group">${L('GRUPO','GROUP')} ${m.group}</span>
+      </div>
+      <div class="tm-stats">
+        <div class="tm-stat"><div class="val">${pct('1')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.home))}</div></div>
+        <div class="tm-stat"><div class="val">${pct('X')}%</div><div class="lab">${L('Empate','Draw')}</div></div>
+        <div class="tm-stat"><div class="val">${pct('2')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.away))}</div></div>
+      </div>
+      <div class="tm-stats" style="grid-template-columns:1fr 1fr">
+        <div class="tm-stat"><div class="val">${m.modal_scoreline}</div><div class="lab">${L('Marcador más repetido','Most common scoreline')} (${pf(Math.round(m.modal_scoreline_share*100))})</div></div>
+        <div class="tm-stat"><div class="val" style="font-size:1rem">${uniqueHtml||'–'}</div><div class="lab">${L('Pick único más salvaje','Wildest unique pick')}</div></div>
+      </div>
+      <div class="today-picks">
+        <div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div>
+        <div class="today-picks-grid">${picksHtml}</div>
+      </div>`));
+  });
 }
 
 /* ---- REBELDÍA ---- */
@@ -1118,7 +1275,7 @@ function rebuild(){
   if(wrap) wrap.remove();
   wrap = el('div','wrap'); document.body.appendChild(wrap);
   renderRail();
-  buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
+  buildHoy(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
   buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildAciertos(); buildFooter();
   observeAll();
 }
