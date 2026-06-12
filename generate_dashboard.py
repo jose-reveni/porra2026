@@ -110,6 +110,249 @@ TEAMS = {
 
 ES2EN = {es: en for en, (es, _fl) in TEAMS.items()}
 
+TRIVIA = {
+    "Mexico": [
+        ("Mexico City se hunde ~50cm al año porque está sobre un lago seco.", "Mexico City sinks ~50cm per year because it's built on a drained lake."),
+        ("México regaló un axolote a la reina Isabel II en 1953.", "Mexico gifted an axolotl to Queen Elizabeth II in 1953."),
+        ("El chicle fue inventado por el general mexicano Antonio López de Santa Anna.", "Chewing gum was invented by Mexican general Antonio López de Santa Anna."),
+    ],
+    "South Africa": [
+        ("Sudáfrica tiene 11 idiomas oficiales, un récord mundial.", "South Africa has 11 official languages, a world record."),
+        ("Un sudafricano inventó el CT scan.", "A South African invented the CT scan."),
+        ("Table Mountain tiene más especies de plantas que todo Reino Unido.", "Table Mountain has more plant species than the entire UK."),
+    ],
+    "South Korea": [
+        ("Corea del Sur tiene más robots per cápita que cualquier país.", "South Korea has more robots per capita than any other country."),
+        ("Existe un Día del Perro Negro en Corea (3 de enero).", "There's a Black Dog Day in Korea (January 3rd)."),
+        ("El servicio postal coreano entrega con drones desde 2017.", "Korea's postal service has delivered by drone since 2017."),
+    ],
+    "Czech Rep.": [
+        ("Los checos beben más cerveza per cápita del mundo: ~140 litros/año.", "Czechs drink the most beer per capita in the world: ~140 liters/year."),
+        ("La palabra 'robot' fue inventada por el escritor checo Karel Čapek en 1920.", "The word 'robot' was coined by Czech writer Karel Čapek in 1920."),
+        ("Praga tiene un museo dedicado exclusivamente a Franz Kafka.", "Prague has a museum dedicated entirely to Franz Kafka."),
+    ],
+    "Canada": [
+        ("En 1967 Canadá construyó una pista de aterrizaje para OVNIs en Alberta.", "In 1967 Canada built a UFO landing pad in Alberta."),
+        ("Canadá tiene más lagos que todos los demás países juntos.", "Canada has more lakes than every other country combined."),
+        ("La RCMP entrenó una vez un hipopótamo como policía montado. Fracasó.", "The RCMP once trained a hippo as a mounted police officer. It failed."),
+    ],
+    "Bosnia-Herz.": [
+        ("Sarajevo tuvo tranvías antes que Londres.", "Sarajevo had trams before London."),
+        ("Bosnia alberga la última selva virgen de Europa: Perućica.", "Bosnia is home to Europe's last primeval forest: Perućica."),
+        ("Un bosnio afirma haber descubierto pirámides más antiguas que las de Egipto. Nadie le cree.", "A Bosnian claims to have discovered pyramids older than Egypt's. Nobody believes him."),
+    ],
+    "Qatar": [
+        ("Qatar usó jinetes robot en carreras de camellos desde 2004.", "Qatar has used robot jockeys in camel races since 2004."),
+        ("Qatar tiene cero impuesto sobre la renta personal.", "Qatar has zero personal income tax."),
+        ("El aeropuerto de Doha tiene un oso de peluche gigante de 7 metros.", "Doha's airport features a giant 7-meter teddy bear."),
+    ],
+    "Switzerland": [
+        ("Suiza tiene suficientes búnkeres nucleares para toda su población.", "Switzerland has enough nuclear bunkers for its entire population."),
+        ("Es ilegal tener un solo conejillo de indias en Suiza (son sociales).", "It's illegal to own just one guinea pig in Switzerland (they're social)."),
+        ("Suiza tiene un plan para invadir… Alemania. Por si acaso.", "Switzerland has a plan to invade… Germany. Just in case."),
+    ],
+    "Brazil": [
+        ("Brasil tuvo un emperador que se declaró 'Protector de los Animales'.", "Brazil had an emperor who declared himself 'Protector of Animals'."),
+        ("La prisión de Carandiru tenía su propia liga de fútbol oficial.", "Carandiru prison had its own official football league."),
+        ("Brasil es el mayor exportador mundial de piedras preciosas.", "Brazil is the world's largest exporter of gemstones."),
+    ],
+    "Morocco": [
+        ("Marruecos fundó la universidad más antigua del mundo aún en funcionamiento (859 d.C.).", "Morocco founded the world's oldest continuously operating university (859 AD)."),
+        ("En Marruecos hay cabras que trepan a los árboles para comer argán.", "In Morocco, goats climb trees to eat argan fruit."),
+        ("El rey de Marruecos tiene un trono portátil que viaja con él.", "The King of Morocco has a portable throne that travels with him."),
+    ],
+    "Haiti": [
+        ("Haití fue el primer país negro independiente del mundo (1804).", "Haiti was the world's first independent Black republic (1804)."),
+        ("Haití tiene la fortaleza más grande de América: la Citadelle Laferrière.", "Haiti has the largest fortress in the Americas: Citadelle Laferrière."),
+        ("El pico más alto del Caribe está en Haití, no en República Dominicana.", "The Caribbean's highest peak is in Haiti, not the Dominican Republic."),
+    ],
+    "Scotland": [
+        ("El animal nacional de Escocia es el unicornio.", "Scotland's national animal is the unicorn."),
+        ("Escocia tiene más de 790 islas, la mayoría deshabitadas.", "Scotland has over 790 islands, most uninhabited."),
+        ("Edimburgo tiene un volcán extinto en pleno centro de la ciudad.", "Edinburgh has an extinct volcano right in the city center."),
+    ],
+    "USA": [
+        ("EE. UU. gastó 22 millones de dólares en desarrollar una pluma que escribiera en el espacio. Los rusos usaron lápiz.", "The US spent $22 million developing a pen that writes in space. The Russians used pencils."),
+        ("Existe una ciudad llamada 'Hell' en Michigan. Se congela cada invierno.", "There's a town called 'Hell' in Michigan. It freezes every winter."),
+        ("La bandera de EE. UU. fue diseñada por un estudiante de 17 años como proyecto escolar.", "The US flag was designed by a 17-year-old student as a school project."),
+    ],
+    "Paraguay": [
+        ("Paraguay fue el único país latinoamericano que envió condolencias al gobierno confederado en la Guerra Civil americana.", "Paraguay was the only Latin American country to send condolences to the Confederate government during the American Civil War."),
+        ("Paraguay tuvo el primer ferrocarril de Sudamérica (1854).", "Paraguay had South America's first railway (1854)."),
+        ("La Armada paraguaya es la más grande del mundo… sin acceso al mar.", "Paraguay's navy is the world's largest… with no access to the sea."),
+    ],
+    "Australia": [
+        ("Australia perdió una guerra contra 20.000 emus en 1932.", "Australia lost a war against 20,000 emus in 1932."),
+        ("Australia tiene un primer ministro que fue devorado (presuntamente) por caníbales en 1803.", "Australia had a PM who was allegedly eaten by cannibals in 1803."),
+        ("Hay más canguros que personas en Australia (~50M vs 26M).", "There are more kangaroos than people in Australia (~50M vs 26M)."),
+    ],
+    "Turkey": [
+        ("Los tulipanes vienen de Turquía, no de Holanda.", "Tulips come from Turkey, not the Netherlands."),
+        ("Papá Noel (San Nicolás) nació en lo que hoy es Turquía.", "Santa Claus (Saint Nicholas) was born in what is now Turkey."),
+        ("Estambul tuvo un gato alcalde no oficial llamado Tombili.", "Istanbul had an unofficial cat mayor named Tombili."),
+    ],
+    "Germany": [
+        ("Alemania tiene ~1.500 tipos de cerveza diferentes.", "Germany has ~1,500 different types of beer."),
+        ("Intentaron enseñar a los perros a hablar en la Alemania nazi. No funcionó.", "They tried to teach dogs to talk in Nazi Germany. It didn't work."),
+        ("Hay más clubes de fútbol que supermercados en Alemania.", "There are more football clubs than supermarkets in Germany."),
+    ],
+    "Curacao": [
+        ("El licor azul de Curazao se hace con cáscaras de naranja de la isla.", "Blue Curaçao liqueur is made from orange peels grown on the island."),
+        ("Curazao fue colonia holandesa, española, francesa e inglesa… a veces todas a la vez.", "Curaçao was a Dutch, Spanish, French, and English colony… sometimes all at once."),
+        ("Curazao tiene una de las sinagogas más antiguas de América (1732).", "Curaçao has one of the oldest synagogues in the Americas (1732)."),
+    ],
+    "Ivory Coast": [
+        ("Costa de Marfil produce el 40% del cacao mundial.", "Ivory Coast produces 40% of the world's cocoa."),
+        ("Tiene una basílica más grande que la de San Pedro en el Vaticano.", "It has a basilica larger than St. Peter's in the Vatican."),
+        ("El nombre 'Costa de Marfil' viene de cuando era el mayor mercado de marfil del mundo.", "The name 'Ivory Coast' comes from when it was the world's largest ivory market."),
+    ],
+    "Ecuador": [
+        ("En la línea ecuatorial de Ecuador, el agua no hace remolino al desaguar.", "At Ecuador's equator line, water doesn't swirl when draining."),
+        ("Ecuador tiene montañas donde puedes ver nieve estando en el ecuador.", "Ecuador has mountains where you can see snow while standing on the equator."),
+        ("Las Islas Galápagos inspiraron la teoría de la evolución de Darwin.", "The Galápagos Islands inspired Darwin's theory of evolution."),
+    ],
+    "Netherlands": [
+        ("Los Países Bajos están por debajo del nivel del mar en un 26% de su territorio.", "The Netherlands is below sea level in 26% of its territory."),
+        ("Hay más bicicletas que personas en los Países Bajos.", "There are more bicycles than people in the Netherlands."),
+        ("Holanda exportó tulipanes por primera vez como error: alguien se comió los bulbos pensando que eran cebollas.", "Holland first exported tulips by mistake: someone ate the bulbs thinking they were onions."),
+    ],
+    "Japan": [
+        ("Japón tiene más mascotas que niños.", "Japan has more pets than children."),
+        ("Hay una isla en Japón llena de conejos salvajes: Ōkunoshima.", "There's an island in Japan full of wild rabbits: Ōkunoshima."),
+        ("Japón tiene un festival donde se lanzan habas a demonios imaginarios.", "Japan has a festival where you throw beans at imaginary demons."),
+    ],
+    "Sweden": [
+        ("Suecia importa basura de otros países porque se le acabó la suya para reciclar.", "Sweden imports trash from other countries because it ran out of its own to recycle."),
+        ("Hay un hotel de hielo en Suecia que se reconstruye cada invierno.", "There's an ice hotel in Sweden rebuilt every winter."),
+        ("Suecia tuvo un rey que murió por comer 14 porciones de semla de una sentada.", "Sweden had a king who died from eating 14 servings of semla in one sitting."),
+    ],
+    "Tunisia": [
+        ("Túnez fue donde se rodó Tatooine en Star Wars. Los decorados siguen ahí.", "Tunisia is where Tatooine was filmed in Star Wars. The sets are still there."),
+        ("Cartago (en Túnez) tenía un puerto secreto para 220 barcos de guerra.", "Carthage (in Tunisia) had a secret harbor for 220 warships."),
+        ("Túnez tiene un lago rosa natural: el Lago de Túnez.", "Tunisia has a natural pink lake: the Lake of Tunis."),
+    ],
+    "Belgium": [
+        ("Bélgica estuvo 589 días sin gobierno (2010-2011). Nadie lo notó.", "Belgium went 589 days without a government (2010-2011). Nobody noticed."),
+        ("Las patatas fritas son belgas, no francesas.", "French fries are Belgian, not French."),
+        ("Bélgica tiene más cómics per cápita que cualquier otro país.", "Belgium has more comic books per capita than any other country."),
+    ],
+    "Egypt": [
+        ("Las pirámides ya eran antiguas cuando Cleopatra vivió. Ella está más cerca de nosotros que de su construcción.", "The pyramids were already ancient when Cleopatra lived. She's closer to us than to their construction."),
+        ("Los egipcios antiguos usaban maquillaje tanto hombres como mujeres.", "Ancient Egyptians wore makeup — both men and women."),
+        ("Egipto tiene la presa más grande de África: la Gran Presa del Renacimiento… bueno, esa es de Etiopía. La de Asuán también es enorme.", "Egypt has one of Africa's largest dams: the Aswan High Dam."),
+    ],
+    "Iran": [
+        ("Irán tiene más cirugías de nariz per cápita que cualquier país.", "Iran has more nose jobs per capita than any other country."),
+        ("El polo fue inventado en Persia (Irán) como entrenamiento de caballería.", "Polo was invented in Persia (Iran) as cavalry training."),
+        ("Irán tiene un desierto donde la temperatura alcanza los 70°C en superficie.", "Iran has a desert where surface temperatures reach 70°C."),
+    ],
+    "New Zealand": [
+        ("Nueva Zelanda tiene más ovejas que personas (5:1).", "New Zealand has more sheep than people (5:1)."),
+        ("Fue el último país grande en ser habitado por humanos (~1250 d.C.).", "It was the last major landmass settled by humans (~1250 AD)."),
+        ("Nueva Zelanda tiene un pájaro que no vuela y pesa 4kg: el kiwi.", "New Zealand has a flightless bird that weighs 4kg: the kiwi."),
+    ],
+    "Spain": [
+        ("España tiene un festival donde se lanzan tomates: La Tomatina.", "Spain has a festival where people throw tomatoes at each other: La Tomatina."),
+        ("La selección española de fútbol no ganó nada importante durante 44 años… y luego ganó 3 seguidos.", "Spain's football team won nothing major for 44 years… then won 3 in a row."),
+        ("España tiene más bares per cápita que cualquier país de la UE.", "Spain has more bars per capita than any EU country."),
+    ],
+    "Cape Verde": [
+        ("Cabo Verde tiene más gente viviendo fuera del país que dentro.", "Cape Verde has more people living abroad than at home."),
+        ("Es el lugar de cría más importante del mundo para tortugas marinas.", "It's the world's most important breeding site for sea turtles."),
+        ("Cabo Verde no tenía población humana hasta que los portugueses llegaron en 1456.", "Cape Verde had no human population until the Portuguese arrived in 1456."),
+    ],
+    "Uruguay": [
+        ("Uruguay tiene más vacas que personas (4:1).", "Uruguay has more cows than people (4:1)."),
+        ("Uruguay fue el primer país del mundo en legalizar el cannabis a nivel nacional.", "Uruguay was the first country to legalize cannabis nationally."),
+        ("El himno nacional de Uruguay dura 5 minutos. Es el más largo del mundo.", "Uruguay's national anthem lasts 5 minutes. It's the world's longest."),
+    ],
+    "Saudi Arabia": [
+        ("Arabia Saudí importa camellos de Australia.", "Saudi Arabia imports camels from Australia."),
+        ("No hay ríos permanentes en Arabia Saudí.", "There are no permanent rivers in Saudi Arabia."),
+        ("Arabia Saudí tiene un edificio (Jeddah Tower) diseñado para medir 1km de alto. Aún sin terminar.", "Saudi Arabia has a building (Jeddah Tower) designed to be 1km tall. Still unfinished."),
+    ],
+    "France": [
+        ("Francia tiene 12 husos horarios (por sus territorios de ultramar). Más que cualquier país.", "France has 12 time zones (due to overseas territories). More than any country."),
+        ("Francia construyó un 'Versalles falso' para engañar a los bombarderos alemanes en la IIGM.", "France built a 'fake Versailles' to fool German bombers in WWII."),
+        ("El croissant no es francés. Es austríaco.", "The croissant isn't French. It's Austrian."),
+    ],
+    "Senegal": [
+        ("Senegal tiene un lago rosa natural: el Lago Retba.", "Senegal has a natural pink lake: Lake Retba."),
+        ("El Rally Dakar originalmente terminaba en Dakar (antes de mudarse a Sudamérica).", "The Dakar Rally originally ended in Dakar (before moving to South America)."),
+        ("Senegal tiene la estatua más alta de África: el Monumento al Renacimiento Africano (49m).", "Senegal has Africa's tallest statue: the African Renaissance Monument (49m)."),
+    ],
+    "Iraq": [
+        ("Irak es donde se inventó la escritura (~3400 a.C.).", "Iraq is where writing was invented (~3400 BC)."),
+        ("Las ruinas de Babilonia están a 85km de Bagdad.", "The ruins of Babylon are 85km from Baghdad."),
+        ("Irak tiene los jardines colgantes de Babilonia, una de las 7 maravillas antiguas. Nunca se han encontrado.", "Iraq had the Hanging Gardens of Babylon, one of the 7 ancient wonders. They've never been found."),
+    ],
+    "Norway": [
+        ("El rey de Noruega es un pingüino. Literalmente. Se llama Nils Olav.", "The King of Norway is a penguin. Literally. His name is Nils Olav."),
+        ("Noruega regaló un árbol de Navidad a Londres cada año desde 1947. Como agradecimiento por la WWII.", "Norway has gifted a Christmas tree to London every year since 1947. As thanks for WWII."),
+        ("Noruega tiene un pueblo fantasma pirámide en el Ártico: Pyramiden.", "Norway has a ghost town pyramid in the Arctic: Pyramiden."),
+    ],
+    "Argentina": [
+        ("Argentina tuvo 5 presidentes en 10 días en 2001.", "Argentina had 5 presidents in 10 days in 2001."),
+        ("El tango nació en los burdeles de Buenos Aires.", "Tango was born in the brothels of Buenos Aires."),
+        ("Argentina tiene la avenida más ancha del mundo: la 9 de Julio (14 carriles).", "Argentina has the world's widest avenue: 9 de Julio (14 lanes)."),
+    ],
+    "Algeria": [
+        ("Argelia es el país más grande de África por superficie.", "Algeria is the largest country in Africa by area."),
+        ("Argelia tiene más de 1.000 km de costa mediterránea.", "Algeria has over 1,000 km of Mediterranean coastline."),
+        ("El desierto del Sahara cubre el 80% de Argelia.", "The Sahara Desert covers 80% of Algeria."),
+    ],
+    "Austria": [
+        ("Austria tiene un pueblo llamado 'Fucking'. Tuvo que cambiar el nombre por los turistas.", "Austria had a village called 'Fucking'. It had to change the name because of tourists."),
+        ("El 80% de la banda sonora de 'The Sound of Music' se rodó en Austria.", "80% of 'The Sound of Music' was filmed in Austria."),
+        ("Austria inventó la bola de nieve (Schneekugel) en 1900.", "Austria invented the snow globe (Schneekugel) in 1900."),
+    ],
+    "Jordan": [
+        ("Jordania tiene el punto más bajo de la Tierra: el Mar Muerto (-430m).", "Jordan has the lowest point on Earth: the Dead Sea (-430m)."),
+        ("Petra (en Jordania) fue tallada en roca rosa hace 2.000 años.", "Petra (in Jordan) was carved into pink rock 2,000 years ago."),
+        ("Jordania tiene un castillo en medio del desierto que parece una nave espacial: Qasr Kharana.", "Jordan has a desert castle that looks like a spaceship: Qasr Kharana."),
+    ],
+    "Portugal": [
+        ("Portugal tiene la alianza diplomática más antigua del mundo con Inglaterra (1373).", "Portugal has the world's oldest diplomatic alliance with England (1373)."),
+        ("Portugal es el país más antiguo de Europa con las mismas fronteras desde 1139.", "Portugal is Europe's oldest country with the same borders since 1139."),
+        ("Lisboa es más antigua que Roma.", "Lisbon is older than Rome."),
+    ],
+    "DR Congo": [
+        ("La RD Congo tiene el 50% de las reservas mundiales de cobalto.", "DR Congo has 50% of the world's cobalt reserves."),
+        ("El río Congo es el más profundo del mundo (220m).", "The Congo River is the world's deepest (220m)."),
+        ("La RD Congo tiene un volcán que produce lava azul: Nyiragongo.", "DR Congo has a volcano that produces blue lava: Nyiragongo."),
+    ],
+    "Uzbekistan": [
+        ("Uzbekistán tiene una de las ciudades más antiguas de la Ruta de la Seda: Samarcanda.", "Uzbekistan has one of the oldest Silk Road cities: Samarkand."),
+        ("El Mar de Aral (en Uzbekistán) era el 4º lago más grande del mundo. Ahora es un desierto.", "The Aral Sea (in Uzbekistan) was the world's 4th largest lake. Now it's a desert."),
+        ("Uzbekistán tiene el metro más bonito de Asia Central. Cada estación es una obra de arte.", "Uzbekistan has Central Asia's most beautiful metro. Each station is a work of art."),
+    ],
+    "Colombia": [
+        ("Colombia tiene más especies de aves que cualquier otro país (~1.900).", "Colombia has more bird species than any other country (~1,900)."),
+        ("El río Caño Cristales en Colombia tiene 5 colores y le llaman 'el río que se escapó del paraíso'.", "Colombia's Caño Cristales river has 5 colors and is called 'the river that escaped paradise'."),
+        ("Colombia es el único país de Sudamérica con costa en el Pacífico Y el Caribe.", "Colombia is the only South American country with both Pacific and Caribbean coasts."),
+    ],
+    "England": [
+        ("Inglaterra tuvo una reina que reinó solo 9 días: Lady Jane Grey.", "England had a queen who reigned just 9 days: Lady Jane Grey."),
+        ("El Big Ben no es el nombre de la torre. Es el nombre de la campana.", "Big Ben isn't the tower's name. It's the bell's name."),
+        ("Inglaterra inventó el fútbol moderno… y luego no ganó un Mundial durante 56 años.", "England invented modern football… then didn't win a World Cup for 56 years."),
+    ],
+    "Croatia": [
+        ("La corbata fue inventada por mercenarios croatas en el siglo XVII.", "The necktie was invented by Croatian mercenaries in the 17th century."),
+        ("Croacia tiene el museo de relaciones rotas del mundo (Zagreb).", "Croatia has the world's Museum of Broken Relationships (Zagreb)."),
+        ("Dálmata (el perro) viene de Dalmacia, Croacia.", "The Dalmatian dog comes from Dalmatia, Croatia."),
+    ],
+    "Ghana": [
+        ("Ghana tiene el ataúd más customizado del mundo: los hacen con forma de pez, avión, Coca-Cola…", "Ghana has the world's most custom coffins: shaped like fish, planes, Coca-Cola bottles…"),
+        ("Ghana fue llamada 'Costa de Oro' por los colonizadores portugueses.", "Ghana was called the 'Gold Coast' by Portuguese colonizers."),
+        ("El lago Volta en Ghana es el mayor lago artificial del mundo por superficie.", "Lake Volta in Ghana is the world's largest artificial lake by surface area."),
+    ],
+    "Panama": [
+        ("Panamá es el único lugar del mundo donde puedes ver el amanecer en el Pacífico y el atardecer en el Atlántico.", "Panama is the only place where you can see sunrise on the Pacific and sunset on the Atlantic."),
+        ("El Canal de Panamá mueve el 6% del comercio mundial.", "The Panama Canal moves 6% of world trade."),
+        ("Panamá tiene más de 1.500 islas. La mayoría sin nombre.", "Panama has over 1,500 islands. Most unnamed."),
+    ],
+}
+
 
 def team_es(name):
     if name is None:
@@ -647,6 +890,10 @@ def compute_today(data, matches):
         if unique_picks:
             best = max(unique_picks, key=lambda x: sum(int(g) for g in x[1].split("-")) + abs(int(x[1].split("-")[0]) - int(x[1].split("-")[1])))
             most_unique = {"name": best[0], "score": best[1]}
+        m_num = int(m["code"].split("-M")[1])
+        t_idx = (m_num - 1) % 3
+        home_trivia = TRIVIA.get(m["home_en"], [("", "")] * 3)[t_idx]
+        away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx]
         all_matches.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
             "home_en": m["home_en"], "away_en": m["away_en"],
@@ -657,6 +904,8 @@ def compute_today(data, matches):
             "modal_scoreline": modal_sl,
             "modal_scoreline_share": modal_pct / 100,
             "most_unique_pick": most_unique,
+            "home_trivia": {"es": home_trivia[0], "en": home_trivia[1]},
+            "away_trivia": {"es": away_trivia[0], "en": away_trivia[1]},
         })
     return {"matches": all_matches}
 
@@ -834,6 +1083,11 @@ footer .brand svg{height:20px;width:auto}
 .no-today .next-match{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
 .no-today .next-date{color:var(--muted);font-size:.78rem;min-width:80px}
 @media(max-width:560px){.today-match .tm-stats{grid-template-columns:1fr}.today-picks-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+.trivia-block{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.trivia-item{background:rgba(0,0,0,.15);border-radius:12px;padding:12px 14px;font-size:.84rem;line-height:1.45}
+.trivia-item .trivia-flag{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.trivia-item .trivia-text{color:var(--text)}
+@media(max-width:560px){.trivia-block{grid-template-columns:1fr}}
 """
 
 JS = r"""
@@ -983,6 +1237,16 @@ function buildHoy(){
       <div class="today-picks">
         <div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div>
         <div class="today-picks-grid">${picksHtml}</div>
+      </div>
+      <div class="trivia-block">
+        <div class="trivia-item">
+          <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.home_flag} ${esc(team(m.home))}</div>
+          <div class="trivia-text">${esc(L(m.home_trivia.es, m.home_trivia.en))}</div>
+        </div>
+        <div class="trivia-item">
+          <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.away_flag} ${esc(team(m.away))}</div>
+          <div class="trivia-text">${esc(L(m.away_trivia.es, m.away_trivia.en))}</div>
+        </div>
       </div>`));
   });
 }
