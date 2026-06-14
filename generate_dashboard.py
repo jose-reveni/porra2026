@@ -1648,6 +1648,7 @@ HTML_TEMPLATE = (
     '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n'
     '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
     '<title>Porra Mundial 2026 · Reveni</title>\n'
+    '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
     '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&'
