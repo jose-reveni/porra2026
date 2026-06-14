@@ -789,6 +789,7 @@ def compute(data):
         live = compute_live(data, matches)
 
     today = compute_today(data, matches)
+    recent_results = compute_recent_results(data, matches)
 
     return {
         "es2en": ES2EN,
@@ -813,6 +814,7 @@ def compute(data):
         "awards": awards,
         "live": live,
         "today": today,
+        "recent_results": recent_results,
     }
 
 
@@ -868,6 +870,42 @@ def compute_live(data, matches):
         key=lambda x: -x["pts"],
     )
     return {"played": played, "table": table}
+
+
+def compute_recent_results(data, matches, limit=6):
+    """Últimos partidos con resultado real y quién acertó/falló."""
+    results = data["results"]
+    names = data["names"]
+    played = []
+    for m in matches:
+        if m["code"] not in results:
+            continue
+        rh, ra = results[m["code"]]
+        ro = outcome(rh, ra)
+        exact = []
+        sign = []
+        miss = []
+        for name, (h, a) in zip(names, m["picks"]):
+            if h is None or a is None:
+                miss.append({"name": name, "pick": "–"})
+            elif h == rh and a == ra:
+                exact.append({"name": name, "pick": f"{h}-{a}"})
+            elif outcome(h, a) == ro:
+                sign.append({"name": name, "pick": f"{h}-{a}"})
+            else:
+                miss.append({"name": name, "pick": f"{h}-{a}"})
+        played.append({
+            "code": m["code"], "group": m["group"], "date": m["date"],
+            "home_en": m["home_en"], "away_en": m["away_en"],
+            "home": m["home"], "away": m["away"],
+            "home_flag": m["home_flag"], "away_flag": m["away_flag"],
+            "result": {"home": rh, "away": ra, "outcome": ro},
+            "exact": exact,
+            "sign": sign,
+            "miss": miss,
+        })
+    played.sort(key=lambda m: (m["date"], m["code"]), reverse=True)
+    return {"matches": played[:limit], "total": len(played)}
 
 
 def compute_today(data, matches):
@@ -930,7 +968,7 @@ a{color:inherit}
 .mint{color:var(--mint)}.muted{color:var(--muted)}
 /* NAV */
 nav.rail{position:fixed;top:0;left:0;height:100vh;width:188px;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
-  border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(0,26,31,.6),transparent);backdrop-filter:blur(6px);z-index:40}
+  border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(0,26,31,.6),transparent);backdrop-filter:blur(6px);z-index:40;overflow-y:auto}
 nav.rail .brand{color:var(--mint);height:26px;margin-bottom:18px;display:block}
 nav.rail .brand svg{height:26px;width:auto}
 .langtoggle{display:flex;gap:4px;margin-bottom:16px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:10px;padding:3px}
@@ -943,6 +981,7 @@ nav.rail a .dot{width:7px;height:7px;border-radius:50%;background:currentColor;o
 nav.rail a:hover{color:var(--text);background:rgba(122,252,208,.05)}
 nav.rail a.active{color:var(--mint);background:rgba(122,252,208,.1)}
 nav.rail a.active .dot{opacity:1;box-shadow:0 0 10px var(--mint)}
+.nav-group-label{color:rgba(226,246,239,.54);font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.11em;margin:12px 10px 2px}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px 0 calc(188px + 40px)}
 /* HERO */
 header.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding-top:40px}
@@ -1056,6 +1095,7 @@ footer .brand svg{height:20px;width:auto}
     border-right:0;border-top:1px solid var(--line)}
   nav.rail .brand{display:none}
   nav.rail a{font-size:.7rem;padding:7px 9px}nav.rail a .dot{display:none}
+  .nav-group-label{display:none}
   .langtoggle{margin-bottom:0;flex:0 0 auto;order:-1}
   .wrap{padding:0 18px 70px}
   .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium{grid-template-columns:1fr}
@@ -1077,11 +1117,23 @@ footer .brand svg{height:20px;width:auto}
 .tp-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(0,0,0,.12);border-radius:8px;font-size:.82rem}
 .tp-item .tp-name{color:var(--text);font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tp-item .tp-score{color:var(--mint);font-family:'Space Grotesk';font-weight:700;white-space:nowrap}
+.recent-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;color:var(--muted);font-size:.86rem}
+.score-final{font-family:'Space Grotesk';font-weight:700;font-size:1.7rem;color:var(--gold);white-space:nowrap}
+.result-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.result-box{background:rgba(0,0,0,.15);border-radius:12px;padding:13px;min-width:0}
+.result-box .rb-title{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.result-box .rb-count{font-family:'Space Grotesk';font-weight:700;color:var(--mint)}
+.result-box.miss .rb-count{color:var(--red)}
+.result-names{display:flex;flex-wrap:wrap;gap:6px}
+.result-person{display:inline-flex;gap:5px;align-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:.78rem;min-width:0}
+.result-person b{font-weight:700;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.result-person span{font-family:'Space Grotesk';color:var(--muted);white-space:nowrap}
 .no-today{text-align:center;padding:46px 22px}
 .no-today .em{font-size:3rem}
 .no-today .next{margin-top:22px;text-align:left}
 .no-today .next-match{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
 .no-today .next-date{color:var(--muted);font-size:.78rem;min-width:80px}
+@media(max-width:720px){.result-groups{grid-template-columns:1fr}}
 @media(max-width:560px){.today-match .tm-stats{grid-template-columns:1fr}.today-picks-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
 .trivia-block{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .trivia-item{background:rgba(0,0,0,.15);border-radius:12px;padding:12px 14px;font-size:.84rem;line-height:1.45}
@@ -1116,11 +1168,10 @@ function animateCount(node){
 }
 function el(t,c,h){ const e = document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e; }
 
-const NAV = [
-  ['hoy','Hoy','Today'],['inicio','Inicio','Home'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],
-  ['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['partidos','Partidos','Matches'],
-  ['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards'],
-  ['aciertos','En directo','Live'],
+const NAV_GROUPS = [
+  {label:['Jornada','Matchday'], items:[['hoy','Hoy','Today'],['aciertos','Ranking','Ranking'],['ultimos','Últimos','Latest']]},
+  {label:['La quiniela','The pool'], items:[['inicio','Resumen','Overview'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['partidos','Partidos','Matches']]},
+  {label:['Participantes','Players'], items:[['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards']]},
 ];
 const LABELS = {
   goleador:['🥅 Goleador','🥅 Goal machine'], cerrojo:['🔒 Cerrojo','🔒 Parked bus'],
@@ -1133,9 +1184,13 @@ function labelOf(k){ const x = LABELS[k] || LABELS.equilibrado; return L(x[0], x
 const rail = el('nav','rail');
 document.body.appendChild(rail);
 function renderRail(){
-  rail.innerHTML = `<a class="brand" href="#inicio">${logo}</a>` +
+  const navHtml = NAV_GROUPS.map(g =>
+    `<div class="nav-group-label">${L(g.label[0],g.label[1])}</div>` +
+    g.items.map(([id,es,en]) => `<a href="#${id}" data-id="${id}"><span class="dot"></span>${L(es,en)}</a>`).join('')
+  ).join('');
+  rail.innerHTML = `<a class="brand" href="#hoy">${logo}</a>` +
     `<div class="langtoggle"><button data-l="es">ES</button><button data-l="en">EN</button></div>` +
-    NAV.map(([id,es,en]) => `<a href="#${id}" data-id="${id}"><span class="dot"></span>${L(es,en)}</a>`).join('');
+    navHtml;
   const on = rail.querySelector('[data-l="'+LANG+'"]'); if (on) on.classList.add('on');
 }
 rail.addEventListener('click', e => {
@@ -1246,6 +1301,49 @@ function buildHoy(){
         <div class="trivia-item">
           <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.away_flag} ${esc(team(m.away))}</div>
           <div class="trivia-text">${esc(L(m.away_trivia.es, m.away_trivia.en))}</div>
+        </div>
+      </div>`));
+  });
+}
+
+/* ---- ÚLTIMOS RESULTADOS ---- */
+function buildUltimos(){
+  const s = section('ultimos', L('🧾 Últimos','🧾 Latest'),
+    L('Últimos partidos jugados','Latest finished matches'),
+    L('Resultado final y reparto de alegrías: plenos, signos acertados y los que han palmado.',
+      'Final score and who got it right: exact hits, correct outcomes and misses.'));
+  const recent = (D.recent_results && D.recent_results.matches) || [];
+  if(!recent.length){
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">🧾</div><h3 style="margin:10px 0 6px">${L('Aún no hay resultados cargados','No results loaded yet')}</h3>
+       <p class="muted">${L('Cuando rellenes marcadores en <b>Real results</b>, aquí aparecerán los últimos partidos terminados.','Once scores are filled in <b>Real results</b>, the latest finished matches will appear here.')}</p>`));
+    return;
+  }
+  s.appendChild(el('div','muted reveal', `${recent.length} ${L('últimos de','latest of')} ${D.recent_results.total} ${L('partidos jugados','finished matches')}`));
+  recent.forEach(m => {
+    const people = arr => arr.length
+      ? arr.map(p => `<span class="result-person"><b>${esc(p.name)}</b><span>${esc(p.pick)}</span></span>`).join('')
+      : `<span class="muted">${L('Nadie','Nobody')}</span>`;
+    const dateObj = new Date(m.date + 'T12:00:00');
+    const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', {day:'numeric', month:'short'});
+    s.appendChild(el('div','today-match reveal',
+      `<div class="tm-head">
+        <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
+        <span class="score-final">${m.result.home}-${m.result.away}</span>
+      </div>
+      <div class="recent-meta"><span>${dateStr}</span><span>${L('Grupo','Group')} ${m.group}</span><span>${L('Resultado final','Final score')}</span></div>
+      <div class="result-groups">
+        <div class="result-box">
+          <div class="rb-title">${L('Pleno','Exact score')} <span class="rb-count">${m.exact.length}</span></div>
+          <div class="result-names">${people(m.exact)}</div>
+        </div>
+        <div class="result-box">
+          <div class="rb-title">${L('Signo','Outcome')} <span class="rb-count">${m.sign.length}</span></div>
+          <div class="result-names">${people(m.sign)}</div>
+        </div>
+        <div class="result-box miss">
+          <div class="rb-title">${L('Palmada','Missed')} <span class="rb-count">${m.miss.length}</span></div>
+          <div class="result-names">${people(m.miss)}</div>
         </div>
       </div>`));
   });
@@ -1489,7 +1587,7 @@ function buildPremios(){
 
 /* ---- ACIERTOS ---- */
 function buildAciertos(){
-  const s = section('aciertos', L('09 · En directo','09 · Live'),
+  const s = section('aciertos', L('📈 Ranking','📈 Ranking'),
     L('Aciertos en directo ⚽','Live scoring ⚽'),
     L('Cuando empiece a rodar el balón y rellenes los resultados reales en el Excel, aquí saldrá el ranking de aciertos.',
       'Once the ball starts rolling and you fill in the real results in the Excel, the scoring ranking appears here.'));
@@ -1539,8 +1637,8 @@ function rebuild(){
   if(wrap) wrap.remove();
   wrap = el('div','wrap'); document.body.appendChild(wrap);
   renderRail();
-  buildHoy(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
-  buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildAciertos(); buildFooter();
+  buildHoy(); buildAciertos(); buildUltimos(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
+  buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildFooter();
   observeAll();
 }
 rebuild();

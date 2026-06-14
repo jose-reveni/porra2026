@@ -76,3 +76,31 @@ class TestTodayData:
         for m in computed_data["today"]["matches"]:
             assert "date" in m
             assert len(m["date"]) == 10
+
+
+class TestRecentResultsData:
+    def test_recent_results_key_exists(self, computed_data):
+        assert "recent_results" in computed_data
+
+    def test_recent_results_has_matches_and_total(self, computed_data):
+        recent = computed_data["recent_results"]
+        assert "matches" in recent
+        assert "total" in recent
+
+    def test_recent_results_are_limited_to_latest_six(self, computed_data):
+        recent = computed_data["recent_results"]
+        assert len(recent["matches"]) <= 6
+        dates = [m["date"] for m in recent["matches"]]
+        assert dates == sorted(dates, reverse=True)
+
+    def test_recent_result_has_final_score_and_outcome_groups(self, computed_data, workbook_data):
+        recent = computed_data["recent_results"]["matches"]
+        if not recent:
+            pytest.skip("Workbook has no real results loaded")
+
+        m = recent[0]
+        assert "result" in m
+        assert {"home", "away", "outcome"} <= set(m["result"])
+        assert m["result"]["outcome"] in {"1", "X", "2"}
+        assert {"exact", "sign", "miss"} <= set(m)
+        assert len(m["exact"]) + len(m["sign"]) + len(m["miss"]) == workbook_data["n"]
