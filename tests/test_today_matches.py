@@ -1,4 +1,5 @@
 import sys
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -76,6 +77,45 @@ class TestTodayData:
         for m in computed_data["today"]["matches"]:
             assert "date" in m
             assert len(m["date"]) == 10
+
+
+class TestTodayMatchdayDate:
+    def test_spanish_early_morning_uses_previous_matchday(self):
+        js = _extract_js_function(gd.JS, "matchdayDateStr")
+        script = f"""
+{js}
+const d = new Date(2026, 5, 15, 2, 0, 0);
+process.stdout.write(matchdayDateStr(d));
+"""
+        result = subprocess.check_output(["node", "-e", script], text=True)
+
+        assert result == "2026-06-14"
+
+    def test_spanish_morning_uses_current_matchday(self):
+        js = _extract_js_function(gd.JS, "matchdayDateStr")
+        script = f"""
+{js}
+const d = new Date(2026, 5, 15, 6, 0, 0);
+process.stdout.write(matchdayDateStr(d));
+"""
+        result = subprocess.check_output(["node", "-e", script], text=True)
+
+        assert result == "2026-06-15"
+
+
+def _extract_js_function(source, name):
+    marker = f"function {name}"
+    start = source.find(marker)
+    assert start != -1, f"{name} is missing from dashboard JS"
+    depth = 0
+    for i in range(start, len(source)):
+        if source[i] == "{":
+            depth += 1
+        elif source[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:i + 1]
+    raise AssertionError(f"{name} JS function is incomplete")
 
 
 class TestRecentResultsData:

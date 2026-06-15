@@ -229,6 +229,11 @@ function fmt(v){
   a = a.replace(/\B(?=(\d{3})+(?!\d))/g, th);
   return b !== undefined ? a + dp + b : a;
 }
+function matchdayDateStr(now){
+  const d = new Date(now.getTime());
+  if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 function pf(x){ let s = String(x); if (LANG==='es') s = s.replace('.', ','); return s + '%'; }
 function animateCount(node){
   const to = parseFloat(node.dataset.count), dec = parseInt(node.dataset.decimals||'0'), suf = node.dataset.suffix||'';
@@ -314,8 +319,7 @@ function buildHoy(){
     L('Los partidos de hoy','Today\'s matches'),
     L('Qué se juega hoy y qué ha puesto cada uno.','What\'s on today and what everyone predicted.'));
   const allM = D.today.matches || [];
-  const now = new Date();
-  const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const todayStr = matchdayDateStr(new Date());
   const todayMatches = allM.filter(m => m.date === todayStr);
   if(!todayMatches.length){
     const upcoming = allM.filter(m => m.date > todayStr).sort((a,b) => a.date.localeCompare(b.date)).slice(0,6);
