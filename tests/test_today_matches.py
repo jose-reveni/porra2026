@@ -144,3 +144,34 @@ class TestRecentResultsData:
         assert m["result"]["outcome"] in {"1", "X", "2"}
         assert {"exact", "sign", "miss"} <= set(m)
         assert len(m["exact"]) + len(m["sign"]) + len(m["miss"]) == workbook_data["n"]
+
+
+class TestLiveProgressionData:
+    def test_live_progression_tracks_every_played_match(self, computed_data):
+        live = computed_data["live"]
+        if not live:
+            pytest.skip("Workbook has no real results loaded")
+
+        assert "progression" in live
+        assert len(live["progression"]) == live["played"]
+        assert live["progression"][-1]["table"] == live["table"]
+
+    def test_live_progression_rows_have_rank_and_delta(self, computed_data, workbook_data):
+        live = computed_data["live"]
+        if not live:
+            pytest.skip("Workbook has no real results loaded")
+
+        first_snapshot = live["progression"][0]
+        assert len(first_snapshot["table"]) == workbook_data["n"]
+        for row in first_snapshot["table"]:
+            assert {
+                "name",
+                "pts",
+                "exact",
+                "sign",
+                "rank",
+                "delta",
+                "round_pts",
+                "round_exact",
+                "round_sign",
+            } <= set(row)

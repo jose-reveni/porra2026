@@ -848,13 +848,37 @@ def compute_live(data, matches):
     pts = [0] * n
     exact = [0] * n
     sign = [0] * n
-    played = 0
-    for m in matches:
-        if m["code"] not in results:
-            continue
+    name_index = {name: i for i, name in enumerate(names)}
+
+    def ranked_rows():
+        rows = [
+            {
+                "name": names[i],
+                "pts": pts[i],
+                "exact": exact[i],
+                "sign": sign[i],
+                "_order": i,
+            }
+            for i in range(n)
+        ]
+        rows.sort(key=lambda x: (-x["pts"], x["_order"]))
+        for rank, row in enumerate(rows, 1):
+            row["rank"] = rank
+            del row["_order"]
+        return rows
+
+    played_matches = sorted(
+        [m for m in matches if m["code"] in results],
+        key=lambda m: (m["date"], m["code"]),
+    )
+    progression = []
+    previous_ranks = {}
+    for idx, m in enumerate(played_matches, 1):
+        before_pts = pts[:]
+        before_exact = exact[:]
+        before_sign = sign[:]
         rh, ra = results[m["code"]]
         ro = outcome(rh, ra)
-        played += 1
         for i, (h, a) in enumerate(m["picks"]):
             if h is None:
                 continue
@@ -864,12 +888,31 @@ def compute_live(data, matches):
             elif outcome(h, a) == ro:
                 pts[i] += 2
                 sign[i] += 1
-    table = sorted(
-        [{"name": names[i], "pts": pts[i], "exact": exact[i], "sign": sign[i]}
-         for i in range(n)],
-        key=lambda x: -x["pts"],
-    )
-    return {"played": played, "table": table}
+        rows = ranked_rows()
+        for row in rows:
+            i = name_index[row["name"]]
+            old_rank = previous_ranks.get(row["name"], row["rank"])
+            row["delta"] = old_rank - row["rank"]
+            row["round_pts"] = pts[i] - before_pts[i]
+            row["round_exact"] = exact[i] - before_exact[i]
+            row["round_sign"] = sign[i] - before_sign[i]
+        previous_ranks = {row["name"]: row["rank"] for row in rows}
+        progression.append({
+            "idx": idx,
+            "code": m["code"],
+            "group": m["group"],
+            "date": m["date"],
+            "home": m["home"],
+            "away": m["away"],
+            "home_en": m["home_en"],
+            "away_en": m["away_en"],
+            "home_flag": m["home_flag"],
+            "away_flag": m["away_flag"],
+            "result": {"home": rh, "away": ra, "outcome": ro},
+            "table": rows,
+        })
+    table = progression[-1]["table"] if progression else ranked_rows()
+    return {"played": len(played_matches), "table": table, "progression": progression}
 
 
 def compute_recent_results(data, matches, limit=6):
@@ -1019,6 +1062,82 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .bar-fill.cool{background:linear-gradient(90deg,#2b6f7f,#4a9aa8)}
 .bar-fill.gold{background:linear-gradient(90deg,#caa24a,var(--gold))}
 .bar-val{font-family:'Space Grotesk';font-weight:700;text-align:right;font-size:.95rem}
+/* ranking prototype */
+.rank-proto-note{display:inline-flex;align-items:center;gap:8px;background:rgba(255,210,122,.12);border:1px solid rgba(255,210,122,.25);
+  border-radius:999px;padding:7px 11px;color:var(--gold);font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:18px}
+.rank-proto-card{background:rgba(0,26,31,.34);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;overflow:hidden}
+.rank-proto-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
+.rank-proto-top h3{font-size:1.08rem;margin-bottom:4px}
+.rank-proto-meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.rank-state-pill{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:6px 9px;
+  color:var(--muted);font-size:.78rem;white-space:nowrap}
+.rank-state-pill b{color:var(--text);font-family:'Space Grotesk'}
+.bump-scroll,.rank-matrix-scroll{overflow-x:auto;padding:6px 2px 12px}
+.bump-svg{display:block;min-width:880px}
+.bump-grid{stroke:rgba(226,246,239,.13);stroke-dasharray:2 5}
+.bump-axis-label{fill:var(--muted);font:700 11px 'Space Grotesk',sans-serif}
+.bump-rank-label{fill:rgba(226,246,239,.6);font:700 11px 'Space Grotesk',sans-serif}
+.bump-name{font:700 12px 'Inter',sans-serif}
+.bump-score{fill:var(--muted);font:600 11px 'Space Grotesk',sans-serif}
+.bump-line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.bump-line-muted{opacity:.22}
+.bump-point{stroke:#001a1f;stroke-width:2}
+.rank-table-compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:14px}
+.rank-table-compact .rank-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;background:rgba(255,255,255,.045);
+  border:1px solid rgba(122,252,208,.1);border-radius:10px;padding:8px 10px;font-size:.83rem}
+.rank-row .rr-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-row .rr-points{font-family:'Space Grotesk';font-weight:700;color:var(--gold)}
+.rank-delta{font-family:'Space Grotesk';font-size:.72rem;color:var(--muted);white-space:nowrap}
+.rank-delta.up{color:var(--mint)}.rank-delta.down{color:var(--red)}
+.race-layout{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:16px;align-items:start}
+.race-control{background:linear-gradient(160deg,rgba(122,252,208,.08),rgba(255,210,122,.055));border:1px solid var(--line);border-radius:14px;padding:14px}
+.race-control input{width:100%;accent-color:var(--mint);margin:12px 0}
+.race-actions{display:grid;grid-template-columns:36px 36px 1fr 36px;gap:8px;align-items:center;margin:12px 0}
+.race-actions button{height:36px;border:1px solid var(--line);border-radius:50%;background:#001a1f;color:var(--mint);
+  font:800 .98rem 'Space Grotesk';cursor:pointer}
+.race-actions .race-play{background:var(--mint);color:#001a1f;border-color:transparent}
+.race-step{font:800 .8rem 'Space Grotesk';color:var(--gold);text-align:center;letter-spacing:.06em}
+.race-match{font-weight:700;margin-top:8px;line-height:1.25}
+.race-now{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.race-now span{background:rgba(0,0,0,.18);border:1px solid rgba(122,252,208,.12);border-radius:10px;padding:8px;font-size:.76rem;color:var(--muted)}
+.race-now b{display:block;color:var(--text);font-family:'Space Grotesk';font-size:1rem}
+.race-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:.76rem;color:var(--muted)}
+.race-legend span{display:inline-flex;align-items:center;gap:6px}.race-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.race-feed{display:grid;gap:9px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(122,252,208,.12)}
+.race-feed-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font:800 .68rem 'Space Grotesk';letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.race-feed-title span{color:var(--gold);letter-spacing:0;text-transform:none}
+.race-feed-list{display:grid;gap:6px}
+.race-feed-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:rgba(0,0,0,.16);
+  border:1px solid rgba(255,255,255,.06);border-left:3px solid var(--runner,var(--mint));border-radius:9px;padding:7px 8px;min-width:0}
+.race-feed-row b{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.race-feed-row small{font-family:'Space Grotesk';font-weight:800;color:var(--gold);white-space:nowrap}
+.race-feed-row .rank-delta{justify-self:end;background:rgba(0,0,0,.18);border-radius:999px;padding:2px 6px;font-size:.68rem}
+.race-feed-empty{border:1px dashed rgba(226,246,239,.13);border-radius:9px;padding:8px;color:var(--muted);font-size:.78rem}
+.race-board{display:grid;gap:8px;isolation:isolate}
+.race-row{display:grid;grid-template-columns:34px minmax(82px,170px) 68px minmax(42px,1fr) 42px 42px;gap:9px;align-items:center;background:rgba(255,255,255,.04);
+  border:1px solid rgba(122,252,208,.08);border-left:4px solid var(--runner);border-radius:10px;padding:7px 10px;min-width:0;
+  position:relative;will-change:transform,box-shadow;transition:border-color .25s ease,background .25s ease}
+.race-row .bar-track{height:10px}.race-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,color-mix(in srgb,var(--runner) 45%,#001a1f),var(--runner));
+  transition:width .58s cubic-bezier(.2,.8,.2,1)}
+.race-row.leader{border-color:rgba(255,210,122,.45);background:rgba(255,210,122,.06)}
+.race-row .rank-delta{justify-self:center;background:rgba(0,0,0,.18);border-radius:999px;padding:3px 7px;font-size:.74rem}
+.race-row.is-moving{z-index:5}
+.race-row.moved-up{z-index:3;animation:rankGlowUp .76s ease both}.race-row.moved-down{z-index:2;animation:rankGlowDown .76s ease both}
+.race-row.moved-up .rank-delta{box-shadow:0 0 0 1px rgba(122,252,208,.25),0 0 18px rgba(122,252,208,.16)}
+.race-row.moved-down .rank-delta{box-shadow:0 0 0 1px rgba(255,122,122,.25),0 0 18px rgba(255,122,122,.13)}
+@keyframes rankGlowUp{0%,100%{box-shadow:0 0 0 rgba(122,252,208,0)}45%{box-shadow:0 0 0 1px rgba(122,252,208,.28),0 0 24px rgba(122,252,208,.16)}}
+@keyframes rankGlowDown{0%,100%{box-shadow:0 0 0 rgba(255,122,122,0)}45%{box-shadow:0 0 0 1px rgba(255,122,122,.24),0 0 24px rgba(255,122,122,.13)}}
+.race-round{font-family:'Space Grotesk';font-weight:800;color:var(--runner);text-align:right;font-size:.88rem}
+.rank-matrix{display:grid;gap:3px;align-items:center;width:max-content;min-width:100%}
+.rank-matrix-name{width:118px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:.78rem}
+.rank-matrix-cell{width:31px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font:700 .72rem 'Space Grotesk',sans-serif;color:#001a1f}
+.rank-matrix-head{height:24px;color:var(--muted);font:700 .65rem 'Space Grotesk',sans-serif;text-align:center}
+.proto-switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:120;display:flex;align-items:center;gap:10px;
+  background:#e2f6ef;color:#001a1f;border:1px solid rgba(255,255,255,.65);border-radius:999px;padding:8px 10px;box-shadow:0 16px 50px rgba(0,0,0,.35)}
+.proto-switcher button{border:0;background:#001a1f;color:var(--mint);width:32px;height:32px;border-radius:50%;font:800 1rem 'Space Grotesk';cursor:pointer}
+.proto-switcher span{font:800 .78rem 'Space Grotesk';letter-spacing:.04em;white-space:nowrap}
 /* PODIUM */
 .podium{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:end;margin-bottom:30px}
 .pod{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;text-align:center;position:relative}
@@ -1100,8 +1219,16 @@ footer .brand svg{height:20px;width:auto}
   .wrap{padding:0 18px 70px}
   .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium{grid-template-columns:1fr}
   .chips{grid-template-columns:repeat(2,1fr)}
+  .race-layout{grid-template-columns:1fr}
+  .proto-switcher{bottom:62px}
 }
-@media(max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+@media(max-width:560px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .race-row{grid-template-columns:28px minmax(58px,1fr) 64px 34px 34px;gap:7px}
+  .race-row .bar-track{grid-column:2 / -1;grid-row:2}
+  .race-round,.race-row .bar-val{font-size:.8rem}
+  .race-row .rank-delta{font-size:.68rem;padding:3px 6px}
+}
 .today-date{font-family:'Space Grotesk';font-size:1.1rem;color:var(--mint);margin-bottom:22px;letter-spacing:.04em}
 .today-match{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;margin-bottom:20px}
 .today-match .tm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
@@ -1184,6 +1311,364 @@ const LABELS = {
   borrego:['🐑 Borrego','🐑 Sheep'], equilibrado:['⚖️ Equilibrado','⚖️ Balanced'],
 };
 function labelOf(k){ const x = LABELS[k] || LABELS.equilibrado; return L(x[0], x[1]); }
+
+// PROTOTYPE: Three live-ranking graph variants, switchable via ?variant=A/B/C, mounted in #aciertos.
+const RANKING_VARIANTS = {
+  A: ['Bump chart', 'Bump chart'],
+  B: ['Carrera por partido', 'Match-by-match race'],
+  C: ['Matriz de posiciones', 'Rank matrix'],
+};
+const RANK_COLORS = ['#7afcd0','#ffd27a','#ff7a7a','#75e0ff','#b994ff','#ff9d52','#a5e66f','#f56ad0','#8aa0ff','#49d6bb'];
+let prototypeKeyListenerReady = false;
+let racePlayTimer = null;
+
+function currentRankingVariant(){
+  const raw = new URLSearchParams(location.search).get('variant');
+  const key = raw ? raw.toUpperCase() : '';
+  return RANKING_VARIANTS[key] ? key : null;
+}
+function variantLabel(key){ const x = RANKING_VARIANTS[key] || RANKING_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
+function liveHistory(){ return (D.live && D.live.progression) || []; }
+function latestSnapshot(){ const h = liveHistory(); return h[h.length - 1] || null; }
+function matchTitle(m){
+  if(!m) return '–';
+  return `${m.home_flag} ${esc(team(m.home))} ${m.result.home}-${m.result.away} ${esc(team(m.away))} ${m.away_flag}`;
+}
+function rankDelta(row){
+  if(!row.delta) return `<span class="rank-delta">=</span>`;
+  const cls = row.delta > 0 ? 'up' : 'down';
+  return `<span class="rank-delta ${cls}">${row.delta > 0 ? '+' : ''}${row.delta}</span>`;
+}
+function rankDeltaLong(row){
+  if(!row.delta) return `<span class="rank-delta">=</span>`;
+  const cls = row.delta > 0 ? 'up' : 'down';
+  const word = row.delta > 0 ? L('sube','up') : L('baja','down');
+  return `<span class="rank-delta ${cls}">${row.delta > 0 ? '+' : ''}${row.delta} ${word}</span>`;
+}
+function rankingColorMap(){
+  const map = {};
+  (D.live && D.live.table || []).forEach((r,i) => { map[r.name] = RANK_COLORS[i % RANK_COLORS.length]; });
+  return map;
+}
+function clearRaceTimer(){
+  if(racePlayTimer){
+    clearInterval(racePlayTimer);
+    racePlayTimer = null;
+  }
+}
+function rowMap(rows){
+  const map = {};
+  rows.forEach(r => { map[r.name] = r; });
+  return map;
+}
+function smoothPath(points){
+  if(!points.length) return '';
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for(let i=1;i<points.length;i++){
+    const a = points[i-1], b = points[i], mid = (a.x + b.x) / 2;
+    d += ` C ${mid.toFixed(1)} ${a.y.toFixed(1)} ${mid.toFixed(1)} ${b.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+  }
+  return d;
+}
+function renderRankingState(rows, limit){
+  return `<div class="rank-table-compact">${rows.slice(0, limit || rows.length).map(r =>
+    `<div class="rank-row">
+      <div class="bar-rank">${r.rank}</div>
+      <div class="rr-name">${esc(r.name)} ${rankDelta(r)}</div>
+      <div class="rr-points">${r.pts}</div>
+    </div>`).join('')}</div>`;
+}
+function rankHeat(rank, total){
+  const t = total <= 1 ? 0 : (rank - 1) / (total - 1);
+  if(t < .12) return '#ffd27a';
+  if(t < .38) return '#7afcd0';
+  if(t < .7) return '#75e0ff';
+  return '#ff8e7d';
+}
+function setRankingVariant(next){
+  clearRaceTimer();
+  const url = new URL(location.href);
+  url.searchParams.set('variant', next);
+  if(!url.hash) url.hash = '#aciertos';
+  history.replaceState(null, '', url);
+  rebuild();
+  const target = document.getElementById('aciertos');
+  if(target) target.scrollIntoView({block:'start'});
+}
+function cycleRankingVariant(dir){
+  const keys = Object.keys(RANKING_VARIANTS);
+  const current = currentRankingVariant() || 'A';
+  const idx = keys.indexOf(current);
+  setRankingVariant(keys[(idx + dir + keys.length) % keys.length]);
+}
+function ensurePrototypeKeys(){
+  if(prototypeKeyListenerReady) return;
+  document.addEventListener('keydown', e => {
+    if(!currentRankingVariant()) return;
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || (document.activeElement && document.activeElement.isContentEditable)) return;
+    if(e.key === 'ArrowLeft'){ e.preventDefault(); cycleRankingVariant(-1); }
+    if(e.key === 'ArrowRight'){ e.preventDefault(); cycleRankingVariant(1); }
+  });
+  prototypeKeyListenerReady = true;
+}
+function renderPrototypeSwitcher(){
+  const old = document.querySelector('.proto-switcher');
+  if(old) old.remove();
+  const key = currentRankingVariant();
+  if(!key) return;
+  ensurePrototypeKeys();
+  const bar = el('div','proto-switcher',
+    `<button type="button" data-dir="-1" aria-label="${L('Variante anterior','Previous variant')}">‹</button>
+     <span>${variantLabel(key)}</span>
+     <button type="button" data-dir="1" aria-label="${L('Variante siguiente','Next variant')}">›</button>`);
+  bar.addEventListener('click', e => {
+    const b = e.target.closest('button[data-dir]');
+    if(b) cycleRankingVariant(Number(b.dataset.dir));
+  });
+  document.body.appendChild(bar);
+}
+function buildRankingPrototype(s, variant){
+  const snap = latestSnapshot();
+  if(!snap){
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">📈</div><h3 style="margin:10px 0 6px">${L('Sin histórico todavía','No history yet')}</h3>
+       <p class="muted">${L('El prototipo necesita al menos un resultado real cargado.','The prototype needs at least one real score loaded.')}</p>`));
+    return;
+  }
+  s.appendChild(el('div','rank-proto-note reveal', `${L('Prototipo','Prototype')} · ${variantLabel(variant)}`));
+  if(variant === 'B') return buildRankingRaceVariant(s);
+  if(variant === 'C') return buildRankingMatrixVariant(s);
+  return buildRankingBumpVariant(s);
+}
+function buildRankingBumpVariant(s){
+  const hist = liveHistory(), finalRows = D.live.table, total = finalRows.length;
+  const names = finalRows.map(r => r.name);
+  const left = 112, right = 166, top = 42, rowH = 31, bottom = 46;
+  const plotW = Math.max(740, (hist.length - 1) * 76);
+  const width = left + plotW + right, height = top + rowH * Math.max(1, total - 1) + bottom;
+  const maps = hist.map(h => rowMap(h.table));
+  const xAt = i => left + (hist.length <= 1 ? 0 : (i / (hist.length - 1)) * plotW);
+  const yAt = rank => top + (rank - 1) * rowH;
+  const grid = hist.map((h,i) => {
+    const x = xAt(i);
+    const label = i === 0 || i === hist.length - 1 || i % 3 === 0 ? `<text class="bump-axis-label" x="${x}" y="${height-14}" text-anchor="middle">P${h.idx}</text>` : '';
+    return `<line class="bump-grid" x1="${x}" y1="${top-18}" x2="${x}" y2="${height-bottom+12}"></line>${label}`;
+  }).join('');
+  const rankLabels = [1,2,3,5,10,15,20,total].filter((v,i,a) => v <= total && a.indexOf(v) === i).map(r =>
+    `<text class="bump-rank-label" x="${left-58}" y="${yAt(r)+4}">#${r}</text>
+     <line class="bump-grid" x1="${left-24}" y1="${yAt(r)}" x2="${width-right+24}" y2="${yAt(r)}"></line>`).join('');
+  const lines = names.map((name, idx) => {
+    const points = maps.map((m,i) => ({x:xAt(i), y:yAt(m[name].rank), row:m[name], snap:hist[i]}));
+    const color = RANK_COLORS[idx % RANK_COLORS.length];
+    const prominent = idx < 8;
+    const first = points[0], last = points[points.length - 1];
+    const nodes = prominent ? points.map(p => `<circle class="bump-point" cx="${p.x}" cy="${p.y}" r="4" fill="${color}"><title>${esc(name)} · #${p.row.rank} · ${p.row.pts} pts · ${p.snap.code}</title></circle>`).join('') : '';
+    return `<path class="bump-line ${prominent?'':'bump-line-muted'}" d="${smoothPath(points)}" stroke="${color}" stroke-width="${prominent?4:2}"><title>${esc(name)}</title></path>
+      ${nodes}
+      <text class="bump-name" x="${left-12}" y="${first.y+4}" text-anchor="end" fill="${color}">${esc(name)}</text>
+      <text class="bump-name" x="${width-right+12}" y="${last.y+4}" fill="${color}">${esc(name)}</text>
+      <text class="bump-score" x="${width-right+112}" y="${last.y+4}" text-anchor="end">${last.row.pts} pts</text>`;
+  }).join('');
+  const card = el('div','rank-proto-card reveal',
+    `<div class="rank-proto-top">
+      <div><h3>${L('Evolución puesto a puesto','Position-by-position evolution')}</h3>
+      <p class="muted">${L('Cada línea sigue a una persona después de cada partido jugado.','Each line follows one person after every finished match.')}</p></div>
+      <div class="rank-proto-meta">
+        <span class="rank-state-pill"><b>${D.live.played}</b> ${L('partidos','matches')}</span>
+        <span class="rank-state-pill"><b>${esc(finalRows[0].name)}</b> ${L('líder','leader')}</span>
+        <span class="rank-state-pill"><b>${finalRows[0].pts}</b> pts</span>
+      </div>
+    </div>
+    <div class="bump-scroll">
+      <svg class="bump-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${L('Evolución del ranking partido a partido','Ranking evolution match by match')}">
+        ${grid}${rankLabels}${lines}
+      </svg>
+    </div>
+    ${renderRankingState(finalRows, 12)}`);
+  s.appendChild(card);
+}
+function buildRankingRaceVariant(s){
+  clearRaceTimer();
+  const hist = liveHistory(), finalRows = D.live.table, mx = finalRows[0].pts || 1, colors = rankingColorMap();
+  const card = el('div','rank-proto-card reveal',
+    `<div class="rank-proto-top">
+      <div><h3>${L('Carrera partido a partido','Match-by-match race')}</h3>
+      <p class="muted">${L('Barras acumuladas, color por persona y delta de puesto contra el partido anterior.','Accumulated bars, one colour per person, and rank delta against the previous match.')}</p></div>
+      <div class="rank-proto-meta"><span class="rank-state-pill"><b>${hist.length}</b> ${L('partidos','matches')}</span></div>
+    </div>
+    <div class="race-layout">
+      <div class="race-control">
+        <div class="k">${L('Partido','Match')}</div>
+        <input type="range" min="0" max="${hist.length-1}" value="${hist.length-1}">
+        <div class="race-actions">
+          <button type="button" class="race-prev" aria-label="${L('Partido anterior','Previous match')}">‹</button>
+          <button type="button" class="race-play" aria-label="${L('Reproducir','Play')}">▶</button>
+          <div class="race-step"></div>
+          <button type="button" class="race-next" aria-label="${L('Partido siguiente','Next match')}">›</button>
+        </div>
+        <div class="race-match"></div>
+        <div class="muted race-date"></div>
+        <div class="race-now"></div>
+        <div class="race-legend">
+          <span><i class="race-dot" style="background:var(--mint)"></i>${L('sube en ranking','rank up')}</span>
+          <span><i class="race-dot" style="background:var(--red)"></i>${L('baja en ranking','rank down')}</span>
+          <span><i class="race-dot" style="background:var(--gold)"></i>${L('pts del partido','match pts')}</span>
+        </div>
+        <div class="race-feed"></div>
+      </div>
+      <div class="race-board"></div>
+    </div>`);
+  const input = card.querySelector('input');
+  const board = card.querySelector('.race-board');
+  const match = card.querySelector('.race-match');
+  const date = card.querySelector('.race-date');
+  const step = card.querySelector('.race-step');
+  const now = card.querySelector('.race-now');
+  const feed = card.querySelector('.race-feed');
+  const play = card.querySelector('.race-play');
+  const prev = card.querySelector('.race-prev');
+  const next = card.querySelector('.race-next');
+  function setPlaying(isPlaying){
+    play.textContent = isPlaying ? 'Ⅱ' : '▶';
+    play.setAttribute('aria-label', isPlaying ? L('Pausar','Pause') : L('Reproducir','Play'));
+  }
+  function stopPlaying(){
+    clearRaceTimer();
+    setPlaying(false);
+  }
+  function goTo(idx){
+    input.value = String(Math.max(0, Math.min(hist.length - 1, idx)));
+    paint();
+  }
+  function collectRowRects(){
+    const rects = new Map();
+    board.querySelectorAll('.race-row').forEach(row => {
+      rects.set(row.dataset.name, row.getBoundingClientRect());
+    });
+    return rects;
+  }
+  function rowHtml(r,i){
+    return `<div class="race-row ${i===0?'leader':''} ${r.delta>0?'moved-up':(r.delta<0?'moved-down':'')}" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || RANK_COLORS[i % RANK_COLORS.length]}">
+      <div class="bar-rank">${r.rank}</div>
+      <div class="bar-name">${esc(r.name)}</div>
+      ${rankDeltaLong(r)}
+      <div class="bar-track"><div class="race-fill" style="width:${(r.pts/mx*100).toFixed(1)}%"></div></div>
+      <div class="bar-val">${r.pts}</div>
+      <div class="race-round">+${r.round_pts || 0}</div>
+    </div>`;
+  }
+  function feedRow(row, valueHtml){
+    return `<div class="race-feed-row" style="--runner:${colors[row.name] || 'var(--mint)'}">
+      <b>${esc(row.name)}</b>
+      ${valueHtml}
+    </div>`;
+  }
+  function raceFeedHtml(snap){
+    const movers = snap.table
+      .filter(r => r.delta !== 0)
+      .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
+      .slice(0, 4);
+    const scorers = snap.table
+      .filter(r => (r.round_pts || 0) > 0)
+      .sort((a,b) => b.round_pts - a.round_pts || a.rank - b.rank)
+      .slice(0, 5);
+    const movementRows = movers.length
+      ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
+      : `<div class="race-feed-empty">${L('Sin cambios de puesto en este partido.','No rank changes in this match.')}</div>`;
+    const scorerRows = scorers.length
+      ? scorers.map(r => feedRow(r, `<small>+${r.round_pts} pts</small>`)).join('')
+      : `<div class="race-feed-empty">${L('Sin puntos repartidos todavía.','No points awarded yet.')}</div>`;
+    return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
+      <div class="race-feed-list">${movementRows}</div>
+      <div class="race-feed-title">${L('Puntos del partido','Match points')}</div>
+      <div class="race-feed-list">${scorerRows}</div>`;
+  }
+  function animateRowsFrom(previousRects){
+    if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(reduceMotion) return;
+    board.querySelectorAll('.race-row').forEach(row => {
+      const before = previousRects.get(row.dataset.name);
+      if(!before || typeof row.animate !== 'function') return;
+      const after = row.getBoundingClientRect();
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if(Math.abs(dx) < .5 && Math.abs(dy) < .5) return;
+      const duration = Math.min(880, Math.max(540, Math.round(430 + Math.abs(dy) * 1.05)));
+      row.classList.add('is-moving');
+      const animation = row.animate([
+        {transform:`translate3d(${dx}px,${dy}px,0)`},
+        {transform:'translate3d(0,0,0)'}
+      ], {duration, easing:'cubic-bezier(.16,.9,.2,1)', fill:'both'});
+      const cleanup = () => {
+        row.classList.remove('is-moving');
+        animation.cancel();
+      };
+      animation.finished.then(cleanup).catch(() => row.classList.remove('is-moving'));
+    });
+  }
+  function paint(options){
+    const animate = !options || options.animate !== false;
+    const previousRects = animate ? collectRowRects() : null;
+    const snap = hist[Number(input.value)];
+    const leader = snap.table[0];
+    const movers = snap.table.filter(r => r.delta !== 0).length;
+    const pointsNow = snap.table.reduce((sum,r) => sum + (r.round_pts || 0), 0);
+    step.textContent = `${snap.idx}/${hist.length}`;
+    match.innerHTML = `${snap.idx}. ${matchTitle(snap)}`;
+    date.textContent = `${snap.date} · ${L('Grupo','Group')} ${snap.group}`;
+    now.innerHTML = `
+      <span><b>${esc(leader.name)}</b>${L('líder','leader')} · ${leader.pts} pts</span>
+      <span><b>${movers}</b>${L('movimientos','moves')}</span>
+      <span><b>+${pointsNow}</b>${L('pts repartidos','pts awarded')}</span>`;
+    feed.innerHTML = raceFeedHtml(snap);
+    board.innerHTML = snap.table.map(rowHtml).join('');
+    requestAnimationFrame(() => animateRowsFrom(previousRects));
+  }
+  input.addEventListener('input', () => { stopPlaying(); paint(); });
+  prev.addEventListener('click', () => { stopPlaying(); goTo(Number(input.value) - 1); });
+  next.addEventListener('click', () => { stopPlaying(); goTo(Number(input.value) + 1); });
+  play.addEventListener('click', () => {
+    if(racePlayTimer){ stopPlaying(); return; }
+    if(Number(input.value) >= hist.length - 1) goTo(0);
+    setPlaying(true);
+    racePlayTimer = setInterval(() => {
+      const idx = Number(input.value);
+      if(idx >= hist.length - 1){ stopPlaying(); return; }
+      goTo(idx + 1);
+    }, 900);
+  });
+  paint({animate:false});
+  s.appendChild(card);
+}
+function buildRankingMatrixVariant(s){
+  const hist = liveHistory(), finalRows = D.live.table, total = finalRows.length;
+  const cols = `118px repeat(${hist.length},31px)`;
+  const header = `<div></div>` + hist.map(h => `<div class="rank-matrix-head">P${h.idx}</div>`).join('');
+  const maps = hist.map(h => rowMap(h.table));
+  const rows = finalRows.map(person => {
+    const cells = hist.map((h,i) => {
+      const r = maps[i][person.name];
+      return `<div class="rank-matrix-cell" style="background:${rankHeat(r.rank,total)}" title="${esc(person.name)} · ${h.code} · #${r.rank} · ${r.pts} pts">${r.rank}</div>`;
+    }).join('');
+    return `<div class="rank-matrix-name">${esc(person.name)}</div>${cells}`;
+  }).join('');
+  const card = el('div','rank-proto-card reveal',
+    `<div class="rank-proto-top">
+      <div><h3>${L('Todas las posiciones, sin cruces','Every rank without crossing lines')}</h3>
+      <p class="muted">${L('Cada celda es el puesto de una persona tras ese partido; dorado arriba, rojo abajo.','Each cell is a person’s rank after that match; gold is top, red is bottom.')}</p></div>
+      <div class="rank-proto-meta">
+        <span class="rank-state-pill"><b>${total}</b> ${L('personas','people')}</span>
+        <span class="rank-state-pill"><b>${hist.length}</b> ${L('partidos','matches')}</span>
+      </div>
+    </div>
+    <div class="rank-matrix-scroll">
+      <div class="rank-matrix" style="grid-template-columns:${cols}">${header}${rows}</div>
+    </div>
+    ${renderRankingState(finalRows, total)}`);
+  s.appendChild(card);
+}
 
 /* ---- NAV (built once, labels re-rendered on language change) ---- */
 const rail = el('nav','rail');
@@ -1603,6 +2088,11 @@ function buildAciertos(){
   }
   const t = D.live.table, mx = t[0].pts || 1;
   s.appendChild(el('div','muted reveal', `${D.live.played} ${L('partidos jugados','matches played')}`));
+  const variant = currentRankingVariant();
+  if(variant){
+    buildRankingPrototype(s, variant);
+    return;
+  }
   const list = el('div','reveal');
   t.forEach((r,i) => list.appendChild(el('div','bar-row',
     `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'👑 ':''}${esc(r.name)} <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.sign} ${L('signos','outcomes')})</span></div>
@@ -1638,12 +2128,14 @@ function observeAll(){
 
 /* ---- BUILD / REBUILD ---- */
 function rebuild(){
+  clearRaceTimer();
   if(wrap) wrap.remove();
   wrap = el('div','wrap'); document.body.appendChild(wrap);
   renderRail();
   buildHoy(); buildAciertos(); buildUltimos(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
   buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildFooter();
   observeAll();
+  renderPrototypeSwitcher();
 }
 rebuild();
 """
