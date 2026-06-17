@@ -75,9 +75,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .bar-fill.cool{background:linear-gradient(90deg,#2b6f7f,#4a9aa8)}
 .bar-fill.gold{background:linear-gradient(90deg,#caa24a,var(--gold))}
 .bar-val{font-family:'Space Grotesk';font-weight:700;text-align:right;font-size:.95rem}
-/* ranking prototype */
-.rank-proto-note{display:inline-flex;align-items:center;gap:8px;background:rgba(255,210,122,.12);border:1px solid rgba(255,210,122,.25);
-  border-radius:999px;padding:7px 11px;color:var(--gold);font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:18px}
+/* ranking evolution */
 .rank-proto-card{background:rgba(0,26,31,.34);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;overflow:hidden}
 .rank-proto-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
 .rank-proto-top h3{font-size:1.08rem;margin-bottom:4px}
@@ -354,6 +352,11 @@ function currentRankingVariant(){
   const key = raw ? raw.toUpperCase() : '';
   return RANKING_VARIANTS[key] ? key : 'B';
 }
+function explicitRankingVariant(){
+  const raw = new URLSearchParams(location.search).get('variant');
+  const key = raw ? raw.toUpperCase() : '';
+  return RANKING_VARIANTS[key] ? key : null;
+}
 function variantLabel(key){ const x = RANKING_VARIANTS[key] || RANKING_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
 function liveHistory(){ return (D.live && D.live.progression) || []; }
 function latestSnapshot(){ const h = liveHistory(); return h[h.length - 1] || null; }
@@ -442,7 +445,7 @@ function ensurePrototypeKeys(){
 function renderPrototypeSwitcher(){
   const old = document.querySelector('.proto-switcher');
   if(old) old.remove();
-  const key = currentRankingVariant();
+  const key = explicitRankingVariant();
   if(!key) return;
   ensurePrototypeKeys();
   const bar = el('div','proto-switcher',
@@ -460,10 +463,9 @@ function buildRankingPrototype(s, variant){
   if(!snap){
     s.appendChild(el('div','card teaser reveal',
       `<div class="em">📈</div><h3 style="margin:10px 0 6px">${L('Sin histórico todavía','No history yet')}</h3>
-       <p class="muted">${L('El prototipo necesita al menos un resultado real cargado.','The prototype needs at least one real score loaded.')}</p>`));
+       <p class="muted">${L('El ranking necesita al menos un resultado real cargado.','The ranking needs at least one real score loaded.')}</p>`));
     return;
   }
-  s.appendChild(el('div','rank-proto-note reveal', `${L('Prototipo','Prototype')} · ${variantLabel(variant)}`));
   if(variant === 'B') return buildRankingRaceVariant(s);
   if(variant === 'C') return buildRankingMatrixVariant(s);
   return buildRankingBumpVariant(s);
@@ -522,7 +524,6 @@ function buildRankingRaceVariant(s){
     `<div class="rank-proto-top">
       <div><h3>${L('Carrera partido a partido','Match-by-match race')}</h3>
       <p class="muted">${L('Barras acumuladas, color por persona y delta de puesto contra el partido anterior.','Accumulated bars, one colour per person, and rank delta against the previous match.')}</p></div>
-      <div class="rank-proto-meta"><span class="rank-state-pill"><b>${hist.length}</b> ${L('partidos','matches')}</span></div>
     </div>
     <div class="race-layout">
       <div class="race-control">
@@ -1114,7 +1115,6 @@ function buildAciertos(){
     return;
   }
   const t = D.live.table, mx = t[0].pts || 1;
-  s.appendChild(el('div','muted reveal', `${D.live.played} ${L('partidos jugados','matches played')}`));
   const variant = currentRankingVariant();
   if(variant){
     buildRankingPrototype(s, variant);
