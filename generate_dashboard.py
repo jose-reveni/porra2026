@@ -1312,7 +1312,7 @@ const LABELS = {
 };
 function labelOf(k){ const x = LABELS[k] || LABELS.equilibrado; return L(x[0], x[1]); }
 
-// PROTOTYPE: Three live-ranking graph variants, switchable via ?variant=A/B/C, mounted in #aciertos.
+// Live ranking variants, switchable via ?variant=A/B/C. Variant B is the default in #aciertos.
 const RANKING_VARIANTS = {
   A: ['Bump chart', 'Bump chart'],
   B: ['Carrera por partido', 'Match-by-match race'],
@@ -1325,7 +1325,7 @@ let racePlayTimer = null;
 function currentRankingVariant(){
   const raw = new URLSearchParams(location.search).get('variant');
   const key = raw ? raw.toUpperCase() : '';
-  return RANKING_VARIANTS[key] ? key : null;
+  return RANKING_VARIANTS[key] ? key : 'B';
 }
 function variantLabel(key){ const x = RANKING_VARIANTS[key] || RANKING_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
 function liveHistory(){ return (D.live && D.live.progression) || []; }
@@ -1397,7 +1397,7 @@ function setRankingVariant(next){
 }
 function cycleRankingVariant(dir){
   const keys = Object.keys(RANKING_VARIANTS);
-  const current = currentRankingVariant() || 'A';
+  const current = currentRankingVariant();
   const idx = keys.indexOf(current);
   setRankingVariant(keys[(idx + dir + keys.length) % keys.length]);
 }
