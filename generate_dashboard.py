@@ -954,6 +954,7 @@ def compute_recent_results(data, matches, limit=6):
 def compute_today(data, matches):
     names = data["names"]
     all_matches = []
+    trivia_used = defaultdict(int)
     for m in matches:
         picks = []
         for i, (h, a) in enumerate(m["picks"]):
@@ -971,10 +972,12 @@ def compute_today(data, matches):
         if unique_picks:
             best = max(unique_picks, key=lambda x: sum(int(g) for g in x[1].split("-")) + abs(int(x[1].split("-")[0]) - int(x[1].split("-")[1])))
             most_unique = {"name": best[0], "score": best[1]}
-        m_num = int(m["code"].split("-M")[1])
-        t_idx = (m_num - 1) % 3
-        home_trivia = TRIVIA.get(m["home_en"], [("", "")] * 3)[t_idx]
-        away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx]
+        t_idx_home = trivia_used[m["home_en"]]
+        t_idx_away = trivia_used[m["away_en"]]
+        trivia_used[m["home_en"]] += 1
+        trivia_used[m["away_en"]] += 1
+        home_trivia = TRIVIA.get(m["home_en"], [("", "")] * 3)[t_idx_home % 3]
+        away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx_away % 3]
         all_matches.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
             "home_en": m["home_en"], "away_en": m["away_en"],

@@ -79,6 +79,22 @@ class TestTodayData:
             assert len(m["date"]) == 10
 
 
+class TestTodayTrivia:
+    def test_no_repeated_trivia_for_same_team(self, computed_data):
+        from collections import defaultdict
+
+        trivia_by_team = defaultdict(list)
+        for m in computed_data["today"]["matches"]:
+            trivia_by_team[m["home_en"]].append(m["home_trivia"]["es"])
+            trivia_by_team[m["away_en"]].append(m["away_trivia"]["es"])
+
+        for team, facts in trivia_by_team.items():
+            non_empty = [f for f in facts if f]
+            assert len(non_empty) == len(set(non_empty)), (
+                f"Team {team} has repeated trivia facts"
+            )
+
+
 class TestTodayMatchdayDate:
     def test_spanish_early_morning_uses_previous_matchday(self):
         js = _extract_js_function(gd.JS, "matchdayDateStr")
