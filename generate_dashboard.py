@@ -954,7 +954,18 @@ def compute_recent_results(data, matches, limit=6):
 def compute_today(data, matches):
     names = data["names"]
     all_matches = []
+
+    # El primer partido de cada país ya mostró un fact con la lógica antigua
+    # (m_num-1)%3. Partimos de ese índice para que los siguientes partidos no
+    # repitan el ya visto.
+    trivia_first_idx = {}
+    for m in sorted(matches, key=lambda x: (x["date"], x["code"])):
+        for team in (m["home_en"], m["away_en"]):
+            if team not in trivia_first_idx:
+                m_num = int(m["code"].split("-M")[1])
+                trivia_first_idx[team] = (m_num - 1) % 3
     trivia_used = defaultdict(int)
+
     for m in matches:
         picks = []
         for i, (h, a) in enumerate(m["picks"]):
@@ -972,12 +983,12 @@ def compute_today(data, matches):
         if unique_picks:
             best = max(unique_picks, key=lambda x: sum(int(g) for g in x[1].split("-")) + abs(int(x[1].split("-")[0]) - int(x[1].split("-")[1])))
             most_unique = {"name": best[0], "score": best[1]}
-        t_idx_home = trivia_used[m["home_en"]]
-        t_idx_away = trivia_used[m["away_en"]]
+        t_idx_home = (trivia_first_idx.get(m["home_en"], 0) + trivia_used[m["home_en"]]) % 3
+        t_idx_away = (trivia_first_idx.get(m["away_en"], 0) + trivia_used[m["away_en"]]) % 3
         trivia_used[m["home_en"]] += 1
         trivia_used[m["away_en"]] += 1
-        home_trivia = TRIVIA.get(m["home_en"], [("", "")] * 3)[t_idx_home % 3]
-        away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx_away % 3]
+        home_trivia = TRIVIA.get(m["home_en"], [("", "")] * 3)[t_idx_home]
+        away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx_away]
         all_matches.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
             "home_en": m["home_en"], "away_en": m["away_en"],
