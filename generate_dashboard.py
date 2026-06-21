@@ -20,7 +20,7 @@ import json
 import sys
 import statistics
 from collections import Counter, defaultdict
-from datetime import date as _date
+from datetime import date as _date, datetime, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -78,6 +78,71 @@ MATCH_DATES = {
     "GL-M3": "2026-06-23", "GL-M4": "2026-06-23",
     "GL-M5": "2026-06-27", "GL-M6": "2026-06-27",
 }
+
+# Horario real de saque del Mundial 2026 (fuente: calendario oficial), en hora
+# del Este de EE. UU. (ET, UTC-4 en junio). Se muestra convertido a hora
+# peninsular española (CEST, UTC+2) = ET + 6h. Las fechas de agrupación por
+# jornada viven en MATCH_DATES; aquí solo está el instante de saque.
+MATCH_KICKOFF_ET = {
+    "GA-M1": "2026-06-11T15:00", "GA-M2": "2026-06-11T22:00",
+    "GA-M3": "2026-06-18T12:00", "GA-M4": "2026-06-18T21:00",
+    "GA-M5": "2026-06-24T21:00", "GA-M6": "2026-06-24T21:00",
+    "GB-M1": "2026-06-12T15:00", "GB-M2": "2026-06-13T15:00",
+    "GB-M3": "2026-06-18T15:00", "GB-M4": "2026-06-18T18:00",
+    "GB-M5": "2026-06-24T15:00", "GB-M6": "2026-06-24T15:00",
+    "GC-M1": "2026-06-13T18:00", "GC-M2": "2026-06-13T21:00",
+    "GC-M3": "2026-06-19T18:00", "GC-M4": "2026-06-19T20:30",
+    "GC-M5": "2026-06-24T18:00", "GC-M6": "2026-06-24T18:00",
+    "GD-M1": "2026-06-12T21:00", "GD-M2": "2026-06-14T00:00",
+    "GD-M3": "2026-06-19T00:00", "GD-M4": "2026-06-19T15:00",
+    "GD-M5": "2026-06-25T22:00", "GD-M6": "2026-06-25T22:00",
+    "GE-M1": "2026-06-14T13:00", "GE-M2": "2026-06-14T19:00",
+    "GE-M3": "2026-06-20T16:00", "GE-M4": "2026-06-20T20:00",
+    "GE-M5": "2026-06-25T16:00", "GE-M6": "2026-06-25T16:00",
+    "GF-M1": "2026-06-14T16:00", "GF-M2": "2026-06-14T22:00",
+    "GF-M3": "2026-06-20T13:00", "GF-M4": "2026-06-21T00:00",
+    "GF-M5": "2026-06-25T19:00", "GF-M6": "2026-06-25T19:00",
+    "GG-M1": "2026-06-15T15:00", "GG-M2": "2026-06-15T21:00",
+    "GG-M3": "2026-06-21T15:00", "GG-M4": "2026-06-21T21:00",
+    "GG-M5": "2026-06-26T23:00", "GG-M6": "2026-06-26T23:00",
+    "GH-M1": "2026-06-15T12:00", "GH-M2": "2026-06-15T18:00",
+    "GH-M3": "2026-06-21T12:00", "GH-M4": "2026-06-21T18:00",
+    "GH-M5": "2026-06-26T20:00", "GH-M6": "2026-06-26T20:00",
+    "GI-M1": "2026-06-16T15:00", "GI-M2": "2026-06-16T18:00",
+    "GI-M3": "2026-06-22T17:00", "GI-M4": "2026-06-22T20:00",
+    "GI-M5": "2026-06-26T15:00", "GI-M6": "2026-06-26T15:00",
+    "GJ-M1": "2026-06-16T21:00", "GJ-M2": "2026-06-17T00:00",
+    "GJ-M3": "2026-06-22T13:00", "GJ-M4": "2026-06-22T23:00",
+    "GJ-M5": "2026-06-27T22:00", "GJ-M6": "2026-06-27T22:00",
+    "GK-M1": "2026-06-17T13:00", "GK-M2": "2026-06-17T22:00",
+    "GK-M3": "2026-06-23T13:00", "GK-M4": "2026-06-23T22:00",
+    "GK-M5": "2026-06-27T19:30", "GK-M6": "2026-06-27T19:30",
+    "GL-M1": "2026-06-17T16:00", "GL-M2": "2026-06-17T19:00",
+    "GL-M3": "2026-06-23T16:00", "GL-M4": "2026-06-23T19:00",
+    "GL-M5": "2026-06-27T17:00", "GL-M6": "2026-06-27T17:00",
+}
+
+# Offsets desde ET (UTC-4 en junio): peninsular = UTC+2 (ET+6), R. Unido = BST
+# UTC+1 (ET+5). El idioma del dashboard decide cuál se muestra.
+_ET_OFFSETS = {"es": timedelta(hours=6), "uk": timedelta(hours=5)}
+
+
+def kickoff_info(code):
+    """Horas de saque por idioma (peninsular para ES, británica para EN) más el
+    instante absoluto para ordenar. next_<lang>=True si en esa zona ya es el día
+    siguiente al de la jornada (partidos de madrugada)."""
+    et = MATCH_KICKOFF_ET.get(code)
+    if not et:
+        return {"time_es": "", "time_uk": "", "next_es": False, "next_uk": False, "dt": ""}
+    base = datetime.fromisoformat(et)
+    porra_date = MATCH_DATES.get(code, "")
+    # cualquier offset fijo sirve como clave de orden (mismo instante para todos)
+    out = {"dt": (base + _ET_OFFSETS["es"]).isoformat()}
+    for lang, off in _ET_OFFSETS.items():
+        local = base + off
+        out[f"time_{lang}"] = local.strftime("%H:%M")
+        out[f"next_{lang}"] = local.date().isoformat() != porra_date
+    return out
 
 # Traducción EN -> ES (reconocible) + bandera
 TEAMS = {
@@ -401,7 +466,7 @@ def parse_workbook(path):
         code = code.strip()
         home_en, _, away_en = teams.strip().partition(" vs ")
         home_en, away_en = home_en.strip(), away_en.strip()
-        group = code.split("-")[0].replace("G", "")  # "GA-M1" -> "A"
+        group = code.split("-")[0][1:]  # "GA-M1" -> "A", "GG-M3" -> "G"
         picks = []
         for p in participants:
             hg = raw.cell(r, p["home_col"]).value
@@ -414,6 +479,7 @@ def parse_workbook(path):
             "home_flag": team_flag(home_en), "away_flag": team_flag(away_en),
             "picks": picks,
             "date": MATCH_DATES.get(code, ""),
+            **kickoff_info(code),
         })
 
     # Clasificados por grupo (1/2/3)
@@ -869,7 +935,7 @@ def compute_live(data, matches):
 
     played_matches = sorted(
         [m for m in matches if m["code"] in results],
-        key=lambda m: (m["date"], m["code"]),
+        key=lambda m: (m["date"], m.get("dt", ""), m["code"]),
     )
     progression = []
     previous_ranks = {}
@@ -947,7 +1013,7 @@ def compute_recent_results(data, matches, limit=6):
             "sign": sign,
             "miss": miss,
         })
-    played.sort(key=lambda m: (m["date"], m["code"]), reverse=True)
+    played.sort(key=lambda m: (m["date"], m.get("dt", ""), m["code"]), reverse=True)
     return {"matches": played[:limit], "total": len(played)}
 
 
@@ -959,7 +1025,7 @@ def compute_today(data, matches):
     # (m_num-1)%3. Partimos de ese índice para que los siguientes partidos no
     # repitan el ya visto.
     trivia_first_idx = {}
-    for m in sorted(matches, key=lambda x: (x["date"], x["code"])):
+    for m in sorted(matches, key=lambda x: (x["date"], x.get("dt", ""), x["code"])):
         for team in (m["home_en"], m["away_en"]):
             if team not in trivia_first_idx:
                 m_num = int(m["code"].split("-M")[1])
@@ -991,6 +1057,9 @@ def compute_today(data, matches):
         away_trivia = TRIVIA.get(m["away_en"], [("", "")] * 3)[t_idx_away]
         all_matches.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
+            "time_es": m.get("time_es", ""), "time_uk": m.get("time_uk", ""),
+            "next_es": m.get("next_es", False), "next_uk": m.get("next_uk", False),
+            "dt": m.get("dt", ""),
             "home_en": m["home_en"], "away_en": m["away_en"],
             "home": m["home"], "away": m["away"],
             "home_flag": m["home_flag"], "away_flag": m["away_flag"],
@@ -1002,6 +1071,7 @@ def compute_today(data, matches):
             "home_trivia": {"es": home_trivia[0], "en": home_trivia[1]},
             "away_trivia": {"es": away_trivia[0], "en": away_trivia[1]},
         })
+    all_matches.sort(key=lambda x: (x["date"], x.get("dt", ""), x["code"]))
     return {"matches": all_matches}
 
 
@@ -1246,6 +1316,9 @@ footer .brand svg{height:20px;width:auto}
 .today-match .tm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .today-match .tm-teams{font-family:'Space Grotesk';font-size:1.3rem;font-weight:700;display:flex;align-items:center;gap:8px}
 .today-match .tm-group{font-size:.78rem;color:var(--muted);background:rgba(122,252,208,.08);padding:4px 10px;border-radius:8px;letter-spacing:.06em}
+.today-match .tm-tags{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.today-match .tm-time{font-size:.78rem;font-weight:700;color:var(--mint);background:rgba(122,252,208,.14);padding:4px 10px;border-radius:8px;letter-spacing:.04em}
+.tm-next{font-size:.62rem;font-weight:700;color:var(--bg,#001a1f);background:var(--mint);border-radius:5px;padding:1px 4px;margin-left:3px;vertical-align:top}
 .today-match .tm-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
 .today-match .tm-stat{background:rgba(0,0,0,.15);border-radius:12px;padding:12px;text-align:center}
 .today-match .tm-stat .val{font-family:'Space Grotesk';font-size:1.3rem;font-weight:700;color:var(--mint)}
@@ -1292,6 +1365,10 @@ let wrap = null;
 function L(es, en){ return LANG === 'es' ? es : en; }
 function team(es){ return LANG === 'es' ? es : (ES2EN[es] || es); }
 function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+// Hora de saque según idioma: ES -> peninsular, EN -> Reino Unido (BST).
+function koTime(m){ return (LANG==='es' ? m.time_es : m.time_uk) || ''; }
+function koNext(m){ return LANG==='es' ? !!m.next_es : !!m.next_uk; }
+function koTz(){ return L('hora peninsular','UK time'); }
 function fmt(v){
   let [a,b] = String(v).split('.');
   const th = LANG==='es' ? '.' : ',', dp = LANG==='es' ? ',' : '.';
@@ -1750,15 +1827,16 @@ function buildHoy(){
     L('Qué se juega hoy y qué ha puesto cada uno.','What\'s on today and what everyone predicted.'));
   const allM = D.today.matches || [];
   const todayStr = matchdayDateStr(new Date());
-  const todayMatches = allM.filter(m => m.date === todayStr);
+  const todayMatches = allM.filter(m => m.date === todayStr)
+    .sort((a,b) => (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code));
   if(!todayMatches.length){
-    const upcoming = allM.filter(m => m.date > todayStr).sort((a,b) => a.date.localeCompare(b.date)).slice(0,6);
+    const upcoming = allM.filter(m => m.date > todayStr).sort((a,b) => a.date.localeCompare(b.date) || (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code)).slice(0,6);
     let nextHtml = '';
     if(upcoming.length){
       const grouped = {};
       upcoming.forEach(m => { if(!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
       nextHtml = '<div class="next">' + Object.entries(grouped).map(([dt, ms]) =>
-        ms.map(m => `<div class="next-match"><span class="next-date">${dt.slice(5)}</span>${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>`).join('')
+        ms.map(m => `<div class="next-match"><span class="next-date" title="${koTime(m)?esc(koTz()):''}">${dt.slice(5)}${koTime(m)?' · '+esc(koTime(m))+(koNext(m)?'<span class="tm-next">+1</span>':''):''}</span>${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>`).join('')
       ).join('') + '</div>';
     }
     s.appendChild(el('div','card no-today reveal',
@@ -1782,7 +1860,7 @@ function buildHoy(){
     s.appendChild(el('div','today-match reveal',
       `<div class="tm-head">
         <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
-        <span class="tm-group">${L('GRUPO','GROUP')} ${m.group}</span>
+        <div class="tm-tags">${koTime(m)?`<span class="tm-time" title="${esc(koTz())}">⏱ ${esc(koTime(m))}${koNext(m)?` <span class="tm-next" title="${L('madrugada del día siguiente','after midnight, next day')}">+1</span>`:''}</span>`:''}<span class="tm-group">${L('GRUPO','GROUP')} ${m.group}</span></div>
       </div>
       <div class="tm-stats">
         <div class="tm-stat"><div class="val">${pct('1')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.home))}</div></div>
