@@ -1194,6 +1194,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
   border:1px solid rgba(255,255,255,.06);border-left:3px solid var(--runner,var(--mint));border-radius:9px;padding:7px 8px;min-width:0}
 .race-feed-row b{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .race-feed-row small{font-family:'Space Grotesk';font-weight:800;color:var(--gold);white-space:nowrap}
+.race-feed-row small.sign-pts{color:var(--mint)}
 .race-feed-row .rank-delta{justify-self:end;background:rgba(0,0,0,.18);border-radius:999px;padding:2px 6px;font-size:.68rem}
 .race-feed-empty{border:1px dashed rgba(226,246,239,.13);border-radius:9px;padding:8px;color:var(--muted);font-size:.78rem}
 .race-board{display:grid;gap:8px;isolation:isolate}
@@ -1688,16 +1689,24 @@ function buildRankingRaceVariant(s){
     const plenos = snap.table
       .filter(r => (r.round_exact || 0) > 0)
       .sort((a,b) => a.rank - b.rank);
+    const signos = snap.table
+      .filter(r => (r.round_sign || 0) > 0)
+      .sort((a,b) => a.rank - b.rank);
     const movementRows = movers.length
       ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
       : `<div class="race-feed-empty">${L('Sin cambios de puesto en este partido.','No rank changes in this match.')}</div>`;
     const plenoRows = plenos.length
       ? plenos.map(r => feedRow(r, `<small>🎯 +${r.round_pts}</small>`)).join('')
       : `<div class="race-feed-empty">${L('Sin plenos en este partido.','No exact scores this match.')}</div>`;
+    const signoRows = signos.length
+      ? signos.map(r => feedRow(r, `<small class="sign-pts">✓ +2</small>`)).join('')
+      : `<div class="race-feed-empty">${L('Sin aciertos de signo en este partido.','No correct outcomes this match.')}</div>`;
     return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
       <div class="race-feed-list">${movementRows}</div>
       <div class="race-feed-title">${L('Plenos del partido','Exact scores')}<span>${plenos.length}</span></div>
-      <div class="race-feed-list">${plenoRows}</div>`;
+      <div class="race-feed-list">${plenoRows}</div>
+      <div class="race-feed-title">${L('Aciertos de signo','Correct outcomes')}<span>${signos.length}</span></div>
+      <div class="race-feed-list">${signoRows}</div>`;
   }
   function animateRowsFrom(previousRects){
     if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
