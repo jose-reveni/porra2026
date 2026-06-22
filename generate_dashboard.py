@@ -1211,6 +1211,19 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 @keyframes rankGlowUp{0%,100%{box-shadow:0 0 0 rgba(122,252,208,0)}45%{box-shadow:0 0 0 1px rgba(122,252,208,.28),0 0 24px rgba(122,252,208,.16)}}
 @keyframes rankGlowDown{0%,100%{box-shadow:0 0 0 rgba(255,122,122,0)}45%{box-shadow:0 0 0 1px rgba(255,122,122,.24),0 0 24px rgba(255,122,122,.13)}}
 .race-round{font-family:'Space Grotesk';font-weight:800;color:var(--runner);text-align:right;font-size:.88rem}
+.race-row .race-tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%) translateY(5px);
+  background:#02181c;border:1px solid rgba(122,252,208,.28);border-radius:11px;padding:9px 14px;display:flex;gap:16px;
+  white-space:nowrap;box-shadow:0 14px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;
+  transition:opacity .16s ease,transform .16s ease;z-index:20}
+.race-row .race-tip::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:#02181c}
+.race-row .race-tip .rt-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.62rem;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.race-row .race-tip .rt-item b{font-family:'Space Grotesk';font-size:1.12rem;line-height:1;color:var(--text)}
+.race-row .race-tip .rt-pleno b{color:var(--gold)}
+.race-row .race-tip .rt-sign b{color:var(--mint)}
+.race-row:hover{z-index:30;cursor:default}
+.race-row:hover .race-tip{opacity:1;transform:translateX(-50%) translateY(0)}
 .rank-matrix{display:grid;gap:3px;align-items:center;width:max-content;min-width:100%}
 .rank-matrix-name{width:118px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:.78rem}
 .rank-matrix-cell{width:31px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
@@ -1464,9 +1477,19 @@ function smoothPath(points){
   }
   return d;
 }
+function rankTip(r){
+  return `<div class="race-tip">
+    <span class="rt-item rt-pleno"><b>${r.exact || 0}</b>${L('plenos','exact')}</span>
+    <span class="rt-item rt-sign"><b>${r.sign || 0}</b>${L('aciertos','outcomes')}</span>
+    <span class="rt-item"><b>${r.pts}</b>pts</span>
+  </div>`;
+}
+function rankSummaryText(r){
+  return `${r.exact || 0} ${L('plenos','exact')} · ${r.sign || 0} ${L('aciertos','outcomes')} · ${r.pts} pts`;
+}
 function renderRankingState(rows, limit){
   return `<div class="rank-table-compact">${rows.slice(0, limit || rows.length).map(r =>
-    `<div class="rank-row">
+    `<div class="rank-row" title="${esc(r.name)} — ${rankSummaryText(r)}">
       <div class="bar-rank">${r.rank}</div>
       <div class="rr-name">${esc(r.name)} ${rankDelta(r)}</div>
       <div class="rr-points">${r.pts}</div>
@@ -1648,6 +1671,7 @@ function buildRankingRaceVariant(s){
       <div class="bar-track"><div class="race-fill" style="width:${(r.pts/mx*100).toFixed(1)}%"></div></div>
       <div class="bar-val">${r.pts}</div>
       <div class="race-round">+${r.round_pts || 0}</div>
+      ${rankTip(r)}
     </div>`;
   }
   function feedRow(row, valueHtml){
@@ -1661,20 +1685,19 @@ function buildRankingRaceVariant(s){
       .filter(r => r.delta !== 0)
       .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
       .slice(0, 4);
-    const scorers = snap.table
-      .filter(r => (r.round_pts || 0) > 0)
-      .sort((a,b) => b.round_pts - a.round_pts || a.rank - b.rank)
-      .slice(0, 5);
+    const plenos = snap.table
+      .filter(r => (r.round_exact || 0) > 0)
+      .sort((a,b) => a.rank - b.rank);
     const movementRows = movers.length
       ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
       : `<div class="race-feed-empty">${L('Sin cambios de puesto en este partido.','No rank changes in this match.')}</div>`;
-    const scorerRows = scorers.length
-      ? scorers.map(r => feedRow(r, `<small>+${r.round_pts} pts</small>`)).join('')
-      : `<div class="race-feed-empty">${L('Sin puntos repartidos todavía.','No points awarded yet.')}</div>`;
+    const plenoRows = plenos.length
+      ? plenos.map(r => feedRow(r, `<small>🎯 +${r.round_pts}</small>`)).join('')
+      : `<div class="race-feed-empty">${L('Sin plenos en este partido.','No exact scores this match.')}</div>`;
     return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
       <div class="race-feed-list">${movementRows}</div>
-      <div class="race-feed-title">${L('Puntos del partido','Match points')}</div>
-      <div class="race-feed-list">${scorerRows}</div>`;
+      <div class="race-feed-title">${L('Plenos del partido','Exact scores')}<span>${plenos.length}</span></div>
+      <div class="race-feed-list">${plenoRows}</div>`;
   }
   function animateRowsFrom(previousRects){
     if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
