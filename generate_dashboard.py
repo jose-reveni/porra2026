@@ -1203,7 +1203,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
   position:relative;will-change:transform,box-shadow;transition:border-color .25s ease,background .25s ease}
 .race-row .bar-track{height:10px}.race-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,color-mix(in srgb,var(--runner) 45%,#001a1f),var(--runner));
   transition:width .58s cubic-bezier(.2,.8,.2,1)}
-.race-row.leader{border-color:rgba(255,210,122,.45);background:rgba(255,210,122,.06)}
+.race-row.leader{border-color:rgba(255,210,122,.45);border-left-color:var(--runner);background:rgba(255,210,122,.06)}
 .race-row .rank-delta{justify-self:center;background:rgba(0,0,0,.18);border-radius:999px;padding:3px 7px;font-size:.74rem}
 .race-row.is-moving{z-index:5}
 .race-row.moved-up{z-index:3;animation:rankGlowUp .76s ease both}.race-row.moved-down{z-index:2;animation:rankGlowDown .76s ease both}
@@ -1421,7 +1421,28 @@ const RANKING_VARIANTS = {
   B: ['Carrera por partido', 'Match-by-match race'],
   C: ['Matriz de posiciones', 'Rank matrix'],
 };
-const RANK_COLORS = ['#7afcd0','#ffd27a','#ff7a7a','#75e0ff','#b994ff','#ff9d52','#a5e66f','#f56ad0','#8aa0ff','#49d6bb'];
+/* Colour por persona, determinista: cada participante conserva SIEMPRE el mismo
+   color en todas las secciones, independientemente de su puesto actual en el
+   ranking. El tono sale de un índice alfabético estable repartido por el ángulo
+   áureo; saturación y luminosidad son fijas para que todos los colores destaquen
+   sobre el fondo verde oscuro (sin marrones ni mostazas apagados). */
+let _personColorMap = null;
+function personColorMap(){
+  if(_personColorMap) return _personColorMap;
+  const names = ((D.live && D.live.table) || []).map(r => r.name)
+    .slice().sort((a,b) => a.localeCompare(b, 'es'));
+  const map = {};
+  names.forEach((name,i) => { map[name] = `hsl(${(i * 137.508 % 360).toFixed(1)} 72% 64%)`; });
+  _personColorMap = map;
+  return map;
+}
+function personColor(name){
+  const m = personColorMap();
+  if(m[name]) return m[name];
+  let h = 0;
+  for(let i=0;i<name.length;i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return `hsl(${h % 360} 72% 64%)`;
+}
 let prototypeKeyListenerReady = false;
 let racePlayTimer = null;
 
@@ -1455,7 +1476,7 @@ function rankDeltaLong(row){
 }
 function rankingColorMap(){
   const map = {};
-  (D.live && D.live.table || []).forEach((r,i) => { map[r.name] = RANK_COLORS[i % RANK_COLORS.length]; });
+  ((D.live && D.live.table) || []).forEach(r => { map[r.name] = personColor(r.name); });
   return map;
 }
 function clearRaceTimer(){
@@ -1577,7 +1598,7 @@ function buildRankingBumpVariant(s){
      <line class="bump-grid" x1="${left-24}" y1="${yAt(r)}" x2="${width-right+24}" y2="${yAt(r)}"></line>`).join('');
   const lines = names.map((name, idx) => {
     const points = maps.map((m,i) => ({x:xAt(i), y:yAt(m[name].rank), row:m[name], snap:hist[i]}));
-    const color = RANK_COLORS[idx % RANK_COLORS.length];
+    const color = personColor(name);
     const prominent = idx < 8;
     const first = points[0], last = points[points.length - 1];
     const nodes = prominent ? points.map(p => `<circle class="bump-point" cx="${p.x}" cy="${p.y}" r="4" fill="${color}"><title>${esc(name)} · #${p.row.rank} · ${p.row.pts} pts · ${p.snap.code}</title></circle>`).join('') : '';
@@ -1665,7 +1686,7 @@ function buildRankingRaceVariant(s){
     return rects;
   }
   function rowHtml(r,i){
-    return `<div class="race-row ${i===0?'leader':''} ${r.delta>0?'moved-up':(r.delta<0?'moved-down':'')}" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || RANK_COLORS[i % RANK_COLORS.length]}">
+    return `<div class="race-row ${i===0?'leader':''} ${r.delta>0?'moved-up':(r.delta<0?'moved-down':'')}" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || personColor(r.name)}">
       <div class="bar-rank">${r.rank}</div>
       <div class="bar-name">${esc(r.name)}</div>
       ${rankDeltaLong(r)}
@@ -1676,7 +1697,7 @@ function buildRankingRaceVariant(s){
     </div>`;
   }
   function feedRow(row, valueHtml){
-    return `<div class="race-feed-row" style="--runner:${colors[row.name] || 'var(--mint)'}">
+    return `<div class="race-feed-row" style="--runner:${colors[row.name] || personColor(row.name)}">
       <b>${esc(row.name)}</b>
       ${valueHtml}
     </div>`;
