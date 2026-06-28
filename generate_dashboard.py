@@ -1854,21 +1854,43 @@ footer .brand svg{height:20px;width:auto}
 /* bracket visualization */
 .bracket-wrap{background:linear-gradient(160deg,rgba(0,26,31,.45),rgba(6,58,68,.5));border:1px solid var(--line);
   border-radius:20px;padding:20px;overflow-x:auto;margin-top:8px}
-.bracket{display:flex;gap:34px;min-width:max-content;align-items:stretch}
-.bk-col{display:flex;flex-direction:column;justify-content:space-around;gap:14px;min-width:188px}
-.bk-col-head{font:800 .72rem 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:2px}
-.bk-match{position:relative;background:rgba(0,0,0,.22);border:1px solid rgba(122,252,208,.16);border-radius:12px;padding:10px}
-.bk-match.final{border-color:rgba(255,210,122,.4);background:linear-gradient(160deg,rgba(255,210,122,.12),rgba(0,0,0,.25))}
-.bk-match::after{content:'';position:absolute;top:50%;right:-34px;width:34px;height:1px;background:rgba(122,252,208,.22)}
-.bk-col:last-child .bk-match::after{display:none}
-.bk-code{font:700 .64rem 'Space Grotesk';color:var(--muted);letter-spacing:.06em;margin-bottom:6px;display:flex;justify-content:space-between}
-.bk-side{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:700;padding:3px 0}
-.bk-side .bk-flag{width:18px;text-align:center}
-.bk-side .bk-pct{margin-left:auto;font:800 .72rem 'Space Grotesk';color:var(--mint)}
+/* --- desktop: real tournament tree with measured SVG connectors --- */
+.bk-tree{position:relative;display:flex;gap:34px;min-width:max-content;align-items:stretch}
+.bk-lines{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
+.bk-lines path{fill:none;stroke:rgba(122,252,208,.3);stroke-width:1.5}
+.bk-col{position:relative;z-index:1;display:flex;flex-direction:column;min-width:184px}
+.bk-col-head{font:800 .72rem 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:12px}
+.bk-col-body{flex:1;display:flex;flex-direction:column;justify-content:space-around}
+.bk-finalcol .bk-col-body{justify-content:center}
+.bk-finalcol .bk-col-head{margin:0 0 8px}
+.bk-third-block{margin-top:22px}
+.bk-match{position:relative;background:rgba(0,0,0,.3);border:1px solid rgba(122,252,208,.16);border-radius:12px;padding:9px 11px;margin:7px 0}
+.bk-match.final{border-color:rgba(255,210,122,.42);background:linear-gradient(160deg,rgba(255,210,122,.13),rgba(0,0,0,.28))}
+.bk-match.third{border-color:rgba(255,255,255,.14);opacity:.9}
+.bk-code{font:700 .62rem 'Space Grotesk';color:var(--muted);letter-spacing:.05em;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
+.bk-side{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:700;padding:2px 0}
+.bk-side .bk-flag{width:18px;text-align:center;flex:none}
+.bk-side .bk-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bk-side .bk-pct{margin-left:auto;font:800 .72rem 'Space Grotesk';color:var(--mint);flex:none}
 .bk-side.dim{color:var(--muted);font-weight:600}
 .bk-cbar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);margin:7px 0 2px;overflow:hidden}
 .bk-cbar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
-.bk-tip{color:var(--muted);font-size:.7rem;margin-top:4px}
+.bk-tip{color:var(--muted);font-size:.68rem;margin-top:4px}
+/* --- mobile: round chips + full-width match list --- */
+.bk-mobile{display:none}
+.bk-chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:12px;margin-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bk-chips::-webkit-scrollbar{display:none}
+.bk-chip{flex:none;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);
+  border-radius:999px;padding:8px 15px;font:800 .82rem 'Space Grotesk';cursor:pointer;white-space:nowrap}
+.bk-chip.on{background:var(--mint);border-color:transparent;color:#001a1f}
+.bk-list{display:flex;flex-direction:column;gap:10px}
+.bk-list[hidden]{display:none}
+.bk-list .bk-match{margin:0}
+@media(max-width:760px){
+  .bracket-wrap{padding:14px;overflow:hidden}
+  .bk-tree{display:none}
+  .bk-mobile{display:block}
+}
 /* survival timeline */
 .survive{margin-top:22px;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:18px;padding:20px}
 .survive h3{font:800 1.1rem 'Space Grotesk';margin-bottom:4px}
@@ -1882,6 +1904,52 @@ footer .brand svg{height:20px;width:auto}
 .surv-cell.out{background:rgba(255,142,125,.22)}
 .surv-cell.fell{background:#ff8e7d;box-shadow:0 0 0 2px rgba(255,142,125,.3)}
 .survive .surv-scroll{overflow-x:auto}
+
+/* ---- KO METRICS PROTOTYPE (throwaway, ?ko=A|B|C) — delete once a layout wins ---- */
+.koproto-note{background:rgba(255,210,122,.12);border:1px solid rgba(255,210,122,.3);color:var(--gold);
+  border-radius:12px;padding:11px 15px;font-size:.86rem;margin-bottom:18px}
+.kp-dossier{background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:18px;padding:18px}
+.kp-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.kp-teamchip{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;
+  padding:6px 13px;font:800 .8rem 'Space Grotesk';cursor:pointer}
+.kp-teamchip.on{background:var(--mint);color:#001a1f;border-color:var(--mint)}
+.kp-dossier-head{font:800 1rem 'Space Grotesk';margin:0 0 12px}
+.kp-scatter{width:100%;height:auto}
+.kp-scatter text{fill:var(--muted);font:700 10px 'Space Grotesk'}
+.kp-scatter .axis{stroke:var(--line)}
+.kp-grave{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.kp-grave-card{background:rgba(255,142,125,.08);border:1px solid rgba(255,142,125,.25);border-radius:14px;
+  padding:14px;text-align:center}
+.kp-grave-card .x{font-size:1.6rem}
+.kp-grave-card .nm{font:800 1rem 'Space Grotesk';margin-top:4px}
+.kp-grave-card .ch{color:#ff8e7d;font-size:.8rem;margin-top:2px}
+.kp-twin-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.kp-twin-row .pct{margin-left:auto;font:800 1rem 'Space Grotesk';color:var(--mint)}
+.kp-twin-bar{flex:1;height:8px;border-radius:4px;background:rgba(122,252,208,.12);overflow:hidden;min-width:60px}
+.kp-twin-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
+.kp-stake{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.kp-stake .swing{font:800 1.8rem 'Space Grotesk';color:var(--gold)}
+.kp-act{padding:46px 0;border-bottom:1px solid var(--line)}
+.kp-act-kicker{font:800 .8rem 'Space Grotesk';letter-spacing:.16em;text-transform:uppercase;color:var(--mint);margin-bottom:10px}
+.kp-act h2{font-size:clamp(1.8rem,4vw,3rem);margin-bottom:14px}
+.kp-act-num{font:800 clamp(3rem,9vw,6rem) 'Space Grotesk';color:var(--mint);line-height:.95;margin-bottom:12px}
+.kp-act-lead{font-size:1.05rem;color:var(--muted);max-width:60ch}
+.kp-duo{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+.kp-duo .b{background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:16px;padding:18px}
+.kp-duo .b .big{font:800 1.6rem 'Space Grotesk';margin:6px 0}
+.kp-act-viz{margin-top:22px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:16px;padding:18px}
+.kp-act-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+.kp-act-grid .kp-act-viz{margin-top:0}
+.kp-tip{position:fixed;z-index:200;pointer-events:none;background:#001a1f;border:1px solid var(--line);
+  border-radius:10px;padding:7px 11px;font:700 .82rem 'Space Grotesk';color:var(--text);
+  box-shadow:0 10px 28px rgba(0,0,0,.45);opacity:0;transition:opacity .08s;max-width:240px}
+.kp-tip .muted{display:block;font-weight:600;font-size:.74rem;margin-top:2px}
+.kp-scatter circle{cursor:pointer;transition:stroke-width .08s}
+.kp-scatter circle:hover{stroke:#fff;stroke-width:2}
+.kp-fichas-wrap .search{margin-bottom:18px}
+@media(max-width:720px){.kp-act-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.kp-duo{grid-template-columns:1fr}}
+
 @media(max-width:560px){.proto-shell-inner{padding:10px 14px}.proto-body{padding:0 14px}}
 """
 
@@ -2930,65 +2998,180 @@ function buildTopBar(activeView){
   wrap.appendChild(bar);
 }
 function renderView(view){
-  if(view === 'ko'){ buildBracket(); buildSurvival(); buildEliminatorias(); }
+  if(view === 'ko'){
+    const kv = currentKoVariant();           // throwaway KO metrics prototype (?ko=A|B|C)
+    if(kv === 'A'){ buildKoIntro('A'); buildBracket(); buildKoDossier(); buildSurvival(); }
+    else if(kv === 'B'){ buildKoVariantB(); }
+    else if(kv === 'C'){ buildKoVariantC(); }
+    else { buildBracket(); buildSurvival(); buildEliminatorias(); }
+  }
   else if(view === 'groups'){
     buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
     buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
   }
-  else { buildHoy(); buildAciertos(); buildUltimos(); }
+  else { buildHoy(); buildStakeToday(); buildAciertos(); buildUltimos(); }
 }
 
-/* ---- BRACKET VISUALIZATION ---- */
-function bkSideName(m, side){
-  const flag = m['fixture_'+side+'_flag'] || '';
-  const name = m['fixture_'+side] || '–';
-  return {flag, name};
+/* ---- BRACKET VISUALIZATION ----
+   The FIFA 2026 bracket is a binary tree, but its ties are NOT sequential
+   (R16-M1 = W73 vs W75, not W73 vs W74). We rebuild the tree from the W-number
+   feeders so each tie sits next to its two real feeders, then draw the elbow
+   connectors as an SVG overlay measured from the live DOM (pixel-accurate
+   regardless of card heights / language). On mobile the tree is replaced by a
+   round selector + a full-width list of that round's ties. */
+const KO_WBASE = {R32:72, R16:88, QF:96, SF:100};
+function koWOf(code){
+  const m = /^(R32|R16|QF|SF)-M(\d+)$/.exec(code || '');
+  return m ? KO_WBASE[m[1]] + (+m[2]) : null;
 }
-function bkMatchNode(m, isFinal){
+function bkMatchNode(m, opts){
+  opts = opts || {};
   const k = D.knockout || {};
   const ready = k.ready && m.winner && m.winner.value;
   const pct = ready ? Math.round((m.winner.agreement || 0) * 100) : 0;
   const sideHtml = (side) => {
-    const s = bkSideName(m, side);
-    const isPick = ready && m.winner.value === s.name;
-    return `<div class="bk-side${ready && !isPick ? ' dim' : ''}">
-      <span class="bk-flag">${s.flag}</span><span>${esc(team(s.name))}</span>
-      ${isPick ? `<span class="bk-pct">${pct}%</span>` : ''}</div>`;
+    const flag = m['fixture_'+side+'_flag'] || '';
+    const name = m['fixture_'+side] || '–';
+    const isPick = ready && m.winner.value === name;
+    return `<div class="bk-side${ready && !isPick ? ' dim' : ''}">`
+      + `<span class="bk-flag">${flag}</span><span class="bk-nm">${esc(team(name))}</span>`
+      + `${isPick ? `<span class="bk-pct">${pct}%</span>` : ''}</div>`;
   };
   const consensus = ready
-    ? `<div class="bk-cbar"><span style="width:${pct}%"></span></div>
-       <div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
+    ? `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`
+      + `<div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
     : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`;
-  return `<div class="bk-match${isFinal ? ' final' : ''}">
-    <div class="bk-code"><span>${m.code || ''}</span><span>${m.date || ''}</span></div>
-    ${sideHtml('home')}${sideHtml('away')}
-    ${consensus}</div>`;
+  const cls = opts.cls ? ' ' + opts.cls : '';
+  const feeders = opts.feeders ? ` data-feeders="${opts.feeders.join(',')}"` : '';
+  return `<div class="bk-match${cls}" data-code="${m.code || ''}"${feeders}>`
+    + `<div class="bk-code"><span>${m.code || ''}</span><span>${m.date || ''}</span></div>`
+    + `${sideHtml('home')}${sideHtml('away')}${consensus}</div>`;
+}
+function drawBracketLines(tree){
+  const svg = tree.querySelector('.bk-lines');
+  if(!svg) return;
+  const tr = tree.getBoundingClientRect();
+  const w = tree.scrollWidth, h = tree.scrollHeight;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('width', w); svg.setAttribute('height', h);
+  const box = node => { const r = node.getBoundingClientRect();
+    return {l:r.left-tr.left, r:r.right-tr.left, cy:(r.top+r.bottom)/2-tr.top}; };
+  let paths = '';
+  tree.querySelectorAll('.bk-match[data-feeders]').forEach(pm => {
+    const p = box(pm);
+    pm.dataset.feeders.split(',').filter(Boolean).forEach(fc => {
+      const cm = tree.querySelector('.bk-match[data-code="' + fc + '"]');
+      if(!cm) return;
+      const c = box(cm), midX = (c.r + p.l) / 2;
+      paths += `<path d="M ${c.r.toFixed(1)} ${c.cy.toFixed(1)} H ${midX.toFixed(1)} V ${p.cy.toFixed(1)} H ${p.l.toFixed(1)}"/>`;
+    });
+  });
+  svg.innerHTML = paths;
+}
+let _bkResizeBound = false;
+function ensureBracketResize(){
+  if(_bkResizeBound) return; _bkResizeBound = true;
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => {
+    const tr = document.querySelector('.bk-tree');
+    if(tr && tr.offsetParent !== null) drawBracketLines(tr);
+  }, 150); });
+}
+function koBracketBox(){
+  const k = D.knockout || {};
+  const rounds = k.rounds || [];
+  const finals = k.final_matches || [];
+  if(!rounds.length && !finals.length) return null;
+  // index every tie by code and by the W-number its winner produces
+  const byCode = {}, wToCode = {};
+  const all = [];
+  rounds.forEach(r => (r.matches || []).forEach(m => all.push(m)));
+  finals.forEach(m => all.push(m));
+  all.forEach(m => { byCode[m.code] = m; const w = koWOf(m.code); if(w) wToCode[w] = m.code; });
+  const feederCodes = m => {
+    const cs = ['fixture_home','fixture_away'].map(key => {
+      const v = /^W(\d+)$/.exec(m[key] || ''); return v ? wToCode[+v[1]] : null;
+    });
+    return (cs[0] && cs[1]) ? cs : null;
+  };
+  // vertical order: rank each tie by the mean position of its R32 leaves so
+  // every tie lines up between its two feeders
+  const rankOf = {};
+  const leaves = code => { const m = byCode[code]; const f = m && feederCodes(m);
+    return f ? leaves(f[0]).concat(leaves(f[1])) : [code]; };
+  const order = byCode['FINAL'] ? leaves('FINAL')
+    : (rounds[0] ? rounds[0].matches.map(m => m.code) : []);
+  order.forEach((c, i) => { rankOf[c] = i; });
+  const rank = code => {
+    if(rankOf[code] != null) return rankOf[code];
+    const m = byCode[code], f = m && feederCodes(m);
+    const r = f ? (rank(f[0]) + rank(f[1])) / 2 : 0;
+    rankOf[code] = r; return r;
+  };
+  all.forEach(m => rank(m.code));
+  const sortByRank = list => list.slice().sort((a, b) => rank(a.code) - rank(b.code));
+  // columns: one per round, then a final column with Final + 3rd place
+  const cols = rounds.map(r => ({ key:r.key, head:L(r.label_es, r.label_en), matches:sortByRank(r.matches || []) }));
+  const finalMatch = byCode['FINAL'], thirdMatch = byCode['3P'];
+  // ---- desktop tree ----
+  let treeHtml = '<svg class="bk-lines" xmlns="http://www.w3.org/2000/svg"></svg>';
+  cols.forEach(c => {
+    treeHtml += `<div class="bk-col"><div class="bk-col-head">${c.head}</div>`
+      + `<div class="bk-col-body">`
+      + c.matches.map(m => bkMatchNode(m, {feeders:feederCodes(m)})).join('')
+      + '</div></div>';
+  });
+  if(finalMatch || thirdMatch){
+    let finalBlock = '', thirdBlock = '';
+    if(finalMatch) finalBlock = `<div class="bk-col-head">${L('Final','Final')}</div>`
+      + bkMatchNode(finalMatch, {cls:'final', feeders:feederCodes(finalMatch)});
+    if(thirdMatch) thirdBlock = `<div class="bk-third-block"><div class="bk-col-head">${L('3.er puesto','3rd place')}</div>`
+      + bkMatchNode(thirdMatch, {cls:'third'}) + '</div>';
+    treeHtml += `<div class="bk-col bk-finalcol"><div class="bk-col-body">${finalBlock}${thirdBlock}</div></div>`;
+  }
+  const tree = el('div','bk-tree', treeHtml);
+  // ---- mobile: round chips + list ----
+  const mRounds = cols.slice();
+  if(finalMatch || thirdMatch){
+    mRounds.push({ key:'final', head:L('Final','Final'),
+      matches:[finalMatch, thirdMatch].filter(Boolean) });
+  }
+  const mCls = m => m.code === 'FINAL' ? 'final' : (m.code === '3P' ? 'third' : '');
+  const chips = mRounds.map((c, i) =>
+    `<button class="bk-chip${i===0?' on':''}" data-i="${i}">${c.head}</button>`).join('');
+  const lists = mRounds.map((c, i) =>
+    `<div class="bk-list" data-i="${i}"${i===0?'':' hidden'}>`
+    + c.matches.map(m => bkMatchNode(m, {cls:mCls(m)})).join('') + '</div>').join('');
+  const mob = el('div','bk-mobile', `<div class="bk-chips">${chips}</div>${lists}`);
+  mob.querySelector('.bk-chips').addEventListener('click', e => {
+    const b = e.target.closest('.bk-chip'); if(!b) return;
+    const i = b.dataset.i;
+    mob.querySelectorAll('.bk-chip').forEach(x => x.classList.toggle('on', x.dataset.i === i));
+    mob.querySelectorAll('.bk-list').forEach(x => { x.hidden = x.dataset.i !== i; });
+  });
+  const box = el('div','bracket-wrap reveal');
+  box.appendChild(tree); box.appendChild(mob);
+  requestAnimationFrame(() => drawBracketLines(tree));
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(() => { if(tree.isConnected) drawBracketLines(tree); });
+  }
+  ensureBracketResize();
+  return box;
 }
 function buildBracket(){
-  const k = D.knockout || {};
   const s = section('bracket', L('🧩 Cuadro','🧩 Bracket'),
     L('El cuadro de eliminatorias','The knockout bracket'),
     L('Cruces oficiales de FIFA. Cuando haya apuestas subidas, cada cruce muestra el % de consenso del ganador y el marcador más probable.',
       'Official FIFA ties. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.'));
-  const cols = [];
-  (k.rounds || []).forEach(r => {
-    cols.push(`<div class="bk-col"><div class="bk-col-head">${L(r.label_es, r.label_en)}</div>
-      ${(r.matches || []).map(m => bkMatchNode(m, false)).join('')}</div>`);
-  });
-  if(k.final_matches && k.final_matches.length){
-    cols.push(`<div class="bk-col"><div class="bk-col-head">${L('Finales','Finals')}</div>
-      ${k.final_matches.map(m => bkMatchNode(m, true)).join('')}</div>`);
-  }
-  if(!cols.length){
+  const box = koBracketBox();
+  if(!box){
     s.appendChild(el('div','card teaser reveal',
       `<div class="em">🧩</div><p class="muted">${L('Aún no hay calendario de eliminatorias.','No knockout schedule yet.')}</p>`));
     return;
   }
-  s.appendChild(el('div','bracket-wrap reveal', `<div class="bracket">${cols.join('')}</div>`));
+  s.appendChild(box);
 }
 /* survival timeline — DEMO data until real picks are uploaded */
-function buildSurvival(){
-  const s = el('section','sec'); s.id = 'survive-wrap';
+function koSurvivalCard(){
   const rounds = [
     L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion'),
   ];
@@ -3007,14 +3190,394 @@ function buildSurvival(){
     }).join('');
     return `<div class="surv-name">${esc(r.name)}</div>${cells}`;
   }).join('');
-  const card = el('div','survive reveal',
+  return el('div','survive reveal',
     `<span class="demo-pill">${L('datos de ejemplo','demo data')}</span>
      <h3>${L('¿Hasta dónde aguanta el pronóstico de cada uno?','How far does each person\'s bracket survive?')}</h3>
      <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que su cuadro se rompe. Se rellenará con las apuestas reales.',
         'Each row is a person; the red block marks the round where their bracket breaks. Will fill with real picks.')}</p>
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
-  s.appendChild(card);
+}
+function buildSurvival(){
+  const s = el('section','sec'); s.id = 'survive-wrap';
+  s.appendChild(koSurvivalCard());
   wrap.appendChild(s);
+}
+
+/* ====================================================================
+   KO METRICS PROTOTYPE — THROWAWAY. Three radically different layouts of
+   the knockout analytics, switchable via ?ko=A|B|C with the floating bar.
+   Everything runs on DEMO data because real knockout picks aren't uploaded
+   yet. When a layout wins, fold it into buildEliminatorias and delete the
+   rest (CSS marked "KO METRICS PROTOTYPE" + these functions + the renderView
+   / rebuild hooks below).
+   ==================================================================== */
+const KO_VARIANTS = {
+  A: ['Cuadro vivo', 'Living bracket'],
+  B: ['Sala de mandos', 'Control room'],
+  C: ['El relato', 'The story'],
+};
+function currentKoVariant(){
+  const raw = new URLSearchParams(location.search).get('ko');
+  const key = raw ? raw.toUpperCase() : '';
+  return KO_VARIANTS[key] ? key : null;
+}
+function koVariantLabel(key){ const x = KO_VARIANTS[key] || KO_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
+function setKoVariant(next){
+  const url = new URL(location.href);
+  url.searchParams.set('view', 'ko');
+  url.searchParams.set('ko', next);
+  history.replaceState(null, '', url);
+  rebuild(); window.scrollTo(0, 0);
+}
+function cycleKoVariant(dir){
+  const keys = Object.keys(KO_VARIANTS);
+  const idx = keys.indexOf(currentKoVariant() || 'A');
+  setKoVariant(keys[(idx + dir + keys.length) % keys.length]);
+}
+let koKeyReady = false;
+function ensureKoKeys(){
+  if(koKeyReady) return;
+  document.addEventListener('keydown', e => {
+    if(currentView() !== 'ko' || !currentKoVariant()) return;
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || (document.activeElement && document.activeElement.isContentEditable)) return;
+    if(e.key === 'ArrowLeft'){ e.preventDefault(); cycleKoVariant(-1); }
+    if(e.key === 'ArrowRight'){ e.preventDefault(); cycleKoVariant(1); }
+  });
+  koKeyReady = true;
+}
+function renderKoSwitcher(){
+  if(currentView() !== 'ko' || !currentKoVariant()) return;
+  const old = document.querySelector('.proto-switcher'); if(old) old.remove();
+  ensureKoKeys();
+  const bar = el('div','proto-switcher',
+    `<button type="button" data-dir="-1" aria-label="${L('Variante anterior','Previous variant')}">‹</button>
+     <span>${koVariantLabel(currentKoVariant())}</span>
+     <button type="button" data-dir="1" aria-label="${L('Variante siguiente','Next variant')}">›</button>`);
+  bar.addEventListener('click', e => { const b = e.target.closest('button[data-dir]'); if(b) cycleKoVariant(Number(b.dataset.dir)); });
+  document.body.appendChild(bar);
+}
+function koSection(){ const sec = el('section','sec'); wrap.appendChild(sec); return sec; }
+let _koDemo = null;
+function koDemoData(){
+  if(_koDemo) return _koDemo;
+  const names = (D.cards || []).map(c => c.name);
+  const pool = [
+    ['Spain','🇪🇸',9],['France','🇫🇷',9],['Brazil','🇧🇷',8],['Argentina','🇦🇷',8],
+    ['England','🏴󠁧󠁢󠁥󠁮󠁧󠁿',7],['Germany','🇩🇪',6],['Portugal','🇵🇹',6],['Netherlands','🇳🇱',5],
+    ['Belgium','🇧🇪',4],['USA','🇺🇸',3],['Croatia','🇭🇷',3],['Uruguay','🇺🇾',2],
+  ];
+  const hash = (s, salt) => { let h = salt >>> 0; for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0; return h; };
+  const pick = (s, salt) => {
+    const total = pool.reduce((a,p) => a + p[2], 0);
+    let r = hash(s, salt) % total;
+    for(const p of pool){ if(r < p[2]) return p; r -= p[2]; }
+    return pool[0];
+  };
+  const players = ['Mbappé','Lamine Yamal','Vinícius','Haaland','Kane','Messi','Musiala','Bellingham'];
+  const rounds = [L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion')];
+  const people = names.map(nm => ({
+    name: nm,
+    champ: pick(nm, 1),
+    runner: pick(nm, 2),
+    ts: players[hash(nm, 3) % players.length],
+    chaos: hash(nm, 4) % 9,
+    fell: hash(nm, 5) % (rounds.length + 1),
+    exp: 42 + (hash(nm, 6) % 52),
+    variance: 9 + (hash(nm, 7) % 38),
+  }));
+  const champDist = {};
+  people.forEach(p => { const key = p.champ[0]; (champDist[key] = champDist[key] || {flag:p.champ[1], count:0}).count++; });
+  const champRank = Object.entries(champDist).map(([t,v]) => ({team:t, flag:v.flag, count:v.count})).sort((a,b) => b.count - a.count);
+  const tsDist = {};
+  people.forEach(p => { tsDist[p.ts] = (tsDist[p.ts] || 0) + 1; });
+  const tsRank = Object.entries(tsDist).map(([t,c]) => ({name:t, count:c})).sort((a,b) => b.count - a.count);
+  const depth = pool.map(p => ({ team:p[0], flag:p[1],
+    r16: Math.min(100, 58 + p[2]*4), qf: Math.min(98, 34 + p[2]*5), sf: Math.min(92, 16 + p[2]*6),
+    fin: Math.min(82, 7 + p[2]*6), champ: Math.min(68, 2 + p[2]*5) }));
+  const twins = [];
+  for(let i=0;i<people.length;i++) for(let j=i+1;j<people.length;j++){
+    const a = people[i], b = people[j]; let sim = 0;
+    if(a.champ[0] === b.champ[0]) sim += 45;
+    if(a.runner[0] === b.runner[0]) sim += 30;
+    if(a.ts === b.ts) sim += 25;
+    if(sim >= 45) twins.push({a:a.name, b:b.name, sim:Math.min(99, sim)});
+  }
+  twins.sort((x,y) => y.sim - x.sim);
+  const outTeams = new Set(['Belgium','USA','Uruguay']);   // DEMO: pretend these are knocked out
+  const grave = people.filter(p => outTeams.has(p.champ[0])).map(p => ({name:p.name, champ:p.champ[0], flag:p.champ[1]}));
+  const chaosRank = people.slice().sort((a,b) => b.chaos - a.chaos);
+  _koDemo = {people, rounds, champRank, tsRank, depth, twins, grave, chaosRank, pool};
+  return _koDemo;
+}
+function koDemoBanner(){
+  return el('div','koproto-note reveal',
+    `⚠️ ${L('Datos de ejemplo: las apuestas de eliminatorias aún no están subidas. Esto enseña la pinta, no los números reales.',
+            'Demo data: knockout picks are not uploaded yet. This shows the look, not the real numbers.')}`);
+}
+function buildKoIntro(key){
+  const titles = {
+    A:[L('Cuadro vivo','Living bracket'),
+       L('El cuadro manda. Explora cada selección y mira hasta dónde la lleva la oficina, con la línea de supervivencia debajo.',
+         'The bracket leads. Poke each team to see how far the office takes them, survival line below.')],
+    B:[L('Sala de mandos','Control room'),
+       L('Todas las métricas de un vistazo: campeón del pueblo, índice de caos, riesgo/recompensa, gemelos de cuadro y el cementerio.',
+         "Every metric at a glance: people's champion, chaos index, risk/reward, bracket twins and the graveyard.")],
+    C:[L('El relato','The story'),
+       L('La eliminatoria contada como una historia que bajas con el scroll: cada acto, una métrica con su gráfica.',
+         'The knockouts told as a story you scroll through: each act, a metric with its own chart.')],
+  };
+  const t = titles[key] || titles.A;
+  const s = section('ko-proto', L('05 · Eliminatorias','05 · Knockouts'), t[0], t[1]);
+  s.appendChild(koDemoBanner());
+}
+let _koTipEl = null, _koTipReady = false;
+function ensureScatterTip(){
+  if(_koTipReady) return;
+  _koTipReady = true;
+  _koTipEl = el('div','kp-tip'); document.body.appendChild(_koTipEl);
+  const position = e => {
+    const pad = 14; const r = _koTipEl.getBoundingClientRect();
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if(x + r.width > innerWidth) x = e.clientX - r.width - pad;
+    if(y + r.height > innerHeight) y = e.clientY - r.height - pad;
+    _koTipEl.style.left = x + 'px'; _koTipEl.style.top = y + 'px';
+  };
+  document.addEventListener('mouseover', e => {
+    const t = e.target;
+    if(t && t.tagName === 'circle' && t.dataset && t.dataset.name){
+      _koTipEl.innerHTML = `<b style="color:${t.dataset.color}">${t.dataset.name}</b><span class="muted">${t.dataset.info}</span>`;
+      _koTipEl.style.opacity = '1'; position(e);
+    }
+  });
+  document.addEventListener('mousemove', e => { if(_koTipEl.style.opacity === '1') position(e); });
+  document.addEventListener('mouseout', e => { if(e.target && e.target.tagName === 'circle') _koTipEl.style.opacity = '0'; });
+}
+function koScatter(people){
+  ensureScatterTip();
+  const W = 560, H = 300, pad = 46;
+  const xs = people.map(p => p.exp), ys = people.map(p => p.variance);
+  const xmin = Math.min(...xs) - 3, xmax = Math.max(...xs) + 3, ymin = Math.min(...ys) - 3, ymax = Math.max(...ys) + 3;
+  const X = v => pad + (v - xmin) / (xmax - xmin) * (W - pad - 12);
+  const Y = v => H - pad - (v - ymin) / (ymax - ymin) * (H - pad - 24);
+  const dots = people.map(p => {
+    const info = `${p.exp} ${L('pts esperados','exp pts')} · ${L('riesgo','risk')} ${p.variance} · ${p.chaos} ${L('sorpresas','upsets')}`;
+    return `<circle data-name="${esc(p.name)}" data-info="${esc(info)}" data-color="${personColor(p.name)}" cx="${X(p.exp).toFixed(1)}" cy="${Y(p.variance).toFixed(1)}" r="6" fill="${personColor(p.name)}" opacity=".85"></circle>`;
+  }).join('');
+  return `<svg class="kp-scatter" viewBox="0 0 ${W} ${H}">
+    <line class="axis" x1="${pad}" y1="${H-pad}" x2="${W-6}" y2="${H-pad}"></line>
+    <line class="axis" x1="${pad}" y1="14" x2="${pad}" y2="${H-pad}"></line>
+    <text x="${W-6}" y="${H-pad+24}" text-anchor="end">${L('puntos esperados →','expected points →')}</text>
+    <text x="${pad}" y="12" text-anchor="middle">${L('↑ riesgo','↑ risk')}</text>
+    ${dots}</svg>`;
+}
+function buildKoDossier(){
+  const dz = koDemoData();
+  const s = koSection();
+  s.appendChild(el('div','sec-head reveal',
+    `<div class="kicker">${L('Dossier de selección','Team dossier')}</div>
+     <h2>${L('¿Hasta dónde la ve la oficina?','How far does the office see them?')}</h2>`));
+  const chips = dz.depth.map((d,i) => `<button class="kp-teamchip${i===0?' on':''}" data-i="${i}">${d.flag} ${esc(team(d.team))}</button>`).join('');
+  const dossier = el('div','kp-dossier reveal', `<div class="kp-chips">${chips}</div><div class="kp-dossier-body"></div>`);
+  const bodyEl = dossier.querySelector('.kp-dossier-body');
+  const renderPanel = i => {
+    const d = dz.depth[i];
+    const rows = [['R16',d.r16],['QF',d.qf],['SF',d.sf],[L('Final','Final'),d.fin],[L('Campeón','Champ'),d.champ]];
+    bodyEl.innerHTML = `<div class="kp-dossier-head">${d.flag} ${esc(team(d.team))} — ${L('% de cuadros que la llevan a…','% of brackets taking them to…')}</div>`
+      + rows.map(([lab,v]) => `<div class="bar-row"><div class="bar-name">${lab}</div>
+          <div class="bar-track"><div class="bar-fill" data-w="${v}" style="width:${v}%"></div></div>
+          <div class="bar-val">${v}%</div></div>`).join('');
+  };
+  dossier.querySelector('.kp-chips').addEventListener('click', e => {
+    const b = e.target.closest('.kp-teamchip'); if(!b) return;
+    dossier.querySelectorAll('.kp-teamchip').forEach(x => x.classList.toggle('on', x === b));
+    renderPanel(+b.dataset.i);
+  });
+  renderPanel(0);
+  s.appendChild(dossier);
+}
+/* ---- reusable demo-metric fragments (shared by variants B and C) ---- */
+function koChampBarsHtml(dz){
+  const mx = dz.champRank[0].count || 1;
+  return dz.champRank.map((c,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+      <div class="bar-name">${c.flag} ${esc(team(c.team))}</div>
+      <div class="bar-track"><div class="bar-fill gold" data-w="${(c.count/mx*100).toFixed(0)}"></div></div>
+      <div class="bar-val" data-count="${c.count}">0</div></div>`).join('');
+}
+function koChaosBarsHtml(dz){
+  const mx = dz.chaosRank[0].chaos || 1;
+  return dz.chaosRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+      <div class="bar-name" style="color:${personColor(p.name)}">${esc(p.name)}</div>
+      <div class="bar-track"><div class="bar-fill" data-w="${(p.chaos/mx*100).toFixed(0)}"></div></div>
+      <div class="bar-val" data-count="${p.chaos}">0</div></div>`).join('');
+}
+function koTwinsHtml(dz){
+  return dz.twins.slice(0,6).map(t => `<div class="kp-twin-row"><span>${esc(t.a)} · ${esc(t.b)}</span>
+      <div class="kp-twin-bar"><span style="width:${t.sim}%"></span></div><span class="pct">${t.sim}%</span></div>`).join('');
+}
+function koGraveHtml(dz){
+  return dz.grave.length
+    ? dz.grave.map(g => `<div class="kp-grave-card"><div class="x">⚰️</div><div class="nm">${esc(g.name)}</div><div class="ch">${g.flag} ${esc(team(g.champ))}</div></div>`).join('')
+    : `<p class="muted">${L('Nadie enterrado… todavía.','Nobody buried… yet.')}</p>`;
+}
+function koPichichiHtml(dz){
+  const mx = dz.tsRank[0].count || 1;
+  return dz.tsRank.slice(0,6).map((t,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+      <div class="bar-name">${esc(t.name)}</div>
+      <div class="bar-track"><div class="bar-fill" data-w="${(t.count/mx*100).toFixed(0)}"></div></div>
+      <div class="bar-val" data-count="${t.count}">0</div></div>`).join('');
+}
+function koStakeHtml(){
+  return `<div class="kp-stake" style="margin-top:12px">
+      <div><div style="font:800 1.2rem 'Space Grotesk'">🇪🇸 ${esc(team('Spain'))} <span class="muted">vs</span> 🇭🇷 ${esc(team('Croatia'))}</div>
+        <div class="muted" style="font-size:.82rem">${L('cruce de ejemplo · cuartos','demo tie · QF')}</div></div>
+      <div style="text-align:right"><div class="swing">±18 pts</div>
+        <div class="muted" style="font-size:.82rem">${L('máx. vuelco en el ranking','max ranking swing')}</div></div>
+    </div>`;
+}
+function buildStakeToday(){
+  const s = section('stake-hoy', L('🔥 En juego','🔥 At stake'),
+    L('Lo que te juegas hoy','What\'s at stake today'),
+    L('Cuánto puede moverse el ranking con los partidos de hoy. (Datos de ejemplo hasta que arranque la eliminatoria.)',
+      'How much the ranking can swing with today\'s matches. (Demo data until the knockouts kick off.)'));
+  s.appendChild(el('div','card reveal', koStakeHtml()));
+}
+function koFichasBody(dz){
+  const twinOf = {};
+  dz.twins.forEach(t => { if(!twinOf[t.a]) twinOf[t.a] = {name:t.b, sim:t.sim}; if(!twinOf[t.b]) twinOf[t.b] = {name:t.a, sim:t.sim}; });
+  const box = el('div','kp-fichas-wrap');
+  const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  const grid = el('div','grid g3');
+  dz.people.slice().sort((a,b) => a.name.localeCompare(b.name,'es')).forEach(p => {
+    const survives = p.fell >= dz.rounds.length;
+    const fellTxt = survives ? L('aguanta hasta el final','lasts to the end') : dz.rounds[p.fell];
+    const tw = twinOf[p.name];
+    const card = el('div','ficha'); card.dataset.name = p.name.toLowerCase();
+    card.innerHTML = `
+      <div class="fh"><div><div class="fn">${esc(p.name)}</div><div class="lab">🏆 ${esc(team(p.champ[0]))}</div></div>
+        <div class="rk">${p.exp}<br>${L('pts esp.','exp pts')}</div></div>
+      <div class="fstats">
+        <div>${L('Campeón','Champion')}<br><span class="v">${p.champ[1]} ${esc(team(p.champ[0]))}</span></div>
+        <div>${L('Subcampeón','Runner-up')}<br><span class="v">${p.runner[1]} ${esc(team(p.runner[0]))}</span></div>
+        <div>${L('Pichichi','Top scorer')}<br><span class="v">${esc(p.ts)}</span></div>
+        <div>${L('Índice de caos','Chaos index')}<br><span class="v">${p.chaos}</span></div>
+      </div>
+      <div class="fline">${L('📉 Su cuadro se rompe en:','📉 Bracket breaks at:')} <b>${fellTxt}</b></div>
+      ${tw ? `<div class="fline">${L('👯 Gemelo:','👯 Twin:')} <b>${esc(tw.name)}</b> (${tw.sim}%)</div>` : ''}`;
+    grid.appendChild(card);
+  });
+  inp.addEventListener('input', () => { const q = inp.value.toLowerCase().trim();
+    grid.querySelectorAll('.ficha').forEach(f => { f.style.display = f.dataset.name.includes(q) ? '' : 'none'; }); });
+  box.appendChild(inp); box.appendChild(grid);
+  return box;
+}
+function koAct(kicker, title, leadHtml, bodyEl){
+  const a = el('div','kp-act reveal');
+  a.innerHTML = `<div class="kp-act-kicker">${kicker}</div><h2>${title}</h2>${leadHtml || ''}`;
+  if(bodyEl) a.appendChild(bodyEl);
+  return a;
+}
+function buildKoVariantB(){
+  buildKoIntro('B');
+  const dz = koDemoData();
+  const champ = koSection();
+  champ.appendChild(el('div','card reveal',
+    `<span class="k">${L('🏆 El campeón del pueblo','🏆 The people\'s champion')}</span>` + koChampBarsHtml(dz)));
+  const g = el('div','grid g2 reveal'); g.style.marginTop = '22px';
+  g.innerHTML =
+    `<div class="card"><span class="k">${L('🎲 Índice de caos (sorpresas en el cuadro)','🎲 Chaos index (upsets in the bracket)')}</span>${koChaosBarsHtml(dz)}</div>`
+    + `<div class="card"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>
+       <p class="muted" style="font-size:.82rem;margin:6px 0 10px">${L('Cada punto es una persona: a la derecha, más puntos esperados; arriba, más a cara o cruz.','Each dot is a person: right = more expected points; up = more boom-or-bust.')}</p>${koScatter(dz.people)}</div>`
+    + `<div class="card"><span class="k">${L('👯 Gemelos de cuadro','👯 Bracket twins')}</span>${koTwinsHtml(dz)}</div>`
+    + `<div class="card"><span class="k">${L('⚰️ El cementerio (su campeón ya está fuera)','⚰️ The graveyard (their champion is already out)')}</span><div class="kp-grave" style="margin-top:12px">${koGraveHtml(dz)}</div></div>`;
+  wrap.appendChild(g);
+  const pich = koSection();
+  pich.appendChild(el('div','card reveal',
+    `<span class="k">${L('👟 Pichichi del pueblo','👟 People\'s top scorer')}</span>${koPichichiHtml(dz)}`));
+}
+function buildKoVariantC(){
+  buildKoIntro('C');
+  const dz = koDemoData();
+  const top = dz.champRank[0], second = dz.champRank[1] || {count:0, team:'', flag:''};
+  const bold = dz.chaosRank[0], safe = dz.chaosRank[dz.chaosRank.length - 1];
+  const prophet = dz.people.slice().sort((a,b) => b.exp - a.exp)[0];
+  const sec = koSection();
+
+  // Acto 1 — el cuadro: el bracket de la variante A, incrustado en el relato
+  const bracketBox = koBracketBox();
+  if(bracketBox){
+    sec.appendChild(koAct(
+      L('Acto 1 · El cuadro','Act 1 · The bracket'),
+      L('El camino hacia la final','The road to the final'),
+      `<p class="kp-act-lead">${L('El cuadro oficial de FIFA. Cuando suban las apuestas, cada cruce mostrará el % de consenso del ganador y el marcador más probable.',
+                                'The official FIFA bracket. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.')}</p>`,
+      bracketBox));
+  }
+
+  // Acto 2 — consenso: titular grande + reparto completo de campeón
+  sec.appendChild(koAct(
+    L('Acto 2 · El consenso','Act 2 · The consensus'),
+    L('El pueblo ha hablado','The people have spoken'),
+    `<div class="kp-act-num">${top.flag} ${esc(team(top.team))}</div>
+     <p class="kp-act-lead">${L(top.count + ' de ' + N + ' coronan a ' + team(top.team) + '. El siguiente, ' + team(second.team) + ', se queda en ' + second.count + '.',
+                               top.count + ' of ' + N + ' crown ' + team(top.team) + '. Next up, ' + team(second.team) + ', stalls at ' + second.count + '.')}</p>`,
+    el('div','kp-act-viz', `<span class="k">${L('🏆 Reparto del título','🏆 Title split')}</span>${koChampBarsHtml(dz)}`)));
+
+  // Acto 2 — carácter: duo + índice de caos + scatter riesgo/recompensa
+  sec.appendChild(koAct(
+    L('Acto 3 · Carácter','Act 3 · Character'),
+    L('Valientes contra los de manual','The bold vs the by-the-book'),
+    `<div class="kp-duo">
+       <div class="b"><div class="muted">${L('🐺 El más loco','🐺 Wildest')}</div><div class="big" style="color:${personColor(bold.name)}">${esc(bold.name)}</div><div class="muted">${bold.chaos} ${L('sorpresas en su cuadro','upsets in their bracket')}</div></div>
+       <div class="b"><div class="muted">${L('🐑 El más de manual','🐑 Most chalk')}</div><div class="big" style="color:${personColor(safe.name)}">${esc(safe.name)}</div><div class="muted">${safe.chaos} ${L('sorpresas','upsets')}</div></div>
+     </div>`,
+    el('div','kp-act-grid',
+      `<div class="kp-act-viz"><span class="k">${L('🎲 Índice de caos','🎲 Chaos index')}</span>${koChaosBarsHtml(dz)}</div>`
+      + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
+
+  // Acto 3 — supervivencia: línea de vida real incrustada
+  sec.appendChild(koAct(
+    L('Acto 4 · Supervivencia','Act 4 · Survival'),
+    L('¿Hasta dónde aguantas?','How far do you last?'),
+    `<p class="kp-act-lead">${L('A medida que entren los resultados reales, esta línea de vida marca dónde se rompe el cuadro de cada uno.',
+                              "As real results land, this lifeline marks where each person's bracket breaks.")}</p>`,
+    koSurvivalCard()));
+
+  // Acto 4 — almas gemelas: quién piensa como quién
+  sec.appendChild(koAct(
+    L('Acto 5 · Almas gemelas','Act 5 · Soulmates'),
+    L('¿Quién piensa como quién?','Who thinks like whom?'),
+    `<p class="kp-act-lead">${L('Cuadros casi calcados: mismo campeón, mismo subcampeón, mismo pichichi.',
+                              'Near-identical brackets: same champion, same runner-up, same top scorer.')}</p>`,
+    el('div','kp-act-viz', koTwinsHtml(dz))));
+
+  // Acto 5 — el cementerio
+  const graveBody = el('div','kp-grave', koGraveHtml(dz));
+  graveBody.style.marginTop = '18px';
+  sec.appendChild(koAct(
+    L('Acto 6 · El cementerio','Act 6 · The graveyard'),
+    L('Campeones caídos','Fallen champions'),
+    `<p class="kp-act-lead">${L('Su campeón ya está fuera. Un minuto de silencio.','Their champion is already out. A minute of silence.')}</p>`,
+    graveBody));
+
+  // Acto 6 — el profeta + pichichi
+  const a6 = koAct(
+    L('Acto 7 · El profeta','Act 7 · The prophet'),
+    L('El que más puntos promete','The one promising the most points'),
+    `<div class="kp-act-num" style="color:${personColor(prophet.name)}">${esc(prophet.name)}</div>
+     <p class="kp-act-lead">${L('Valor esperado ' + prophet.exp + ' pts en la fase final (demo).', 'Expected value ' + prophet.exp + ' pts in the final phase (demo).')}</p>`,
+    el('div','kp-act-viz', `<span class="k">${L('👟 Pichichi del pueblo','👟 People\'s top scorer')}</span>${koPichichiHtml(dz)}`));
+  sec.appendChild(a6);
+
+  // Acto 8 — las fichas: directorio por persona, como en la fase de grupos
+  const a8 = koAct(
+    L('Acto 8 · Las fichas','Act 8 · The cards'),
+    L('La ficha de cada uno 🪪',"Everyone's card 🪪"),
+    `<p class="kp-act-lead">${L('Resumen por persona: su campeón, su pichichi, lo loco que va su cuadro y hasta dónde aguanta. Busca tu nombre.',
+                              'A summary per person: their champion, top scorer, how wild their bracket is and how far it lasts. Search your name.')}</p>`,
+    koFichasBody(dz));
+  a8.style.borderBottom = '0';
+  sec.appendChild(a8);
 }
 
 /* ---- BUILD / REBUILD ---- */
@@ -3031,6 +3594,7 @@ function rebuild(){
   buildFooter();
   observeAll();
   renderPrototypeSwitcher();
+  renderKoSwitcher();
 }
 rebuild();
 """
