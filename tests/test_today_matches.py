@@ -189,6 +189,22 @@ class TestRecentResultsData:
         assert {"exact", "sign", "miss"} <= set(m)
         assert len(m["exact"]) + len(m["sign"]) + len(m["miss"]) == workbook_data["n"]
 
+    def test_recent_results_include_knockout_matches(self, computed_data, workbook_data):
+        recent = computed_data["recent_results"]["matches"]
+        ko_match = next((m for m in recent if m["code"] == "R32-M3"), None)
+
+        assert ko_match is not None
+        assert ko_match["is_knockout"] is True
+        assert ko_match["phase_es"] == "Dieciseisavos"
+        assert ko_match["result"]["home"] == 0
+        assert ko_match["result"]["away"] == 1
+        assert ko_match["result"]["winner"] == "Canadá"
+        assert {"exact", "sign", "miss", "advance"} <= set(ko_match)
+        assert (
+            len(ko_match["exact"]) + len(ko_match["sign"]) + len(ko_match["miss"])
+            == workbook_data["n"]
+        )
+
 
 class TestLiveProgressionData:
     def test_live_progression_tracks_every_played_match(self, computed_data):
@@ -198,17 +214,36 @@ class TestLiveProgressionData:
 
         assert "progression" in live
         assert live["steps"] == len(live["progression"])
-        assert len(live["progression"]) == live["played"] + (
-            1 if live.get("standings_ready") else 0
-        )
+        virtual_steps = (1 if live.get("standings_ready") else 0)
+        if computed_data["knockout"].get("scoring"):
+            virtual_steps += 1
+        assert len(live["progression"]) == live["played"] + virtual_steps
         last = live["progression"][-1]
-        if live.get("standings_ready"):
+        if computed_data["knockout"].get("scoring"):
+            assert last.get("virtual") is True
+            assert last.get("kind") == "ko"
+            assert last["table"][0]["pts"] == live["table"][0]["pts"]
+        elif live.get("standings_ready"):
             assert last.get("virtual") is True
             assert last.get("kind") == "standings"
             assert last["table"][0]["pts"] == live["table"][0]["pts"]
         assert {"group_pts", "standings_pts", "thirds_pts", "ko_pts"} <= set(
             live["table"][0]
         )
+
+    def test_live_progression_includes_knockout_step(self, computed_data):
+        live = computed_data["live"]
+        if not live or not computed_data["knockout"].get("scoring"):
+            pytest.skip("Workbook has no knockout results loaded")
+
+        ko_step = live["progression"][-1]
+        assert ko_step["code"] == "KO"
+        assert ko_step["kind"] == "ko"
+        assert ko_step["label_es"] == "Eliminatorias"
+        assert {"ko_pts", "round_ko_pts", "round_exact", "round_sign", "round_advance"} <= set(
+            ko_step["table"][0]
+        )
+        assert ko_step["table"][0]["pts"] == live["table"][0]["pts"]
 
     def test_live_progression_rows_have_rank_and_delta(self, computed_data, workbook_data):
         live = computed_data["live"]
@@ -274,10 +309,37 @@ class TestKnockoutData:
             "winner_flag": "🇨🇦",
         }
 
+    def test_knockout_bracket_resolves_winner_into_next_round(self, computed_data):
+        r32m3 = computed_data["knockout"]["rounds"][0]["matches"][2]
+        r16m2 = computed_data["knockout"]["rounds"][1]["matches"][1]
+        assert r32m3["fixture_home"] == "Sudáfrica"
+        assert r32m3["fixture_away"] == "Canadá"
+        assert r16m2["fixture_home"] == "W75"
+        assert r16m2["fixture_away"] == "W76"
+        assert r16m2["resolved_home"] == "Canadá"
+        assert r16m2["resolved_home_flag"] == "🇨🇦"
+
     def test_knockout_consensus_handles_empty_template(self):
-        empty_xlsx = Path(__file__).resolve().parent.parent / "Porra_Admin_v4_EN.xlsx"
-        empty_data = gd.compute(gd.parse_workbook(str(empty_xlsx)))
-        champion = empty_data["knockout"]["outright"]["champion"]
+        empty_data = {
+            "names": ["A"],
+            "n": 1,
+            "knockout_results": {"matches": {}, "outright": {}, "awards": {}},
+            "knockouts": {
+                "rounds": [],
+                "final_matches": [],
+                "outright": {
+                    "champion": {
+                        "label_es": "Campeón",
+                        "label_en": "Champion",
+                        "points": 12,
+                        "picks": [None],
+                    }
+                },
+                "awards": {},
+            },
+        }
+        knockout = gd.compute_knockout(empty_data)
+        champion = knockout["outright"]["champion"]
         assert champion["value"] is None
         assert champion["agreement"] == 0
 

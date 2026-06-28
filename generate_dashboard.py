@@ -17,6 +17,7 @@ Uso:
 from __future__ import annotations
 
 import json
+import re
 import sys
 import statistics
 from collections import Counter, defaultdict
@@ -39,6 +40,9 @@ NAME_ROW = 6                     # fila con los nombres reales
 GROUP_MATCH_ROWS = range(7, 79)  # 72 partidos de fase de grupos
 QUALIFIER_ROWS = range(80, 116)  # 1st/2nd/3rd de cada grupo (A..L)
 THIRDS_ROWS = range(117, 125)    # 8 mejores terceros
+
+# W-numbers for knockout bracket feeders (must match JS KO_WBASE).
+KO_WBASE = {"R32": 72, "R16": 88, "QF": 96, "SF": 100}
 
 KNOCKOUT_ROUNDS = [
     {"key": "r32", "code": "R32", "label_es": "Dieciseisavos", "label_en": "Round of 32", "first_row": 126, "matches": 16, "advance_points": 1},
@@ -1165,7 +1169,7 @@ def compute(data):
 
     # ---- Aciertos en directo (solo si hay resultados) ----
     live = None
-    if data["results"]:
+    if data["results"] or any(data["knockout_results"].values()):
         live = compute_live(data, matches)
 
     today = compute_today(data, matches)
@@ -1225,10 +1229,49 @@ def style_label(st, rebel_index):
     return "equilibrado"
 
 
+def ko_w_number(code):
+    m = re.match(r"^(R32|R16|QF|SF)-M(\d+)$", code or "")
+    if not m:
+        return None
+    return KO_WBASE[m.group(1)] + int(m.group(2))
+
+
+def build_ko_winner_map(knockout_results, knockouts_raw):
+    """Map W-numbers to real winners as results land."""
+    winners = {}
+    kr_matches = knockout_results.get("matches", {})
+    for rnd in knockouts_raw["rounds"]:
+        for m in rnd["matches"]:
+            w = ko_w_number(m["code"])
+            result = kr_matches.get(m["code"])
+            if w and result and result.get("winner"):
+                key = _team_key(result["winner"])
+                winners[w] = {
+                    "name": team_es(key),
+                    "name_en": key,
+                    "flag": team_flag(key),
+                }
+    return winners
+
+
+def resolve_knockout_fixture(pub_match, winner_by_w):
+    """Expose resolved team names without replacing W## feeder placeholders."""
+    for side in ("home", "away"):
+        val = pub_match.get(f"fixture_{side}", "")
+        wm = re.match(r"^W(\d+)$", val)
+        if not wm:
+            continue
+        team = winner_by_w.get(int(wm.group(1)))
+        if team:
+            pub_match[f"resolved_{side}"] = team["name"]
+            pub_match[f"resolved_{side}_flag"] = team["flag"]
+
+
 def compute_knockout(data):
     names = data["names"]
     n = data["n"]
     raw = data["knockouts"]
+    winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
 
     total_rows = 0
     filled_rows = 0
@@ -1244,13 +1287,15 @@ def compute_knockout(data):
                 + _filled_text_picks(m["winner_picks"])
             )
             total_rows += n * 2
-            match_rows.append({
+            pub = {
                 "code": m["code"],
                 "score": score,
                 "winner": winner,
                 "result": _knockout_public_result(result),
                 **_knockout_public_schedule(m),
-            })
+            }
+            resolve_knockout_fixture(pub, winner_by_w)
+            match_rows.append(pub)
         rounds.append({
             "key": rnd["key"],
             "label_es": rnd["label_es"],
@@ -1265,7 +1310,7 @@ def compute_knockout(data):
         result = data["knockout_results"]["matches"].get(m["code"])
         filled_rows += _filled_score_picks(m["score_picks"])
         total_rows += n
-        final_matches.append({
+        pub = {
             "key": m["key"],
             "code": m["code"],
             "label_es": m["label_es"],
@@ -1273,7 +1318,9 @@ def compute_knockout(data):
             "score": score,
             "result": _knockout_public_result(result),
             **_knockout_public_schedule(m),
-        })
+        }
+        resolve_knockout_fixture(pub, winner_by_w)
+        final_matches.append(pub)
 
     outright = {}
     for key, meta in raw["outright"].items():
@@ -1603,6 +1650,7 @@ def compute_live(data, matches):
         })
 
     group_table = progression[-1]["table"] if progression else snapshot_rows()
+    group_pts_by_name = {row["name"]: row["pts"] for row in group_table}
     last_date = played_matches[-1]["date"] if played_matches else ""
 
     # Paso virtual: cierre de fase de grupos (clasificados + mejores terceros).
@@ -1628,9 +1676,40 @@ def compute_live(data, matches):
         })
 
     ko = compute_knockout_scoring(data)
-    ko_pts_by_name = {row["name"]: row["pts"] for row in ko["table"]} if ko else {}
-    group_pts_by_name = {row["name"]: row["pts"] for row in group_table}
-    pre_bonus_rank = {row["name"]: row["rank"] for row in group_table}
+    ko_rows_by_name = {row["name"]: row for row in ko["table"]} if ko else {}
+    ko_pts_by_name = {name: row["pts"] for name, row in ko_rows_by_name.items()}
+    if ko_pts_by_name:
+        before_pts = pts[:]
+        for i, name in enumerate(names):
+            pts[i] += ko_pts_by_name.get(name, 0)
+        rows = snapshot_rows(before_pts, show_standings=True)
+        for row in rows:
+            i = name_index[row["name"]]
+            ko_row = ko_rows_by_name.get(row["name"], {})
+            row["group_pts"] = group_pts_by_name.get(row["name"], 0)
+            row["standings_pts"] = standings_pts[i]
+            row["thirds_pts"] = thirds_pts[i]
+            row["ko_pts"] = ko_row.get("pts", 0)
+            row["round_ko_pts"] = ko_row.get("pts", 0)
+            row["round_exact"] = ko_row.get("exact", 0)
+            row["round_sign"] = ko_row.get("outcomes", 0)
+            row["round_advance"] = ko_row.get("advance", 0)
+        progression.append({
+            "idx": len(progression) + 1,
+            "code": "KO",
+            "virtual": True,
+            "kind": "ko",
+            "label_es": "Eliminatorias",
+            "label_en": "Knockouts",
+            "date": _latest_knockout_result_date(data),
+            "group": "",
+            "table": rows,
+        })
+
+    final_delta_by_name = {
+        row["name"]: row.get("delta", 0)
+        for row in (progression[-1]["table"] if progression else [])
+    }
 
     grand_rows = []
     for i in range(n):
@@ -1638,7 +1717,7 @@ def compute_live(data, matches):
         kp = ko_pts_by_name.get(nm, 0)
         grand_rows.append({
             "name": nm,
-            "pts": pts[i] + kp,
+            "pts": pts[i],
             "group_pts": group_pts_by_name.get(nm, 0),
             "standings_pts": standings_pts[i],
             "thirds_pts": thirds_pts[i],
@@ -1650,7 +1729,7 @@ def compute_live(data, matches):
     grand_rows.sort(key=lambda x: (-x["pts"], x["_order"]))
     for rank, row in enumerate(grand_rows, 1):
         row["rank"] = rank
-        row["delta"] = pre_bonus_rank.get(row["name"], rank) - rank
+        row["delta"] = final_delta_by_name.get(row["name"], 0)
         del row["_order"]
 
     return {
@@ -1664,20 +1743,27 @@ def compute_live(data, matches):
     }
 
 
+def _latest_knockout_result_date(data):
+    result_codes = set(data["knockout_results"]["matches"])
+    dates = []
+    for rnd in data["knockouts"]["rounds"]:
+        dates.extend(m["date"] for m in rnd["matches"] if m["code"] in result_codes and m.get("date"))
+    dates.extend(m["date"] for m in data["knockouts"]["final_matches"] if m["code"] in result_codes and m.get("date"))
+    return max(dates) if dates else ""
+
+
 def compute_recent_results(data, matches, limit=6):
     """Últimos partidos con resultado real y quién acertó/falló."""
     results = data["results"]
     names = data["names"]
     played = []
-    for m in matches:
-        if m["code"] not in results:
-            continue
-        rh, ra = results[m["code"]]
+
+    def score_groups(picks, rh, ra):
         ro = outcome(rh, ra)
         exact = []
         sign = []
         miss = []
-        for name, (h, a) in zip(names, m["picks"]):
+        for name, (h, a) in zip(names, picks):
             if h is None or a is None:
                 miss.append({"name": name, "pick": "–"})
             elif h == rh and a == ra:
@@ -1686,8 +1772,17 @@ def compute_recent_results(data, matches, limit=6):
                 sign.append({"name": name, "pick": f"{h}-{a}"})
             else:
                 miss.append({"name": name, "pick": f"{h}-{a}"})
+        return exact, sign, miss
+
+    for m in matches:
+        if m["code"] not in results:
+            continue
+        rh, ra = results[m["code"]]
+        ro = outcome(rh, ra)
+        exact, sign, miss = score_groups(m["picks"], rh, ra)
         played.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
+            "dt": m.get("dt", ""),
             "home_en": m["home_en"], "away_en": m["away_en"],
             "home": m["home"], "away": m["away"],
             "home_flag": m["home_flag"], "away_flag": m["away_flag"],
@@ -1696,6 +1791,86 @@ def compute_recent_results(data, matches, limit=6):
             "sign": sign,
             "miss": miss,
         })
+
+    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    for rnd in data["knockouts"]["rounds"]:
+        for m in rnd["matches"]:
+            result = data["knockout_results"]["matches"].get(m["code"])
+            if not result or "score" not in result:
+                continue
+            rh, ra = result["score"]
+            ro = outcome(rh, ra)
+            exact, sign, miss = score_groups(m["score_picks"], rh, ra)
+            advance = []
+            winner = result.get("winner")
+            if winner:
+                winner_key = _cmp_text(winner)
+                advance = [
+                    {"name": name, "pick": team_es(pick)}
+                    for name, pick in zip(names, m["winner_picks"])
+                    if pick and _cmp_text(pick) == winner_key
+                ]
+            pub = _knockout_public_schedule(m)
+            resolve_knockout_fixture(pub, winner_by_w)
+            played.append({
+                "code": m["code"],
+                "group": "",
+                "date": pub["date"],
+                "dt": pub.get("dt", ""),
+                "home_en": pub["fixture_home_en"],
+                "away_en": pub["fixture_away_en"],
+                "home": pub["fixture_home"],
+                "away": pub["fixture_away"],
+                "home_flag": pub["fixture_home_flag"],
+                "away_flag": pub["fixture_away_flag"],
+                "result": {
+                    "home": rh,
+                    "away": ra,
+                    "outcome": ro,
+                    "winner": team_es(winner) if winner else None,
+                    "winner_flag": team_flag(winner) if winner else "",
+                },
+                "exact": exact,
+                "sign": sign,
+                "miss": miss,
+                "advance": advance,
+                "is_knockout": True,
+                "phase_es": rnd["label_es"],
+                "phase_en": rnd["label_en"],
+                "advance_points": rnd["advance_points"],
+            })
+
+    for m in data["knockouts"]["final_matches"]:
+        result = data["knockout_results"]["matches"].get(m["code"])
+        if not result or "score" not in result:
+            continue
+        rh, ra = result["score"]
+        ro = outcome(rh, ra)
+        exact, sign, miss = score_groups(m["score_picks"], rh, ra)
+        pub = _knockout_public_schedule(m)
+        resolve_knockout_fixture(pub, winner_by_w)
+        played.append({
+            "code": m["code"],
+            "group": "",
+            "date": pub["date"],
+            "dt": pub.get("dt", ""),
+            "home_en": pub["fixture_home_en"],
+            "away_en": pub["fixture_away_en"],
+            "home": pub["fixture_home"],
+            "away": pub["fixture_away"],
+            "home_flag": pub["fixture_home_flag"],
+            "away_flag": pub["fixture_away_flag"],
+            "result": {"home": rh, "away": ra, "outcome": ro},
+            "exact": exact,
+            "sign": sign,
+            "miss": miss,
+            "advance": [],
+            "is_knockout": True,
+            "phase_es": m["label_es"],
+            "phase_en": m["label_en"],
+            "advance_points": 0,
+        })
+
     played.sort(key=lambda m: (m["date"], m.get("dt", ""), m["code"]), reverse=True)
     return {"matches": played[:limit], "total": len(played)}
 
@@ -2053,7 +2228,7 @@ footer .brand svg{height:20px;width:auto}
 .tp-item .tp-score{color:var(--mint);font-family:'Space Grotesk';font-weight:700;white-space:nowrap}
 .recent-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;color:var(--muted);font-size:.86rem}
 .score-final{font-family:'Space Grotesk';font-weight:700;font-size:1.7rem;color:var(--gold);white-space:nowrap}
-.result-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.result-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:18px}
 .result-box{background:rgba(0,0,0,.15);border-radius:12px;padding:13px;min-width:0}
 .result-box .rb-title{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .result-box .rb-count{font-family:'Space Grotesk';font-weight:700;color:var(--mint)}
@@ -2107,20 +2282,25 @@ footer .brand svg{height:20px;width:auto}
 .bk-finalcol .bk-col-head{margin:0 0 8px}
 .bk-third-block{margin-top:22px}
 .bk-match{position:relative;background:rgba(0,0,0,.3);border:1px solid rgba(122,252,208,.16);border-radius:12px;padding:9px 11px;margin:7px 0}
+.bk-match.played{border-color:rgba(122,252,208,.38);background:rgba(0,26,31,.42)}
 .bk-match.final{border-color:rgba(255,210,122,.42);background:linear-gradient(160deg,rgba(255,210,122,.13),rgba(0,0,0,.28))}
 .bk-match.third{border-color:rgba(255,255,255,.14);opacity:.9}
 .bk-code{font:700 .62rem 'Space Grotesk';color:var(--muted);letter-spacing:.05em;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
 .bk-side{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:700;padding:2px 0}
 .bk-side .bk-flag{width:18px;text-align:center;flex:none}
 .bk-side .bk-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bk-side .bk-goals{margin-left:auto;font:800 .78rem 'Space Grotesk';color:var(--text);flex:none}
 .bk-side .bk-pct{margin-left:auto;font:800 .72rem 'Space Grotesk';color:var(--mint);flex:none}
 .bk-side.dim{color:var(--muted);font-weight:600}
+.bk-side.won{color:var(--mint)}
+.bk-side.out{opacity:.42;font-weight:600}
 .bk-cbar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);margin:7px 0 2px;overflow:hidden}
 .bk-cbar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
 .bk-cbar.split{display:flex}
 .bk-cbar.split span{flex:none}
 .bk-cbar .away{background:var(--gold)}
 .bk-tip{color:var(--muted);font-size:.68rem;margin-top:4px}
+.bk-tip.bk-real{color:var(--gold);font-weight:600}
 /* --- mobile: round chips + full-width match list --- */
 .bk-mobile{display:none}
 .bk-chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:12px;margin-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -2291,7 +2471,10 @@ function matchTitle(m){
   return `${m.home_flag} ${esc(team(m.home))} ${m.result.home}-${m.result.away} ${esc(team(m.away))} ${m.away_flag}`;
 }
 function snapshotSubtitle(snap){
-  if(snap.virtual) return L('Cierre fase de grupos','End of group stage');
+  if(snap.virtual){
+    const label = snap.kind === 'ko' ? L('Eliminatorias','Knockouts') : L('Cierre fase de grupos','End of group stage');
+    return snap.date ? `${snap.date} · ${label}` : label;
+  }
   return `${snap.date} · ${L('Grupo','Group')} ${snap.group}`;
 }
 function rankDelta(row){
@@ -2450,7 +2633,7 @@ function buildRankingBumpVariant(s){
   const card = el('div','rank-proto-card reveal',
     `<div class="rank-proto-top">
       <div><h3>${L('Evolución puesto a puesto','Position-by-position evolution')}</h3>
-      <p class="muted">${L('Cada línea sigue el ranking tras cada partido; el último paso suma los clasificados de grupo.','Each line follows the ranking after every match; the last step adds group-standings points.')}</p></div>
+      <p class="muted">${L('Cada línea sigue el ranking tras cada partido y los hitos de clasificados/eliminatorias.','Each line follows the ranking after every match and standings/knockout milestones.')}</p></div>
       <div class="rank-proto-meta">
         <span class="rank-state-pill"><b>${D.live.played}</b> ${L('partidos','matches')}</span>
         <span class="rank-state-pill"><b>${esc(finalRows[0].name)}</b> ${L('líder','leader')}</span>
@@ -2471,7 +2654,7 @@ function buildRankingRaceVariant(s){
   const card = el('div','rank-proto-card reveal',
     `<div class="rank-proto-top">
       <div><h3>${L('Carrera partido a partido','Match-by-match race')}</h3>
-      <p class="muted">${L('Barras acumuladas partido a partido; el último paso (★) reparte los puntos de clasificados y mejores terceros.','Accumulated bars match by match; the last step (★) awards group-standings and best-thirds points.')}</p></div>
+      <p class="muted">${L('Barras acumuladas partido a partido; los pasos ★ reparten puntos de clasificados o eliminatorias.','Accumulated bars match by match; ★ steps award standings or knockout points.')}</p></div>
     </div>
     <div class="race-layout">
       <div class="race-control">
@@ -2543,6 +2726,7 @@ function buildRankingRaceVariant(s){
   }
   function raceFeedHtml(snap){
     if(snap.virtual){
+      const isKo = snap.kind === 'ko';
       const bonus = snap.table
         .filter(r => (r.round_pts || 0) > 0)
         .sort((a,b) => b.round_pts - a.round_pts || a.rank - b.rank)
@@ -2557,14 +2741,20 @@ function buildRankingRaceVariant(s){
       const bonusRows = bonus.length
         ? bonus.map(r => {
             const parts = [];
+            if(isKo){
+              if(r.round_exact) parts.push(L('pleno','exact'));
+              else if(r.round_sign) parts.push(L('signo','outcome'));
+              if(r.round_advance) parts.push(`${L('pase','advance')} x${r.round_advance}`);
+              return feedRow(r, `<small>KO +${r.round_pts}${parts.length ? ' · '+parts.join(' · ') : ''}</small>`);
+            }
             if(r.round_standings_pts) parts.push(`${L('clasif.','standings')} +${r.round_standings_pts}`);
             if(r.round_thirds_pts) parts.push(`${L('3.ºs','thirds')} +${r.round_thirds_pts}`);
-            return feedRow(r, `<small>🏁 +${r.round_pts} · ${parts.join(' · ')}</small>`);
+            return feedRow(r, `<small>🏁 +${r.round_pts}${parts.length ? ' · '+parts.join(' · ') : ''}</small>`);
           }).join('')
-        : `<div class="race-feed-empty">${L('Nadie suma en clasificados.','No standings points awarded.')}</div>`;
+        : `<div class="race-feed-empty">${isKo ? L('Nadie suma en eliminatorias.','No knockout points awarded.') : L('Nadie suma en clasificados.','No standings points awarded.')}</div>`;
       return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
         <div class="race-feed-list">${movementRows}</div>
-        <div class="race-feed-title">${L('Puntos de clasificados','Standings points')}<span>${bonus.length}</span></div>
+        <div class="race-feed-title">${isKo ? L('Puntos KO','KO points') : L('Puntos de clasificados','Standings points')}<span>${bonus.length}</span></div>
         <div class="race-feed-list">${bonusRows}</div>`;
     }
     const movers = snap.table
@@ -2670,7 +2860,7 @@ function buildRankingMatrixVariant(s){
       <p class="muted">${L('Cada celda es el puesto de una persona tras ese partido; dorado arriba, rojo abajo.','Each cell is a person’s rank after that match; gold is top, red is bottom.')}</p></div>
       <div class="rank-proto-meta">
         <span class="rank-state-pill"><b>${total}</b> ${L('personas','people')}</span>
-        <span class="rank-state-pill"><b>${hist.length}</b> ${L('partidos','matches')}</span>
+        <span class="rank-state-pill"><b>${hist.length}</b> ${L('pasos','steps')}</span>
       </div>
     </div>
     <div class="rank-matrix-scroll">
@@ -2868,12 +3058,19 @@ function buildUltimos(){
       : `<span class="muted">${L('Nadie','Nobody')}</span>`;
     const dateObj = new Date(m.date + 'T12:00:00');
     const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', {day:'numeric', month:'short'});
+    const phase = m.is_knockout ? L(m.phase_es || 'Eliminatorias', m.phase_en || 'Knockouts') : `${L('Grupo','Group')} ${m.group}`;
+    const winner = m.result && m.result.winner ? `<span>${m.result.winner_flag || ''} ${esc(team(m.result.winner))}</span>` : '';
+    const advanceBox = m.is_knockout ? `
+        <div class="result-box">
+          <div class="rb-title">${L('Pase','Advance')} <span class="rb-count">${(m.advance || []).length}</span></div>
+          <div class="result-names">${people(m.advance || [])}</div>
+        </div>` : '';
     s.appendChild(el('div','today-match reveal',
       `<div class="tm-head">
         <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
         <span class="score-final">${m.result.home}-${m.result.away}</span>
       </div>
-      <div class="recent-meta"><span>${dateStr}</span><span>${L('Grupo','Group')} ${m.group}</span><span>${L('Resultado final','Final score')}</span></div>
+      <div class="recent-meta"><span>${dateStr}</span><span>${phase}</span><span>${L('Resultado final','Final score')}</span>${winner}</div>
       <div class="result-groups">
         <div class="result-box">
           <div class="rb-title">${L('Pleno','Exact score')} <span class="rb-count">${m.exact.length}</span></div>
@@ -2887,6 +3084,7 @@ function buildUltimos(){
           <div class="rb-title">${L('Palmada','Missed')} <span class="rb-count">${m.miss.length}</span></div>
           <div class="result-names">${people(m.miss)}</div>
         </div>
+        ${advanceBox}
       </div>`));
   });
 }
@@ -3340,13 +3538,18 @@ function bkMatchNode(m, opts){
   opts = opts || {};
   const k = D.knockout || {};
   const ready = k.ready && m.winner && m.winner.value;
+  const played = !!(m.result && m.result.winner);
+  const realScore = played && m.result.score
+    ? `${m.result.score.home}-${m.result.score.away}` : '';
   const pct = ready ? Math.round(m.winner.agreement || 0) : 0;
   const norm = v => (v || '').toString().trim().toLowerCase();
   const distCount = value => ((m.winner && m.winner.dist) || [])
     .filter(x => norm(x.value) === norm(value))
     .reduce((a, x) => a + (x.count || 0), 0);
+  const sideName = side => m['resolved_'+side] || m['fixture_'+side] || '–';
+  const sideFlag = side => m['resolved_'+side+'_flag'] || m['fixture_'+side+'_flag'] || '';
   const realSide = side => {
-    const name = m['fixture_'+side] || '';
+    const name = sideName(side);
     return name && !/^W\d+$/.test(name) && !/^RU\d+$/.test(name) ? name : '';
   };
   const homeName = realSide('home'), awayName = realSide('away');
@@ -3356,22 +3559,30 @@ function bkMatchNode(m, opts){
   const homePct = N ? Math.round(homeCount / N * 100) : 0;
   const awayPct = N ? Math.round(awayCount / N * 100) : 0;
   const sideHtml = (side) => {
-    const flag = m['fixture_'+side+'_flag'] || '';
-    const name = m['fixture_'+side] || '–';
+    const flag = sideFlag(side);
+    const name = sideName(side);
     const count = side === 'home' ? homeCount : awayCount;
     const sidePct = side === 'home' ? homePct : awayPct;
     const isPick = ready && m.winner.value === name;
-    return `<div class="bk-side${ready && !isPick ? ' dim' : ''}">`
+    const isRealWin = played && norm(m.result.winner) === norm(name);
+    const isRealOut = played && homeName && awayName && norm(name) === norm(side === 'home' ? homeName : awayName) && !isRealWin;
+    const goals = played && m.result.score
+      ? `<span class="bk-goals">${m.result.score[side]}</span>` : '';
+    const pctHtml = !played && count ? `<span class="bk-pct">${sidePct}%</span>` : '';
+    const cls = [ready && !isPick ? ' dim' : '', isRealWin ? ' won' : '', isRealOut ? ' out' : ''].join('');
+    return `<div class="bk-side${cls}">`
       + `<span class="bk-flag">${flag}</span><span class="bk-nm">${esc(team(name))}</span>`
-      + `${count ? `<span class="bk-pct">${sidePct}%</span>` : ''}</div>`;
+      + `${goals || pctHtml}</div>`;
   };
-  const consensus = ready
-    ? (hasSplit
-      ? `<div class="bk-cbar split"><span class="home" style="width:${homePct}%"></span><span class="away" style="width:${awayPct}%"></span></div>`
-      : `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`)
-      + `<div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
-    : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`;
-  const cls = opts.cls ? ' ' + opts.cls : '';
+  const consensus = played
+    ? `<div class="bk-tip bk-real">${L('resultado','result')} ${realScore} · ${m.result.winner_flag || ''} ${esc(team(m.result.winner))}</div>`
+    : (ready
+      ? (hasSplit
+        ? `<div class="bk-cbar split"><span class="home" style="width:${homePct}%"></span><span class="away" style="width:${awayPct}%"></span></div>`
+        : `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`)
+        + `<div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
+      : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`);
+  const cls = (opts.cls ? ' ' + opts.cls : '') + (played ? ' played' : '');
   const feeders = opts.feeders ? ` data-feeders="${opts.feeders.join(',')}"` : '';
   return `<div class="bk-match${cls}" data-code="${m.code || ''}"${feeders}>`
     + `<div class="bk-code"><span>${m.code || ''}</span><span>${m.date || ''}</span></div>`
