@@ -29,7 +29,7 @@ import openpyxl
 # Configuración / constantes
 # --------------------------------------------------------------------------
 
-DEFAULT_XLSX = "Porra_Admin_v4_EN.xlsx"
+DEFAULT_XLSX = "Porra_Admin_v5_EN.xlsx"
 DEFAULT_OUT = "index.html"  # raíz del sitio de GitHub Pages
 LOGO_SVG_PATH = "reveni-logo.svg"
 
@@ -630,6 +630,7 @@ def parse_workbook(path):
 
     # ¿Hay resultados reales?
     results = parse_results(wb)
+    standings_results, thirds_results = parse_standings_results(wb)
 
     return {
         "participants": participants,
@@ -639,6 +640,8 @@ def parse_workbook(path):
         "qualifiers": qualifiers,
         "thirds": thirds,
         "results": results,
+        "standings_results": standings_results,
+        "thirds_results": thirds_results,
         "knockouts": knockouts,
         "knockout_results": knockout_results,
     }
@@ -658,6 +661,41 @@ def parse_results(wb):
         if h is not None and a is not None:
             out[code] = (h, a)
     return out
+
+
+def parse_standings_results(wb):
+    """Lee los clasificados reales por grupo (1.º/2.º/3.º) y los 8 mejores
+    terceros de la pestaña 'Real results', si están rellenos.
+
+    Devuelve (standings, thirds):
+      standings -> {grupo: {1: equipo, 2: equipo, 3: equipo}}
+      thirds    -> [equipo, ...]  (los terceros clasificados)
+    """
+    rr = wb["Real results"]
+    standings = {}
+    for r in QUALIFIER_ROWS:
+        label = rr.cell(r, 2).value
+        if not label:
+            continue
+        label = str(label).strip().lower()
+        if label.startswith("1st"):
+            pos = 1
+        elif label.startswith("2nd"):
+            pos = 2
+        elif label.startswith("3rd"):
+            pos = 3
+        else:
+            continue
+        group = label.split("group")[-1].strip().upper()
+        team = _text(rr.cell(r, 3).value)
+        if team:
+            standings.setdefault(group, {})[pos] = team
+    thirds = []
+    for r in THIRDS_ROWS:
+        team = _text(rr.cell(r, 3).value)
+        if team:
+            thirds.append(team)
+    return standings, thirds
 
 
 def parse_knockouts(raw, participants):
@@ -1379,6 +1417,58 @@ def _cmp_text(v):
     return str(v).strip().casefold()
 
 
+# Baremo de clasificados (idéntico al de la hoja Calculation del Excel):
+# 1.º acertado = 3 (1 por clasificar + 2 por la posición exacta);
+# 2.º y 3.º = 1 si el equipo queda entre los tres del grupo; mejor tercero = 1.
+STANDINGS_EXACT_FIRST_BONUS = 2
+STANDINGS_QUALIFY_POINTS = 1
+THIRD_POINTS = 1
+
+
+def compute_standings_points(data):
+    """Puntos por clasificados de grupo (1.º/2.º/3.º) y por los 8 mejores
+    terceros, por participante. Replica exactamente las fórmulas del Excel.
+
+    Devuelve (standings_pts, thirds_pts, breakdown) donde breakdown lleva el
+    desglose por persona para poder mostrarlo en la web.
+    """
+    n = data["n"]
+    standings_results = data.get("standings_results") or {}
+    thirds_results = data.get("thirds_results") or []
+    qualifiers = data.get("qualifiers") or {}
+    thirds_picks = data.get("thirds") or []
+
+    standings_pts = [0] * n
+    thirds_pts = [0] * n
+
+    for group, actual in standings_results.items():
+        first = _cmp_text(actual[1]) if actual.get(1) else None
+        qualified = {_cmp_text(actual[pos]) for pos in actual if actual.get(pos)}
+        picks = qualifiers.get(group, {})
+        for pos in (1, 2, 3):
+            slot = picks.get(pos)
+            if not slot:
+                continue
+            for i, pick in enumerate(slot):
+                if not pick:
+                    continue
+                key = _cmp_text(pick)
+                if key in qualified:
+                    standings_pts[i] += STANDINGS_QUALIFY_POINTS
+                    if pos == 1 and first and key == first:
+                        standings_pts[i] += STANDINGS_EXACT_FIRST_BONUS
+
+    if thirds_results:
+        actual_thirds = {_cmp_text(t) for t in thirds_results}
+        for row in thirds_picks:
+            for i, pick in enumerate(row):
+                if pick and _cmp_text(pick) in actual_thirds:
+                    thirds_pts[i] += THIRD_POINTS
+
+    ready = bool(standings_results) or bool(thirds_results)
+    return standings_pts, thirds_pts, ready
+
+
 def compute_live(data, matches):
     """Ranking simplificado de aciertos cuando hay resultados (signo=2, pleno=4)."""
     results = data["results"]
@@ -1389,27 +1479,42 @@ def compute_live(data, matches):
     sign = [0] * n
     name_index = {name: i for i, name in enumerate(names)}
 
-    def ranked_rows():
-        rows = [
-            {
-                "name": names[i],
-                "pts": pts[i],
-                "exact": exact[i],
-                "sign": sign[i],
-                "_order": i,
-            }
-            for i in range(n)
-        ]
-        rows.sort(key=lambda x: (-x["pts"], x["_order"]))
-        for rank, row in enumerate(rows, 1):
-            row["rank"] = rank
-            del row["_order"]
-        return rows
-
     played_matches = sorted(
         [m for m in matches if m["code"] in results],
         key=lambda m: (m["date"], m.get("dt", ""), m["code"]),
     )
+    standings_pts, thirds_pts, standings_ready = compute_standings_points(data)
+
+    def snapshot_rows(before_pts=None, round_exact=None, round_sign=None, show_standings=False):
+        nonlocal previous_ranks
+        rows = []
+        for i in range(n):
+            match_only = before_pts[i] if (show_standings and before_pts) else pts[i]
+            rows.append({
+                "name": names[i],
+                "pts": pts[i],
+                "group_pts": match_only,
+                "standings_pts": standings_pts[i] if show_standings else 0,
+                "thirds_pts": thirds_pts[i] if show_standings else 0,
+                "exact": exact[i],
+                "sign": sign[i],
+                "_order": i,
+            })
+        rows.sort(key=lambda x: (-x["pts"], x["_order"]))
+        for rank, row in enumerate(rows, 1):
+            row["rank"] = rank
+            i = row["_order"]
+            if before_pts is not None:
+                old_rank = previous_ranks.get(row["name"], rank)
+                row["delta"] = old_rank - rank
+                row["round_pts"] = pts[i] - before_pts[i]
+                row["round_exact"] = round_exact[i] if round_exact else 0
+                row["round_sign"] = round_sign[i] if round_sign else 0
+            del row["_order"]
+        if before_pts is not None:
+            previous_ranks = {row["name"]: row["rank"] for row in rows}
+        return rows
+
     progression = []
     previous_ranks = {}
     for idx, m in enumerate(played_matches, 1):
@@ -1427,15 +1532,11 @@ def compute_live(data, matches):
             elif outcome(h, a) == ro:
                 pts[i] += 2
                 sign[i] += 1
-        rows = ranked_rows()
+        rows = snapshot_rows(before_pts, exact, sign)
         for row in rows:
             i = name_index[row["name"]]
-            old_rank = previous_ranks.get(row["name"], row["rank"])
-            row["delta"] = old_rank - row["rank"]
-            row["round_pts"] = pts[i] - before_pts[i]
             row["round_exact"] = exact[i] - before_exact[i]
             row["round_sign"] = sign[i] - before_sign[i]
-        previous_ranks = {row["name"]: row["rank"] for row in rows}
         progression.append({
             "idx": idx,
             "code": m["code"],
@@ -1450,8 +1551,67 @@ def compute_live(data, matches):
             "result": {"home": rh, "away": ra, "outcome": ro},
             "table": rows,
         })
-    table = progression[-1]["table"] if progression else ranked_rows()
-    return {"played": len(played_matches), "table": table, "progression": progression}
+
+    group_table = progression[-1]["table"] if progression else snapshot_rows()
+    last_date = played_matches[-1]["date"] if played_matches else ""
+
+    # Paso virtual: cierre de fase de grupos (clasificados + mejores terceros).
+    if standings_ready and any(standings_pts[i] + thirds_pts[i] for i in range(n)):
+        before_pts = pts[:]
+        for i in range(n):
+            pts[i] += standings_pts[i] + thirds_pts[i]
+        rows = snapshot_rows(before_pts, show_standings=True)
+        for row in rows:
+            i = name_index[row["name"]]
+            row["round_standings_pts"] = standings_pts[i]
+            row["round_thirds_pts"] = thirds_pts[i]
+        progression.append({
+            "idx": len(progression) + 1,
+            "code": "STANDINGS",
+            "virtual": True,
+            "kind": "standings",
+            "label_es": "Clasificados de grupo",
+            "label_en": "Group standings",
+            "date": last_date,
+            "group": "",
+            "table": rows,
+        })
+
+    ko = compute_knockout_scoring(data)
+    ko_pts_by_name = {row["name"]: row["pts"] for row in ko["table"]} if ko else {}
+    group_pts_by_name = {row["name"]: row["pts"] for row in group_table}
+    pre_bonus_rank = {row["name"]: row["rank"] for row in group_table}
+
+    grand_rows = []
+    for i in range(n):
+        nm = names[i]
+        kp = ko_pts_by_name.get(nm, 0)
+        grand_rows.append({
+            "name": nm,
+            "pts": pts[i] + kp,
+            "group_pts": group_pts_by_name.get(nm, 0),
+            "standings_pts": standings_pts[i],
+            "thirds_pts": thirds_pts[i],
+            "ko_pts": kp,
+            "exact": exact[i],
+            "sign": sign[i],
+            "_order": i,
+        })
+    grand_rows.sort(key=lambda x: (-x["pts"], x["_order"]))
+    for rank, row in enumerate(grand_rows, 1):
+        row["rank"] = rank
+        row["delta"] = pre_bonus_rank.get(row["name"], rank) - rank
+        del row["_order"]
+
+    return {
+        "played": len(played_matches),
+        "steps": len(progression),
+        "table": grand_rows,
+        "group_table": group_table,
+        "progression": progression,
+        "standings_ready": standings_ready,
+        "has_bonus": standings_ready or bool(ko_pts_by_name),
+    }
 
 
 def compute_recent_results(data, matches, limit=6):
@@ -1627,6 +1787,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
   border:1px solid rgba(122,252,208,.1);border-radius:10px;padding:8px 10px;font-size:.83rem}
 .rank-row .rr-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rank-row .rr-points{font-family:'Space Grotesk';font-weight:700;color:var(--gold)}
+.rr-breakdown{display:block;font-size:.7rem;font-weight:500;color:var(--muted);letter-spacing:.01em;margin-top:1px}
 .rank-delta{font-family:'Space Grotesk';font-size:.72rem;color:var(--muted);white-space:nowrap}
 .rank-delta.up{color:var(--mint)}.rank-delta.down{color:var(--red)}
 .race-layout{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:16px;align-items:start}
@@ -2041,7 +2202,12 @@ function liveHistory(){ return (D.live && D.live.progression) || []; }
 function latestSnapshot(){ const h = liveHistory(); return h[h.length - 1] || null; }
 function matchTitle(m){
   if(!m) return '–';
+  if(m.virtual) return L(m.label_es || 'Clasificados de grupo', m.label_en || 'Group standings');
   return `${m.home_flag} ${esc(team(m.home))} ${m.result.home}-${m.result.away} ${esc(team(m.away))} ${m.away_flag}`;
+}
+function snapshotSubtitle(snap){
+  if(snap.virtual) return L('Cierre fase de grupos','End of group stage');
+  return `${snap.date} · ${L('Grupo','Group')} ${snap.group}`;
 }
 function rankDelta(row){
   if(!row.delta) return `<span class="rank-delta">=</span>`;
@@ -2089,11 +2255,19 @@ function rankTip(r){
 function rankSummaryText(r){
   return `${r.exact || 0} ${L('plenos','exact')} · ${r.sign || 0} ${L('aciertos','outcomes')} · ${r.pts} pts`;
 }
+function rankBreakdown(r){
+  if(!(r.standings_pts || r.thirds_pts || r.ko_pts)) return '';
+  const parts = [`${L('grupos','groups')} ${r.group_pts || 0}`];
+  if(r.standings_pts) parts.push(`${L('clasif.','standings')} +${r.standings_pts}`);
+  if(r.thirds_pts) parts.push(`${L('3.ºs','thirds')} +${r.thirds_pts}`);
+  if(r.ko_pts) parts.push(`KO +${r.ko_pts}`);
+  return `<span class="rr-breakdown">${parts.join(' · ')}</span>`;
+}
 function renderRankingState(rows, limit){
   return `<div class="rank-table-compact">${rows.slice(0, limit || rows.length).map(r =>
     `<div class="rank-row" title="${esc(r.name)} — ${rankSummaryText(r)}">
       <div class="bar-rank">${r.rank}</div>
-      <div class="rr-name">${esc(r.name)} ${rankDelta(r)}</div>
+      <div class="rr-name">${esc(r.name)} ${rankDelta(r)}${rankBreakdown(r)}</div>
       <div class="rr-points">${r.pts}</div>
     </div>`).join('')}</div>`;
 }
@@ -2191,7 +2365,7 @@ function buildRankingBumpVariant(s){
   const card = el('div','rank-proto-card reveal',
     `<div class="rank-proto-top">
       <div><h3>${L('Evolución puesto a puesto','Position-by-position evolution')}</h3>
-      <p class="muted">${L('Cada línea sigue a una persona después de cada partido jugado.','Each line follows one person after every finished match.')}</p></div>
+      <p class="muted">${L('Cada línea sigue el ranking tras cada partido; el último paso suma los clasificados de grupo.','Each line follows the ranking after every match; the last step adds group-standings points.')}</p></div>
       <div class="rank-proto-meta">
         <span class="rank-state-pill"><b>${D.live.played}</b> ${L('partidos','matches')}</span>
         <span class="rank-state-pill"><b>${esc(finalRows[0].name)}</b> ${L('líder','leader')}</span>
@@ -2212,7 +2386,7 @@ function buildRankingRaceVariant(s){
   const card = el('div','rank-proto-card reveal',
     `<div class="rank-proto-top">
       <div><h3>${L('Carrera partido a partido','Match-by-match race')}</h3>
-      <p class="muted">${L('Barras acumuladas, color por persona y delta de puesto contra el partido anterior.','Accumulated bars, one colour per person, and rank delta against the previous match.')}</p></div>
+      <p class="muted">${L('Barras acumuladas partido a partido; el último paso (★) reparte los puntos de clasificados y mejores terceros.','Accumulated bars match by match; the last step (★) awards group-standings and best-thirds points.')}</p></div>
     </div>
     <div class="race-layout">
       <div class="race-control">
@@ -2283,6 +2457,31 @@ function buildRankingRaceVariant(s){
     </div>`;
   }
   function raceFeedHtml(snap){
+    if(snap.virtual){
+      const bonus = snap.table
+        .filter(r => (r.round_pts || 0) > 0)
+        .sort((a,b) => b.round_pts - a.round_pts || a.rank - b.rank)
+        .slice(0, 8);
+      const movers = snap.table
+        .filter(r => r.delta !== 0)
+        .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
+        .slice(0, 4);
+      const movementRows = movers.length
+        ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
+        : `<div class="race-feed-empty">${L('Sin cambios de puesto.','No rank changes.')}</div>`;
+      const bonusRows = bonus.length
+        ? bonus.map(r => {
+            const parts = [];
+            if(r.round_standings_pts) parts.push(`${L('clasif.','standings')} +${r.round_standings_pts}`);
+            if(r.round_thirds_pts) parts.push(`${L('3.ºs','thirds')} +${r.round_thirds_pts}`);
+            return feedRow(r, `<small>🏁 +${r.round_pts} · ${parts.join(' · ')}</small>`);
+          }).join('')
+        : `<div class="race-feed-empty">${L('Nadie suma en clasificados.','No standings points awarded.')}</div>`;
+      return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
+        <div class="race-feed-list">${movementRows}</div>
+        <div class="race-feed-title">${L('Puntos de clasificados','Standings points')}<span>${bonus.length}</span></div>
+        <div class="race-feed-list">${bonusRows}</div>`;
+    }
     const movers = snap.table
       .filter(r => r.delta !== 0)
       .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
@@ -2342,7 +2541,7 @@ function buildRankingRaceVariant(s){
     const pointsNow = snap.table.reduce((sum,r) => sum + (r.round_pts || 0), 0);
     step.textContent = `${snap.idx}/${hist.length}`;
     match.innerHTML = `${snap.idx}. ${matchTitle(snap)}`;
-    date.textContent = `${snap.date} · ${L('Grupo','Group')} ${snap.group}`;
+    date.textContent = snapshotSubtitle(snap);
     now.innerHTML = `
       <span><b>${esc(leader.name)}</b>${L('líder','leader')} · ${leader.pts} pts</span>
       <span><b>${movers}</b>${L('movimientos','moves')}</span>
@@ -2370,7 +2569,8 @@ function buildRankingRaceVariant(s){
 function buildRankingMatrixVariant(s){
   const hist = liveHistory(), finalRows = D.live.table, total = finalRows.length;
   const cols = `118px repeat(${hist.length},31px)`;
-  const header = `<div></div>` + hist.map(h => `<div class="rank-matrix-head">P${h.idx}</div>`).join('');
+  const header = `<div></div>` + hist.map(h =>
+    `<div class="rank-matrix-head">${h.virtual ? '★' : 'P'+h.idx}</div>`).join('');
   const maps = hist.map(h => rowMap(h.table));
   const rows = finalRows.map(person => {
     const cells = hist.map((h,i) => {
@@ -2924,7 +3124,7 @@ function buildAciertos(){
   }
   const list = el('div','reveal');
   t.forEach((r,i) => list.appendChild(el('div','bar-row',
-    `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'👑 ':''}${esc(r.name)} <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.sign} ${L('signos','outcomes')})</span></div>
+    `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'👑 ':''}${esc(r.name)} <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.sign} ${L('signos','outcomes')})</span>${rankBreakdown(r)}</div>
      <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
      <div class="bar-val" data-count="${r.pts}">0</div>`)));
   s.appendChild(list);

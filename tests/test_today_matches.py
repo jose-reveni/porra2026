@@ -11,7 +11,7 @@ import generate_dashboard as gd
 
 @pytest.fixture(scope="module")
 def workbook_data():
-    xlsx = Path(__file__).resolve().parent.parent / "Porra_Admin_v4_EN.xlsx"
+    xlsx = Path(__file__).resolve().parent.parent / "Porra_Admin_v5_EN.xlsx"
     return gd.parse_workbook(str(xlsx))
 
 
@@ -169,8 +169,18 @@ class TestLiveProgressionData:
             pytest.skip("Workbook has no real results loaded")
 
         assert "progression" in live
-        assert len(live["progression"]) == live["played"]
-        assert live["progression"][-1]["table"] == live["table"]
+        assert live["steps"] == len(live["progression"])
+        assert len(live["progression"]) == live["played"] + (
+            1 if live.get("standings_ready") else 0
+        )
+        last = live["progression"][-1]
+        if live.get("standings_ready"):
+            assert last.get("virtual") is True
+            assert last.get("kind") == "standings"
+            assert last["table"][0]["pts"] == live["table"][0]["pts"]
+        assert {"group_pts", "standings_pts", "thirds_pts", "ko_pts"} <= set(
+            live["table"][0]
+        )
 
     def test_live_progression_rows_have_rank_and_delta(self, computed_data, workbook_data):
         live = computed_data["live"]
