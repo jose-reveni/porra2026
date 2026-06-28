@@ -251,11 +251,13 @@ TRIVIA = {
         ("Mexico City se hunde ~50cm al año porque está sobre un lago seco.", "Mexico City sinks ~50cm per year because it's built on a drained lake."),
         ("México regaló un axolote a la reina Isabel II en 1953.", "Mexico gifted an axolotl to Queen Elizabeth II in 1953."),
         ("El chicle fue inventado por el general mexicano Antonio López de Santa Anna.", "Chewing gum was invented by Mexican general Antonio López de Santa Anna."),
+        ("El agave del mezcal tarda entre 7 y 30 años en madurar antes de destilarse.", "Mezcal agave takes 7 to 30 years to mature before distillation."),
     ],
     "South Africa": [
         ("Sudáfrica tiene 11 idiomas oficiales, un récord mundial.", "South Africa has 11 official languages, a world record."),
         ("Un sudafricano inventó el CT scan.", "A South African invented the CT scan."),
         ("Table Mountain tiene más especies de plantas que todo Reino Unido.", "Table Mountain has more plant species than the entire UK."),
+        ("Sudáfrica es el único país con tres capitales: Pretoria, Ciudad del Cabo y Bloemfontein.", "South Africa is the only country with three capitals: Pretoria, Cape Town, and Bloemfontein."),
     ],
     "South Korea": [
         ("Corea del Sur tiene más robots per cápita que cualquier país.", "South Korea has more robots per capita than any other country."),
@@ -271,11 +273,13 @@ TRIVIA = {
         ("En 1967 Canadá construyó una pista de aterrizaje para OVNIs en Alberta.", "In 1967 Canada built a UFO landing pad in Alberta."),
         ("Canadá tiene más lagos que todos los demás países juntos.", "Canada has more lakes than every other country combined."),
         ("La RCMP entrenó una vez un hipopótamo como policía montado. Fracasó.", "The RCMP once trained a hippo as a mounted police officer. It failed."),
+        ("Canadá tiene la costa más larga del mundo: más de 202.000 km.", "Canada has the world's longest coastline: over 202,000 km."),
     ],
     "Bosnia-Herz.": [
         ("Sarajevo tuvo tranvías antes que Londres.", "Sarajevo had trams before London."),
         ("Bosnia alberga la última selva virgen de Europa: Perućica.", "Bosnia is home to Europe's last primeval forest: Perućica."),
         ("Un bosnio afirma haber descubierto pirámides más antiguas que las de Egipto. Nadie le cree.", "A Bosnian claims to have discovered pyramids older than Egypt's. Nobody believes him."),
+        ("Sarajevo acogió los Juegos Olímpicos de Invierno de 1984.", "Sarajevo hosted the 1984 Winter Olympics."),
     ],
     "Qatar": [
         ("Qatar usó jinetes robot en carreras de camellos desde 2004.", "Qatar has used robot jockeys in camel races since 2004."),
@@ -286,16 +290,19 @@ TRIVIA = {
         ("Suiza tiene suficientes búnkeres nucleares para toda su población.", "Switzerland has enough nuclear bunkers for its entire population."),
         ("Es ilegal tener un solo conejillo de indias en Suiza (son sociales).", "It's illegal to own just one guinea pig in Switzerland (they're social)."),
         ("Suiza tiene un plan para invadir… Alemania. Por si acaso.", "Switzerland has a plan to invade… Germany. Just in case."),
+        ("El chocolate con leche se inventó en Suiza en 1875 (Daniel Peter).", "Milk chocolate was invented in Switzerland in 1875 (Daniel Peter)."),
     ],
     "Brazil": [
         ("Brasil tuvo un emperador que se declaró 'Protector de los Animales'.", "Brazil had an emperor who declared himself 'Protector of Animals'."),
         ("La prisión de Carandiru tenía su propia liga de fútbol oficial.", "Carandiru prison had its own official football league."),
         ("Brasil es el mayor exportador mundial de piedras preciosas.", "Brazil is the world's largest exporter of gemstones."),
+        ("El Cristo Redentor de Río mide 38 metros y pesa unas 635 toneladas.", "Rio's Christ the Redeemer is 38 meters tall and weighs about 635 tonnes."),
     ],
     "Morocco": [
         ("Marruecos fundó la universidad más antigua del mundo aún en funcionamiento (859 d.C.).", "Morocco founded the world's oldest continuously operating university (859 AD)."),
         ("En Marruecos hay cabras que trepan a los árboles para comer argán.", "In Morocco, goats climb trees to eat argan fruit."),
         ("El rey de Marruecos tiene un trono portátil que viaja con él.", "The King of Morocco has a portable throne that travels with him."),
+        ("La película Casablanca no se rodó en Marruecos: se filmó en un estudio de Hollywood.", "The movie Casablanca wasn't filmed in Morocco — it was shot on a Hollywood soundstage."),
     ],
     "Haiti": [
         ("Haití fue el primer país negro independiente del mundo (1804).", "Haiti was the world's first independent Black republic (1804)."),
@@ -311,16 +318,19 @@ TRIVIA = {
         ("EE. UU. gastó 22 millones de dólares en desarrollar una pluma que escribiera en el espacio. Los rusos usaron lápiz.", "The US spent $22 million developing a pen that writes in space. The Russians used pencils."),
         ("Existe una ciudad llamada 'Hell' en Michigan. Se congela cada invierno.", "There's a town called 'Hell' in Michigan. It freezes every winter."),
         ("La bandera de EE. UU. fue diseñada por un estudiante de 17 años como proyecto escolar.", "The US flag was designed by a 17-year-old student as a school project."),
+        ("Yellowstone fue el primer parque nacional del mundo (1872).", "Yellowstone was the world's first national park (1872)."),
     ],
     "Paraguay": [
         ("Paraguay fue el único país latinoamericano que envió condolencias al gobierno confederado en la Guerra Civil americana.", "Paraguay was the only Latin American country to send condolences to the Confederate government during the American Civil War."),
         ("Paraguay tuvo el primer ferrocarril de Sudamérica (1854).", "Paraguay had South America's first railway (1854)."),
         ("La Armada paraguaya es la más grande del mundo… sin acceso al mar.", "Paraguay's navy is the world's largest… with no access to the sea."),
+        ("El guaraní es cooficial con el español: único país de América con una lengua indígena oficial a nivel nacional.", "Guaraní is co-official with Spanish — the only country in the Americas with an indigenous national language."),
     ],
     "Australia": [
         ("Australia perdió una guerra contra 20.000 emus en 1932.", "Australia lost a war against 20,000 emus in 1932."),
         ("Australia tiene un primer ministro que fue devorado (presuntamente) por caníbales en 1803.", "Australia had a PM who was allegedly eaten by cannibals in 1803."),
         ("Hay más canguros que personas en Australia (~50M vs 26M).", "There are more kangaroos than people in Australia (~50M vs 26M)."),
+        ("La Gran Barrera de Coral mide más de 2.300 km y es visible desde el espacio.", "The Great Barrier Reef stretches over 2,300 km and is visible from space."),
     ],
     "Turkey": [
         ("Los tulipanes vienen de Turquía, no de Holanda.", "Tulips come from Turkey, not the Netherlands."),
@@ -331,6 +341,7 @@ TRIVIA = {
         ("Alemania tiene ~1.500 tipos de cerveza diferentes.", "Germany has ~1,500 different types of beer."),
         ("Intentaron enseñar a los perros a hablar en la Alemania nazi. No funcionó.", "They tried to teach dogs to talk in Nazi Germany. It didn't work."),
         ("Hay más clubes de fútbol que supermercados en Alemania.", "There are more football clubs than supermarkets in Germany."),
+        ("Berlín tiene más puentes que Venecia: unos 1.700.", "Berlin has more bridges than Venice: about 1,700."),
     ],
     "Curacao": [
         ("El licor azul de Curazao se hace con cáscaras de naranja de la isla.", "Blue Curaçao liqueur is made from orange peels grown on the island."),
@@ -341,26 +352,31 @@ TRIVIA = {
         ("Costa de Marfil produce el 40% del cacao mundial.", "Ivory Coast produces 40% of the world's cocoa."),
         ("Tiene una basílica más grande que la de San Pedro en el Vaticano.", "It has a basilica larger than St. Peter's in the Vatican."),
         ("El nombre 'Costa de Marfil' viene de cuando era el mayor mercado de marfil del mundo.", "The name 'Ivory Coast' comes from when it was the world's largest ivory market."),
+        ("Costa de Marfil es el mayor exportador mundial de nueces de cola.", "Ivory Coast is the world's largest exporter of kola nuts."),
     ],
     "Ecuador": [
         ("En la línea ecuatorial de Ecuador, el agua no hace remolino al desaguar.", "At Ecuador's equator line, water doesn't swirl when draining."),
         ("Ecuador tiene montañas donde puedes ver nieve estando en el ecuador.", "Ecuador has mountains where you can see snow while standing on the equator."),
         ("Las Islas Galápagos inspiraron la teoría de la evolución de Darwin.", "The Galápagos Islands inspired Darwin's theory of evolution."),
+        ("Ecuador fue el primer país en reconocer derechos legales a la naturaleza en su Constitución (2008).", "Ecuador was the first country to grant legal rights to nature in its constitution (2008)."),
     ],
     "Netherlands": [
         ("Los Países Bajos están por debajo del nivel del mar en un 26% de su territorio.", "The Netherlands is below sea level in 26% of its territory."),
         ("Hay más bicicletas que personas en los Países Bajos.", "There are more bicycles than people in the Netherlands."),
         ("Holanda exportó tulipanes por primera vez como error: alguien se comió los bulbos pensando que eran cebollas.", "Holland first exported tulips by mistake: someone ate the bulbs thinking they were onions."),
+        ("Los holandeses son los más altos del mundo: la altura media del hombre supera 1,83 m.", "The Dutch are the world's tallest people: average male height exceeds 1.83 m."),
     ],
     "Japan": [
         ("Japón tiene más mascotas que niños.", "Japan has more pets than children."),
         ("Hay una isla en Japón llena de conejos salvajes: Ōkunoshima.", "There's an island in Japan full of wild rabbits: Ōkunoshima."),
         ("Japón tiene un festival donde se lanzan habas a demonios imaginarios.", "Japan has a festival where you throw beans at imaginary demons."),
+        ("Japón tiene más de 50.000 personas centenarias.", "Japan has over 50,000 centenarians."),
     ],
     "Sweden": [
         ("Suecia importa basura de otros países porque se le acabó la suya para reciclar.", "Sweden imports trash from other countries because it ran out of its own to recycle."),
         ("Hay un hotel de hielo en Suecia que se reconstruye cada invierno.", "There's an ice hotel in Sweden rebuilt every winter."),
         ("Suecia tuvo un rey que murió por comer 14 porciones de semla de una sentada.", "Sweden had a king who died from eating 14 servings of semla in one sitting."),
+        ("En verano el sol no se pone en el norte de Suecia: hay sol de medianoche.", "In summer the sun doesn't set in northern Sweden — there's midnight sun."),
     ],
     "Tunisia": [
         ("Túnez fue donde se rodó Tatooine en Star Wars. Los decorados siguen ahí.", "Tunisia is where Tatooine was filmed in Star Wars. The sets are still there."),
@@ -371,11 +387,13 @@ TRIVIA = {
         ("Bélgica estuvo 589 días sin gobierno (2010-2011). Nadie lo notó.", "Belgium went 589 days without a government (2010-2011). Nobody noticed."),
         ("Las patatas fritas son belgas, no francesas.", "French fries are Belgian, not French."),
         ("Bélgica tiene más cómics per cápita que cualquier otro país.", "Belgium has more comic books per capita than any other country."),
+        ("Bélgica produce más de 220.000 toneladas de chocolate al año.", "Belgium produces over 220,000 tonnes of chocolate per year."),
     ],
     "Egypt": [
         ("Las pirámides ya eran antiguas cuando Cleopatra vivió. Ella está más cerca de nosotros que de su construcción.", "The pyramids were already ancient when Cleopatra lived. She's closer to us than to their construction."),
         ("Los egipcios antiguos usaban maquillaje tanto hombres como mujeres.", "Ancient Egyptians wore makeup — both men and women."),
         ("Egipto tiene la presa más grande de África: la Gran Presa del Renacimiento… bueno, esa es de Etiopía. La de Asuán también es enorme.", "Egypt has one of Africa's largest dams: the Aswan High Dam."),
+        ("La palabra 'papel' viene del papiro egipcio.", "The word 'paper' comes from Egyptian papyrus."),
     ],
     "Iran": [
         ("Irán tiene más cirugías de nariz per cápita que cualquier país.", "Iran has more nose jobs per capita than any other country."),
@@ -391,11 +409,13 @@ TRIVIA = {
         ("España tiene un festival donde se lanzan tomates: La Tomatina.", "Spain has a festival where people throw tomatoes at each other: La Tomatina."),
         ("La selección española de fútbol no ganó nada importante durante 44 años… y luego ganó 3 seguidos.", "Spain's football team won nothing major for 44 years… then won 3 in a row."),
         ("España tiene más bares per cápita que cualquier país de la UE.", "Spain has more bars per capita than any EU country."),
+        ("España es el segundo país más visitado del mundo (~85 millones de turistas al año).", "Spain is the world's second most visited country (~85 million tourists a year)."),
     ],
     "Cape Verde": [
         ("Cabo Verde tiene más gente viviendo fuera del país que dentro.", "Cape Verde has more people living abroad than at home."),
         ("Es el lugar de cría más importante del mundo para tortugas marinas.", "It's the world's most important breeding site for sea turtles."),
         ("Cabo Verde no tenía población humana hasta que los portugueses llegaron en 1456.", "Cape Verde had no human population until the Portuguese arrived in 1456."),
+        ("El morna caboverdiano inspiró la canción 'Sodade', famosa en todo el mundo.", "Cape Verdean morna music inspired the world-famous song 'Sodade'."),
     ],
     "Uruguay": [
         ("Uruguay tiene más vacas que personas (4:1).", "Uruguay has more cows than people (4:1)."),
@@ -411,11 +431,13 @@ TRIVIA = {
         ("Francia tiene 12 husos horarios (por sus territorios de ultramar). Más que cualquier país.", "France has 12 time zones (due to overseas territories). More than any country."),
         ("Francia construyó un 'Versalles falso' para engañar a los bombarderos alemanes en la IIGM.", "France built a 'fake Versailles' to fool German bombers in WWII."),
         ("El croissant no es francés. Es austríaco.", "The croissant isn't French. It's Austrian."),
+        ("Francia produce más de 1.600 tipos de queso diferentes.", "France produces over 1,600 different types of cheese."),
     ],
     "Senegal": [
         ("Senegal tiene un lago rosa natural: el Lago Retba.", "Senegal has a natural pink lake: Lake Retba."),
         ("El Rally Dakar originalmente terminaba en Dakar (antes de mudarse a Sudamérica).", "The Dakar Rally originally ended in Dakar (before moving to South America)."),
         ("Senegal tiene la estatua más alta de África: el Monumento al Renacimiento Africano (49m).", "Senegal has Africa's tallest statue: the African Renaissance Monument (49m)."),
+        ("La isla de Gorée, frente a Dakar, fue declarada Patrimonio de la Humanidad por la UNESCO.", "Gorée Island, off Dakar, was declared a UNESCO World Heritage Site."),
     ],
     "Iraq": [
         ("Irak es donde se inventó la escritura (~3400 a.C.).", "Iraq is where writing was invented (~3400 BC)."),
@@ -426,21 +448,25 @@ TRIVIA = {
         ("El rey de Noruega es un pingüino. Literalmente. Se llama Nils Olav.", "The King of Norway is a penguin. Literally. His name is Nils Olav."),
         ("Noruega regaló un árbol de Navidad a Londres cada año desde 1947. Como agradecimiento por la WWII.", "Norway has gifted a Christmas tree to London every year since 1947. As thanks for WWII."),
         ("Noruega tiene un pueblo fantasma pirámide en el Ártico: Pyramiden.", "Norway has a ghost town pyramid in the Arctic: Pyramiden."),
+        ("En verano el sol no se pone en el norte de Noruega: hay sol de medianoche.", "In summer the sun doesn't set in northern Norway — there's midnight sun."),
     ],
     "Argentina": [
         ("Argentina tuvo 5 presidentes en 10 días en 2001.", "Argentina had 5 presidents in 10 days in 2001."),
         ("El tango nació en los burdeles de Buenos Aires.", "Tango was born in the brothels of Buenos Aires."),
         ("Argentina tiene la avenida más ancha del mundo: la 9 de Julio (14 carriles).", "Argentina has the world's widest avenue: 9 de Julio (14 lanes)."),
+        ("Argentina es el mayor consumidor mundial de carne de vacuno per cápita.", "Argentina is the world's largest per-capita consumer of beef."),
     ],
     "Algeria": [
         ("Argelia es el país más grande de África por superficie.", "Algeria is the largest country in Africa by area."),
         ("Argelia tiene más de 1.000 km de costa mediterránea.", "Algeria has over 1,000 km of Mediterranean coastline."),
         ("El desierto del Sahara cubre el 80% de Argelia.", "The Sahara Desert covers 80% of Algeria."),
+        ("Argelia tiene 7 lugares declarados Patrimonio de la Humanidad por la UNESCO.", "Algeria has 7 UNESCO World Heritage Sites."),
     ],
     "Austria": [
         ("Austria tiene un pueblo llamado 'Fucking'. Tuvo que cambiar el nombre por los turistas.", "Austria had a village called 'Fucking'. It had to change the name because of tourists."),
         ("El 80% de la banda sonora de 'The Sound of Music' se rodó en Austria.", "80% of 'The Sound of Music' was filmed in Austria."),
         ("Austria inventó la bola de nieve (Schneekugel) en 1900.", "Austria invented the snow globe (Schneekugel) in 1900."),
+        ("Viena ha sido elegida repetidamente la ciudad más habitable del mundo.", "Vienna has repeatedly been ranked the world's most liveable city."),
     ],
     "Jordan": [
         ("Jordania tiene el punto más bajo de la Tierra: el Mar Muerto (-430m).", "Jordan has the lowest point on Earth: the Dead Sea (-430m)."),
@@ -451,11 +477,13 @@ TRIVIA = {
         ("Portugal tiene la alianza diplomática más antigua del mundo con Inglaterra (1373).", "Portugal has the world's oldest diplomatic alliance with England (1373)."),
         ("Portugal es el país más antiguo de Europa con las mismas fronteras desde 1139.", "Portugal is Europe's oldest country with the same borders since 1139."),
         ("Lisboa es más antigua que Roma.", "Lisbon is older than Rome."),
+        ("El fado fue declarado Patrimonio Inmaterial de la Humanidad por la UNESCO.", "Fado music was declared UNESCO Intangible Cultural Heritage."),
     ],
     "DR Congo": [
         ("La RD Congo tiene el 50% de las reservas mundiales de cobalto.", "DR Congo has 50% of the world's cobalt reserves."),
         ("El río Congo es el más profundo del mundo (220m).", "The Congo River is the world's deepest (220m)."),
         ("La RD Congo tiene un volcán que produce lava azul: Nyiragongo.", "DR Congo has a volcano that produces blue lava: Nyiragongo."),
+        ("El río Congo es el único gran río del mundo que cruza el ecuador dos veces.", "The Congo River is the only major river in the world that crosses the equator twice."),
     ],
     "Uzbekistan": [
         ("Uzbekistán tiene una de las ciudades más antiguas de la Ruta de la Seda: Samarcanda.", "Uzbekistan has one of the oldest Silk Road cities: Samarkand."),
@@ -466,21 +494,25 @@ TRIVIA = {
         ("Colombia tiene más especies de aves que cualquier otro país (~1.900).", "Colombia has more bird species than any other country (~1,900)."),
         ("El río Caño Cristales en Colombia tiene 5 colores y le llaman 'el río que se escapó del paraíso'.", "Colombia's Caño Cristales river has 5 colors and is called 'the river that escaped paradise'."),
         ("Colombia es el único país de Sudamérica con costa en el Pacífico Y el Caribe.", "Colombia is the only South American country with both Pacific and Caribbean coasts."),
+        ("Bogotá está a 2.640 m de altitud: una de las capitales más altas del mundo.", "Bogotá sits at 2,640 m altitude — one of the world's highest capitals."),
     ],
     "England": [
         ("Inglaterra tuvo una reina que reinó solo 9 días: Lady Jane Grey.", "England had a queen who reigned just 9 days: Lady Jane Grey."),
         ("El Big Ben no es el nombre de la torre. Es el nombre de la campana.", "Big Ben isn't the tower's name. It's the bell's name."),
         ("Inglaterra inventó el fútbol moderno… y luego no ganó un Mundial durante 56 años.", "England invented modern football… then didn't win a World Cup for 56 years."),
+        ("Los ingleses beben unos 165 millones de tazas de té al día.", "The English drink about 165 million cups of tea per day."),
     ],
     "Croatia": [
         ("La corbata fue inventada por mercenarios croatas en el siglo XVII.", "The necktie was invented by Croatian mercenaries in the 17th century."),
         ("Croacia tiene el museo de relaciones rotas del mundo (Zagreb).", "Croatia has the world's Museum of Broken Relationships (Zagreb)."),
         ("Dálmata (el perro) viene de Dalmacia, Croacia.", "The Dalmatian dog comes from Dalmatia, Croatia."),
+        ("Croacia tiene más de 1.200 islas, pero solo unas 50 están habitadas.", "Croatia has over 1,200 islands, but only about 50 are inhabited."),
     ],
     "Ghana": [
         ("Ghana tiene el ataúd más customizado del mundo: los hacen con forma de pez, avión, Coca-Cola…", "Ghana has the world's most custom coffins: shaped like fish, planes, Coca-Cola bottles…"),
         ("Ghana fue llamada 'Costa de Oro' por los colonizadores portugueses.", "Ghana was called the 'Gold Coast' by Portuguese colonizers."),
         ("El lago Volta en Ghana es el mayor lago artificial del mundo por superficie.", "Lake Volta in Ghana is the world's largest artificial lake by surface area."),
+        ("Ghana fue el primer país subsahariano en independizarse de Europa colonial (1957).", "Ghana was the first sub-Saharan country to gain independence from colonial Europe (1957)."),
     ],
     "Panama": [
         ("Panamá es el único lugar del mundo donde puedes ver el amanecer en el Pacífico y el atardecer en el Atlántico.", "Panama is the only place where you can see sunrise on the Pacific and sunset on the Atlantic."),
@@ -488,6 +520,18 @@ TRIVIA = {
         ("Panamá tiene más de 1.500 islas. La mayoría sin nombre.", "Panama has over 1,500 islands. Most unnamed."),
     ],
 }
+
+# Índice del fact de TRIVIA por ronda eliminatoria (0-based). R32 usa el 4.º dato.
+KO_TRIVIA_INDEX = {"r32": 3}
+
+
+def match_trivia(team_en, fact_idx):
+    facts = TRIVIA.get(team_en, [])
+    if fact_idx < len(facts):
+        es, en = facts[fact_idx]
+    else:
+        es, en = "", ""
+    return {"es": es, "en": en}
 
 
 def team_es(name):
@@ -1272,6 +1316,10 @@ def compute_knockout(data):
     n = data["n"]
     raw = data["knockouts"]
     winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
+    scoring = compute_knockout_scoring(data)
+    ko_table = scoring["table"] if scoring else [
+        {"name": names[i], "pts": 0, "rank": i + 1} for i in range(n)
+    ]
 
     total_rows = 0
     filled_rows = 0
@@ -1292,9 +1340,16 @@ def compute_knockout(data):
                 "score": score,
                 "winner": winner,
                 "result": _knockout_public_result(result),
+                **_ko_public_pick_fields(m, names, n),
                 **_knockout_public_schedule(m),
             }
             resolve_knockout_fixture(pub, winner_by_w)
+            trivia_idx = KO_TRIVIA_INDEX.get(rnd["key"])
+            if trivia_idx is not None:
+                pub["home_trivia"] = match_trivia(pub.get("fixture_home_en"), trivia_idx)
+                pub["away_trivia"] = match_trivia(pub.get("fixture_away_en"), trivia_idx)
+            if not result or "score" not in result:
+                pub["stake"] = compute_ko_match_stake(m, rnd, names, ko_table)
             match_rows.append(pub)
         rounds.append({
             "key": rnd["key"],
@@ -1317,9 +1372,12 @@ def compute_knockout(data):
             "label_en": m["label_en"],
             "score": score,
             "result": _knockout_public_result(result),
+            **_ko_public_pick_fields(m, names, n),
             **_knockout_public_schedule(m),
         }
         resolve_knockout_fixture(pub, winner_by_w)
+        if not result or "score" not in result:
+            pub["stake"] = compute_ko_match_stake(m, None, names, ko_table)
         final_matches.append(pub)
 
     outright = {}
@@ -1346,10 +1404,10 @@ def compute_knockout(data):
             **consensus,
         }
 
-    scoring = compute_knockout_scoring(data)
     kr = data["knockout_results"]
     results_started = bool(kr["matches"] or kr["outright"] or kr["awards"])
     metrics = compute_knockout_metrics(data) if filled_rows > 0 else None
+    progression = compute_ko_progression(data)
     return {
         "ready": filled_rows > 0,
         "filled": filled_rows,
@@ -1362,6 +1420,7 @@ def compute_knockout(data):
         "awards": awards,
         "scoring": scoring,
         "metrics": metrics,
+        "progression": progression,
     }
 
 
@@ -1441,6 +1500,275 @@ def compute_knockout_scoring(data):
     return {"table": table, "played": sum(1 for v in results["matches"].values() if "score" in v)}
 
 
+KO_SURVIVAL_ROUNDS = [
+    {"key": "r32", "label_es": "Dieciseisavos", "label_en": "Round of 32"},
+    {"key": "r16", "label_es": "Octavos", "label_en": "Round of 16"},
+    {"key": "qf", "label_es": "Cuartos", "label_en": "Quarter-finals"},
+    {"key": "sf", "label_es": "Semis", "label_en": "Semi-finals"},
+    {"key": "final", "label_es": "Final", "label_en": "Final"},
+    {"key": "champion", "label_es": "Campeón", "label_en": "Champion"},
+]
+
+
+def _ko_public_pick_fields(match, names, n):
+    """Picks individuales y analítica agregada para la vista Hoy."""
+    picks = []
+    for i, (h, a) in enumerate(match["score_picks"]):
+        winner = match["winner_picks"][i] if match.get("winner_picks") else None
+        picks.append({
+            "name": names[i],
+            "home": h,
+            "away": a,
+            "winner": team_es(winner) if winner else None,
+            "winner_flag": team_flag(winner) if winner else "",
+        })
+    o1 = sum(1 for h, a in match["score_picks"] if h is not None and h > a)
+    ox = sum(1 for h, a in match["score_picks"] if h is not None and h == a)
+    o2 = sum(1 for h, a in match["score_picks"] if h is not None and h < a)
+    counter = Counter(
+        f"{h}-{a}" for h, a in match["score_picks"] if h is not None and a is not None
+    )
+    modal = counter.most_common(1)
+    modal_sl = modal[0][0] if modal else "–"
+    modal_pct = round(modal[0][1] / n, 3) if modal and n else 0
+    return {
+        "picks": picks,
+        "outcome_dist": {"1": o1, "X": ox, "2": o2},
+        "modal_scoreline": modal_sl,
+        "modal_scoreline_share": modal_pct,
+    }
+
+
+def compute_ko_match_stake(match, rnd, names, ko_table):
+    """Cuánto puede mover el ranking KO un cruce aún sin jugar."""
+    advance_pts = rnd["advance_points"] if rnd else 0
+    has_winner = bool(match.get("winner_picks"))
+    max_one = (3 + 2 + advance_pts) if has_winner else 5
+    if not ko_table:
+        ko_table = [{"name": name, "pts": 0} for name in names]
+    sorted_table = sorted(ko_table, key=lambda r: (-r["pts"], r["name"].lower()))
+    rank_rows = {}
+    for rank, row in enumerate(sorted_table, 1):
+        rank_rows[row["name"]] = {**row, "rank": row.get("rank", rank)}
+
+    people = []
+    picks = 0
+    max_swing = 0
+    total_pts = 0
+    for i, name in enumerate(names):
+        h, a = match["score_picks"][i]
+        winner = match["winner_picks"][i] if has_winner else None
+        if h is None and not winner:
+            continue
+        picks += 1
+        person_max = max_one if winner else (5 if h is not None else 0)
+        total_pts += person_max
+        row = rank_rows.get(name, {"pts": 0, "rank": len(names)})
+        new_pts = row["pts"] + person_max
+        new_rank = 1 + sum(
+            1 for other in sorted_table
+            if other["pts"] > new_pts
+            or (other["pts"] == new_pts and other["name"].lower() < name.lower())
+        )
+        swing = row["rank"] - new_rank
+        max_swing = max(max_swing, swing)
+        people.append({
+            "name": name,
+            "max_pts": person_max,
+            "swing": swing,
+            "score": f"{h}-{a}" if h is not None else None,
+            "winner": team_es(winner) if winner else None,
+            "winner_flag": team_flag(winner) if winner else "",
+        })
+    if not picks:
+        return None
+    return {
+        "max_one": max_one,
+        "advance_points": advance_pts,
+        "max_points": total_pts,
+        "picks": picks,
+        "max_swing": max_swing,
+        "people": people,
+    }
+
+
+def _ko_match_side_keys(match, pub, winner_by_w):
+    """Claves canónicas de local y visitante en un cruce resuelto."""
+    keys = []
+    for side in ("home", "away"):
+        val = pub.get(f"fixture_{side}") or match.get(f"fixture_{side}", "")
+        if val and not str(val).startswith("W"):
+            keys.append(_cmp_team(val))
+            continue
+        resolved = pub.get(f"resolved_{side}")
+        if resolved:
+            keys.append(_cmp_team(resolved))
+            continue
+        wm = re.match(r"^W(\d+)$", str(val))
+        if wm:
+            team = winner_by_w.get(int(wm.group(1)))
+            if team:
+                keys.append(_cmp_team(team.get("name_en") or team.get("name")))
+    return keys
+
+
+def _ko_champion_fell_round(person_idx, data):
+    """Ronda en la que el campeón predicho queda fuera del torneo."""
+    raw = data["knockouts"]
+    champ_pick = raw["outright"]["champion"]["picks"][person_idx]
+    fell_alive = len(KO_SURVIVAL_ROUNDS)
+    if not champ_pick:
+        return fell_alive
+
+    champ_key = _cmp_team(champ_pick)
+    if champ_key in _ko_alive_teams(data):
+        return fell_alive
+
+    winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
+    results = data["knockout_results"]["matches"]
+
+    for round_idx, rnd_meta in enumerate(KO_SURVIVAL_ROUNDS):
+        if rnd_meta["key"] == "champion":
+            continue
+        key = rnd_meta["key"]
+        if key == "final":
+            matches = [m for m in raw["final_matches"] if m["key"] == "final"]
+        else:
+            rnd = next((r for r in raw["rounds"] if r["key"] == key), None)
+            if not rnd:
+                continue
+            matches = rnd["matches"]
+        for match in matches:
+            result = results.get(match["code"])
+            if not result or not result.get("winner"):
+                continue
+            pub = _knockout_public_schedule(match)
+            resolve_knockout_fixture(pub, winner_by_w)
+            if champ_key not in _ko_match_side_keys(match, pub, winner_by_w):
+                continue
+            if _cmp_team(result["winner"]) != champ_key:
+                return round_idx
+
+    return 0
+
+
+def _iter_knockout_played_matches(data):
+    """Cruces KO jugados en orden cronológico."""
+    results = data["knockout_results"]["matches"]
+    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    played = []
+
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            result = results.get(match["code"])
+            if not result or "score" not in result:
+                continue
+            pub = _knockout_public_schedule(match)
+            resolve_knockout_fixture(pub, winner_by_w)
+            played.append((rnd, match, result, pub))
+
+    for match in data["knockouts"]["final_matches"]:
+        result = results.get(match["code"])
+        if not result or "score" not in result:
+            continue
+        pub = _knockout_public_schedule(match)
+        resolve_knockout_fixture(pub, winner_by_w)
+        played.append((None, match, result, pub))
+
+    played.sort(key=lambda item: (item[3]["date"], item[3].get("dt", ""), item[1]["code"]))
+    return played
+
+
+def compute_ko_progression(data):
+    """Ranking KO partido a partido (subidón/batacazo por jornada)."""
+    played = _iter_knockout_played_matches(data)
+    if not played:
+        return None
+
+    names = data["names"]
+    n = data["n"]
+    pts = [0] * n
+    exact = [0] * n
+    outcomes = [0] * n
+    advance = [0] * n
+    previous_ranks = {}
+    progression = []
+
+    for idx, (rnd, match, result, pub) in enumerate(played, 1):
+        before_pts = pts[:]
+        before_exact = exact[:]
+        before_out = outcomes[:]
+        before_adv = advance[:]
+        rh, ra = result["score"]
+        ro = outcome(rh, ra)
+        adv_pts = rnd["advance_points"] if rnd else 0
+
+        for i, (h, a) in enumerate(match["score_picks"]):
+            if h is None or a is None:
+                continue
+            if outcome(h, a) == ro:
+                pts[i] += 3
+                outcomes[i] += 1
+                if h == rh and a == ra:
+                    pts[i] += 2
+                    exact[i] += 1
+
+        if rnd and result.get("winner"):
+            actual = _cmp_text(result["winner"])
+            for i, pick in enumerate(match["winner_picks"]):
+                if pick and _cmp_text(pick) == actual:
+                    pts[i] += adv_pts
+                    advance[i] += 1
+
+        rows = []
+        for i in range(n):
+            rows.append({
+                "name": names[i],
+                "pts": pts[i],
+                "exact": exact[i],
+                "outcomes": outcomes[i],
+                "advance": advance[i],
+                "_order": i,
+            })
+        rows.sort(key=lambda row: (-row["pts"], row["_order"]))
+        for rank, row in enumerate(rows, 1):
+            i = row["_order"]
+            row["rank"] = rank
+            old_rank = previous_ranks.get(row["name"], rank)
+            row["delta"] = old_rank - rank
+            row["round_pts"] = pts[i] - before_pts[i]
+            row["round_exact"] = exact[i] - before_exact[i]
+            row["round_outcomes"] = outcomes[i] - before_out[i]
+            row["round_advance"] = advance[i] - before_adv[i]
+            del row["_order"]
+        previous_ranks = {row["name"]: row["rank"] for row in rows}
+
+        phase_es = rnd["label_es"] if rnd else match["label_es"]
+        phase_en = rnd["label_en"] if rnd else match["label_en"]
+        progression.append({
+            "idx": idx,
+            "code": match["code"],
+            "date": pub["date"],
+            "dt": pub.get("dt", ""),
+            "home": pub["fixture_home"],
+            "away": pub["fixture_away"],
+            "home_flag": pub["fixture_home_flag"],
+            "away_flag": pub["fixture_away_flag"],
+            "phase_es": phase_es,
+            "phase_en": phase_en,
+            "result": {"home": rh, "away": ra, "outcome": ro},
+            "table": rows,
+        })
+
+    final_table = progression[-1]["table"]
+    return {
+        "played": len(played),
+        "steps": len(progression),
+        "table": final_table,
+        "progression": progression,
+    }
+
+
 def _team_prestige(data):
     """Prestigio por consenso de clasificación (1.º=3, 2.º=2, 3.º=1)."""
     pos_weight = {1: 3, 2: 2, 3: 1}
@@ -1464,7 +1792,7 @@ def _ko_alive_teams(data):
             for side in ("home", "away"):
                 name = match.get(f"fixture_{side}", "")
                 if name and not str(name).startswith("W"):
-                    alive.add(_cmp_text(team_es(name)))
+                    alive.add(_cmp_team(name))
 
     results = data["knockout_results"]["matches"]
     for rnd in data["knockouts"]["rounds"]:
@@ -1472,11 +1800,11 @@ def _ko_alive_teams(data):
             result = results.get(match["code"])
             if not result or not result.get("winner"):
                 continue
-            winner_key = _cmp_text(team_es(result["winner"]))
+            winner_key = _cmp_team(result["winner"])
             for side in ("home", "away"):
                 name = match.get(f"fixture_{side}", "")
                 if name and not str(name).startswith("W"):
-                    side_key = _cmp_text(team_es(name))
+                    side_key = _cmp_team(name)
                     if side_key != winner_key:
                         alive.discard(side_key)
     return alive
@@ -1605,15 +1933,12 @@ def compute_knockout_metrics(data):
         if not pick:
             continue
         pick_es = team_es(pick)
-        if _cmp_text(pick_es) not in alive:
+        if _cmp_team(pick) not in alive:
             grave.append({"name": names[i], "champ": pick_es, "flag": team_flag(pick)})
 
     round_labels = [
-        {"es": "Octavos", "en": "R16"},
-        {"es": "Cuartos", "en": "QF"},
-        {"es": "Semis", "en": "SF"},
-        {"es": "Final", "en": "Final"},
-        {"es": "Campeón", "en": "Champion"},
+        {"es": meta["label_es"], "en": meta["label_en"]}
+        for meta in KO_SURVIVAL_ROUNDS
     ]
     fell_alive = len(round_labels)
 
@@ -1645,9 +1970,7 @@ def compute_knockout_metrics(data):
             exp = max(1, 8 - variance_counts[i] // 3)
         champ_arr = [team_es(champ_pick), team_flag(champ_pick)] if champ_pick else ["–", "🏳️"]
         runner_arr = [team_es(runner_pick), team_flag(runner_pick)] if runner_pick else ["–", "🏳️"]
-        fell = fell_alive
-        if champ_pick and _cmp_text(team_es(champ_pick)) not in alive:
-            fell = fell_alive - 1
+        fell = _ko_champion_fell_round(i, data)
         people.append({
             "name": name,
             "champ": champ_arr,
@@ -1747,6 +2070,13 @@ def _text_consensus(picks, n):
 
 def _cmp_text(v):
     return str(v).strip().casefold()
+
+
+def _cmp_team(name):
+    """Clave canónica para comparar selecciones (EN/ES, acentos, alias FIFA)."""
+    if name is None:
+        return None
+    return _cmp_text(_team_key(name))
 
 
 # Baremo de clasificados (idéntico al de la hoja Calculation del Excel):
@@ -2633,6 +2963,9 @@ footer .brand svg{height:20px;width:auto}
 .kp-act-viz{margin-top:22px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:16px;padding:18px}
 .kp-act-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
 .kp-act-grid .kp-act-viz{margin-top:0}
+.kp-prog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+.kp-prog-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.88rem}
+.kp-prog-row .nm{font-weight:700}
 .kp-tip{position:fixed;z-index:200;pointer-events:none;background:#001a1f;border:1px solid var(--line);
   border-radius:10px;padding:7px 11px;font:700 .82rem 'Space Grotesk';color:var(--text);
   box-shadow:0 10px 28px rgba(0,0,0,.45);opacity:0;transition:opacity .08s;max-width:240px}
@@ -2640,7 +2973,7 @@ footer .brand svg{height:20px;width:auto}
 .kp-scatter circle{cursor:pointer;transition:stroke-width .08s}
 .kp-scatter circle:hover{stroke:#fff;stroke-width:2}
 .kp-fichas-wrap .search{margin-bottom:18px}
-@media(max-width:720px){.kp-act-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.kp-act-grid,.kp-prog-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.kp-duo{grid-template-columns:1fr}}
 
 @media(max-width:560px){.proto-shell-inner{padding:10px 14px}.proto-body{padding:0 14px}}
@@ -3199,9 +3532,15 @@ function buildHero(){
 function todayScheduleMatches(){
   const groupMatches = (D.today && D.today.matches) || [];
   const koRounds = ((D.knockout && D.knockout.rounds) || []).flatMap(r =>
-    (r.matches || []).map(m => ({...m, phase_es:r.label_es, phase_en:r.label_en, is_knockout:true})));
+    (r.matches || []).map(m => ({
+      ...m,
+      phase_es:r.label_es,
+      phase_en:r.label_en,
+      is_knockout:true,
+      advance_points:r.advance_points,
+    })));
   const koFinals = ((D.knockout && D.knockout.final_matches) || [])
-    .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true}));
+    .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true, advance_points:0}));
   const knockoutMatches = koRounds.concat(koFinals).map(m => ({
     ...m,
     home:m.fixture_home,
@@ -3224,13 +3563,20 @@ function groupMatchStakeHtml(m){
 }
 
 function koMatchStakeHtml(m){
-  const rnd = ((D.knockout && D.knockout.rounds) || []).find(r => (r.matches || []).some(x => x.code === m.code));
-  if(!rnd) return '';
-  const adv = rnd.advance_points || 0;
-  const maxOne = 3 + 2 + 1 + adv;
+  const st = m.stake;
+  if(!st) return '';
+  const swingers = (st.people || []).filter(p => p.swing > 0)
+    .sort((a,b) => b.swing - a.swing || b.max_pts - a.max_pts).slice(0,4);
+  const swingHtml = swingers.length
+    ? `<div class="muted" style="font-size:.82rem;margin-top:8px">${L('Más en juego','Most at stake')}: ${swingers.map(p =>
+        `<b>${esc(p.name)}</b> +${p.max_pts}${p.swing ? ` (±${p.swing})` : ''}`).join(' · ')}</div>`
+    : '';
   return `<div class="kp-stake tm-stake">
     <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego (eliminatorias)','At stake (knockouts)')}</div>
-      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${maxOne} ${L('pts/persona','pts/person')} (+${adv} ${L('por pase','per advance')})</div></div>
+      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${st.max_one} ${L('pts/persona','pts/person')} (+${st.advance_points} ${L('por pase','per advance')}) · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div></div>
+    <div style="text-align:right"><div class="swing">±${st.max_swing}</div>
+      <div class="muted" style="font-size:.82rem">${L('puestos en ranking KO','KO rank places')}</div></div>
+    ${swingHtml}
   </div>`;
 }
 
@@ -3270,17 +3616,44 @@ function buildHoy(){
       const winnerHtml = m.winner && m.winner.value
         ? `<div class="tm-stat"><div class="val" style="font-size:1rem">${m.winner.flag || ''} ${esc(team(m.winner.value))}</div><div class="lab">${L('Consenso ganador','Winner consensus')} · ${pf(m.winner.agreement)} · ${m.winner.count}/${N}</div></div>`
         : '';
+      const scoreHtml = m.score && m.score.value
+        ? `<div class="tm-stat"><div class="val">${esc(m.score.value)}</div><div class="lab">${L('Marcador más repetido','Most common scoreline')} (${pf(Math.round((m.score.agreement || 0)))})</div></div>`
+        : '';
+      const o = m.outcome_dist || {}, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
+      const pct = k => tot ? Math.round((o[k]||0)/tot*100) : 0;
+      const statsCount = 1 + (resultHtml ? 1 : 0) + (winnerHtml ? 1 : 0) + (scoreHtml ? 1 : 0);
+      const outcomeHtml = tot ? `<div class="tm-stats" style="grid-template-columns:repeat(3,1fr)">
+        <div class="tm-stat"><div class="val">${pct('1')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.home))}</div></div>
+        <div class="tm-stat"><div class="val">${pct('X')}%</div><div class="lab">${L('Empate','Draw')}</div></div>
+        <div class="tm-stat"><div class="val">${pct('2')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.away))}</div></div>
+      </div>` : '';
+      const picksHtml = (m.picks || []).map(p =>
+        `<div class="tp-item"><span class="tp-name">${esc(p.name)}</span><span class="tp-score">${p.home!=null?p.home+'-'+p.away:'–'}${p.winner ? ' · '+ (p.winner_flag||'') + esc(team(p.winner)) : ''}</span></div>`
+      ).join('');
       s.appendChild(el('div','today-match reveal',
         `<div class="tm-head">
           <div class="tm-teams">${m.home_flag ? m.home_flag + ' ' : ''}${esc(team(m.home))} – ${esc(team(m.away))}${m.away_flag ? ' ' + m.away_flag : ''}</div>
           <div class="tm-tags">${koTime(m)?`<span class="tm-time" title="${esc(koTz())}">⏱ ${esc(koTime(m))}${koNext(m)?` <span class="tm-next" title="${L('madrugada del día siguiente','after midnight, next day')}">+1</span>`:''}</span>`:''}<span class="tm-group">${L(m.phase_es || 'ELIMINATORIA', m.phase_en || 'KNOCKOUT')}</span></div>
         </div>
-        <div class="tm-stats" style="grid-template-columns:repeat(${1 + (resultHtml ? 1 : 0) + (winnerHtml ? 1 : 0)},1fr)">
+        <div class="tm-stats" style="grid-template-columns:repeat(${statsCount},1fr)">
           <div class="tm-stat"><div class="val" style="font-size:1rem">${esc(m.venue || '')}</div><div class="lab">${esc(m.city || '')}</div></div>
           ${resultHtml}
           ${winnerHtml}
+          ${scoreHtml}
         </div>
-        ${koMatchStakeHtml(m)}`));
+        ${outcomeHtml}
+        ${koMatchStakeHtml(m)}
+        ${picksHtml ? `<div class="today-picks"><div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div><div class="today-picks-grid">${picksHtml}</div></div>` : ''}
+        ${m.home_trivia && m.home_trivia.es ? `<div class="trivia-block">
+        <div class="trivia-item">
+          <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.home_flag} ${esc(team(m.home))}</div>
+          <div class="trivia-text">${esc(L(m.home_trivia.es, m.home_trivia.en))}</div>
+        </div>
+        <div class="trivia-item">
+          <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.away_flag} ${esc(team(m.away))}</div>
+          <div class="trivia-text">${esc(L(m.away_trivia.es, m.away_trivia.en))}</div>
+        </div>
+      </div>` : ''}`));
       return;
     }
     const o = m.outcome_dist, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
@@ -4023,10 +4396,37 @@ function koSurvivalCard(){
     return `<div class="surv-name">${esc(r.name)}</div>${cells}`;
   }).join('');
   return el('div','survive reveal',
-    `<h3>${L('¿Hasta dónde aguanta el pronóstico de cada uno?','How far does each person\'s bracket survive?')}</h3>
-     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que su campeón ya no puede ganar el torneo.',
-        'Each row is a person; the red block marks the round where their champion can no longer win the tournament.')}</p>
+    `<h3>${L('¿Hasta dónde aguanta tu campeón?','How long does your champion last?')}</h3>
+     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que cae tu campeón predicho. Fallar un pase intermedio no te elimina si tu campeón sigue vivo.',
+        'Each row is one person; the red block marks the round your predicted champion is knocked out. A wrong pick elsewhere does not end your run if your champion is still alive.')}</p>
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
+}
+function koProgressionCard(k){
+  const prog = k.progression;
+  if(!prog || !prog.progression || !prog.progression.length) return null;
+  const last = prog.progression[prog.progression.length - 1];
+  const matchTitle = `${last.home_flag || ''} ${team(last.home)} – ${team(last.away)} ${last.away_flag || ''}`;
+  const gainers = last.table.filter(r => r.delta > 0).sort((a,b) => b.delta - a.delta || a.rank - b.rank).slice(0,5);
+  const losers = last.table.filter(r => r.delta < 0).sort((a,b) => a.delta - b.delta || b.rank - a.rank).slice(0,5);
+  const scorers = last.table.filter(r => r.round_pts > 0).sort((a,b) => b.round_pts - a.round_pts).slice(0,5);
+  const row = (r, extra) => `<div class="kp-prog-row"><span class="nm" style="color:${personColor(r.name)}">${esc(r.name)}</span><span>${extra}</span></div>`;
+  const gainHtml = gainers.length
+    ? gainers.map(r => row(r, `<b class="mint">+${r.round_pts} pts</b> · ↑${r.delta}`)).join('')
+    : `<p class="muted">${L('Sin subidas de puesto.','No rank climbs.')}</p>`;
+  const loseHtml = losers.length
+    ? losers.map(r => row(r, `<b class="muted">+${r.round_pts} pts</b> · ↓${Math.abs(r.delta)}`)).join('')
+    : `<p class="muted">${L('Sin bajadas de puesto.','No rank drops.')}</p>`;
+  const scoreHtml = scorers.length
+    ? scorers.map(r => row(r, `<b>+${r.round_pts}</b> (${r.round_exact ? r.round_exact + ' pleno' : ''}${r.round_exact && r.round_outcomes ? ' · ' : ''}${r.round_outcomes ? r.round_outcomes + ' signo' : ''}${r.round_advance ? ' · ' + r.round_advance + ' pase' : ''})`)).join('')
+    : `<p class="muted">${L('Nadie sumó en este cruce.','Nobody scored in this tie.')}</p>`;
+  return el('div','kp-prog reveal',
+    `<h3>${L('Subidón y batacazo del último cruce','Ups and downs from the latest tie')}</h3>
+     <p class="muted" style="margin-bottom:14px"><b>${esc(matchTitle)}</b> · ${last.result.home}-${last.result.away} · ${L(last.phase_es, last.phase_en)}</p>
+     <div class="kp-prog-grid">
+       <div class="kp-act-viz"><span class="k">${L('🚀 Subidón','🚀 Climbers')}</span>${gainHtml}</div>
+       <div class="kp-act-viz"><span class="k">${L('📉 Batacazo','📉 Slides')}</span>${loseHtml}</div>
+       <div class="kp-act-viz"><span class="k">${L('⚽ Quién sumó','⚽ Who scored')}</span>${scoreHtml}</div>
+     </div>`);
 }
 function buildKnockouts(){
   const k = D.knockout || {};
@@ -4138,7 +4538,7 @@ function koFichasBody(dz){
         <div>${L('Pichichi','Top scorer')}<br><span class="v">${esc(p.ts)}</span></div>
         <div>${L('Índice de caos','Chaos index')}<br><span class="v">${p.chaos}</span></div>
       </div>
-      <div class="fline">${L('📉 Su cuadro se rompe en:','📉 Bracket breaks at:')} <b>${fellTxt}</b></div>
+      <div class="fline">${L('📉 Tu campeón cae en:','📉 Your champion falls at:')} <b>${fellTxt}</b></div>
       ${tw ? `<div class="fline">${L('👯 Gemelo:','👯 Twin:')} <b>${esc(tw.name)}</b> (${tw.sim}%)</div>` : ''}`;
     grid.appendChild(card);
   });
@@ -4203,12 +4603,18 @@ function buildKoStoryBody(){
       + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
 
   if(koResultsStarted()){
-    sec.appendChild(koAct(
+    const survivalAct = koAct(
       L('Acto 4 · Supervivencia','Act 4 · Survival'),
-      L('¿Hasta dónde aguantas?','How far do you last?'),
-      `<p class="kp-act-lead">${L('La línea de vida marca dónde deja de ser posible que tu campeón gane el torneo.',
-                                'The lifeline marks where your champion can no longer win the tournament.')}</p>`,
-      koSurvivalCard()));
+      L('¿Hasta dónde aguanta tu campeón?','How long does your champion last?'),
+      `<p class="kp-act-lead">${L('La línea de vida sigue a tu campeón predicho, no a cada acierto suelto del cuadro. Caes cuando ese equipo queda fuera del torneo.',
+                                'The lifeline follows your predicted champion, not every individual bracket pick. You\'re out when that team is eliminated.')}</p>`,
+      koSurvivalCard());
+    sec.appendChild(survivalAct);
+    const progCard = koProgressionCard(k);
+    if(progCard){
+      progCard.style.marginTop = '18px';
+      survivalAct.appendChild(progCard);
+    }
   }
 
   sec.appendChild(koAct(

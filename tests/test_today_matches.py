@@ -94,6 +94,16 @@ class TestTodayTrivia:
                 f"Team {team} has repeated trivia facts"
             )
 
+    def test_r32_matches_have_fourth_trivia_fact(self, computed_data):
+        r32 = computed_data["knockout"]["rounds"][0]["matches"]
+        for m in r32:
+            assert m["home_trivia"]["es"], f"{m['code']} home trivia missing"
+            assert m["away_trivia"]["es"], f"{m['code']} away trivia missing"
+            home_en = m["fixture_home_en"]
+            away_en = m["fixture_away_en"]
+            assert m["home_trivia"]["es"] == gd.TRIVIA[home_en][3][0]
+            assert m["away_trivia"]["es"] == gd.TRIVIA[away_en][3][0]
+
 
 class TestTodayMatchdayDate:
     def test_spanish_early_morning_uses_previous_matchday(self):
@@ -403,3 +413,101 @@ class TestKnockoutData:
         assert "m.winner.agreement || 0) * 100" not in gd.JS
         assert "bk-cbar split" in gd.JS
         assert "Resultado final" in gd.JS
+        assert "koProgressionCard" in gd.JS
+
+    def test_knockout_matches_expose_picks_and_stake(self, computed_data):
+        unplayed = computed_data["knockout"]["rounds"][0]["matches"][0]
+        assert unplayed["code"] == "R32-M1"
+        assert "picks" in unplayed
+        assert len(unplayed["picks"]) == computed_data["hero"]["participants"]
+        assert "outcome_dist" in unplayed
+        assert "stake" in unplayed
+        assert unplayed["stake"]["max_one"] == 6
+        assert unplayed["stake"]["picks"] > 0
+
+    def test_knockout_progression_after_r32_m3(self, computed_data):
+        prog = computed_data["knockout"]["progression"]
+        assert prog is not None
+        assert prog["played"] == 1
+        assert prog["progression"][0]["code"] == "R32-M3"
+        row = prog["progression"][0]["table"][0]
+        assert {"rank", "delta", "round_pts", "round_advance"} <= set(row)
+
+    def test_knockout_champion_survival_not_penalized_for_other_picks(
+        self, computed_data, workbook_data,
+    ):
+        metrics = computed_data["knockout"]["metrics"]
+        match = workbook_data["knockouts"]["rounds"][0]["matches"][2]
+        result = workbook_data["knockout_results"]["matches"]["R32-M3"]
+        winner_key = gd._cmp_team(result["winner"])
+        still_alive = []
+        for i, name in enumerate(workbook_data["names"]):
+            champ = workbook_data["knockouts"]["outright"]["champion"]["picks"][i]
+            pick = match["winner_picks"][i]
+            if not champ or not pick:
+                continue
+            if gd._cmp_team(pick) != winner_key and gd._cmp_team(champ) != gd._cmp_team("South Africa"):
+                person = next(p for p in metrics["people"] if p["name"] == name)
+                still_alive.append(person["fell"])
+        assert still_alive
+        assert all(fell == len(metrics["rounds"]) for fell in still_alive)
+
+    def test_knockout_champion_survival_falls_when_champion_loses(self):
+        data = {
+            "names": ["Ana", "Bob"],
+            "n": 2,
+            "qualifiers": {},
+            "knockout_results": {
+                "matches": {
+                    "R32-M1": {"score": (0, 1), "winner": "Mexico"},
+                },
+                "outright": {},
+                "awards": {},
+            },
+            "knockouts": {
+                "rounds": [{
+                    "key": "r32",
+                    "label_es": "Dieciseisavos",
+                    "label_en": "Round of 32",
+                    "advance_points": 1,
+                    "matches": [{
+                        "code": "R32-M1",
+                        "fixture_home": "Mexico",
+                        "fixture_away": "South Africa",
+                        "score_picks": [(0, 1), (1, 0)],
+                        "penalty_picks": ["Mexico", "South Africa"],
+                        "winner_picks": ["Mexico", "South Africa"],
+                    }],
+                }],
+                "final_matches": [],
+                "outright": {
+                    "champion": {
+                        "label_es": "Campeón",
+                        "label_en": "Champion",
+                        "points": 12,
+                        "picks": ["South Africa", "Mexico"],
+                    }
+                },
+                "awards": {},
+            },
+        }
+        metrics = gd.compute_knockout_metrics(data)
+        ana = next(p for p in metrics["people"] if p["name"] == "Ana")
+        bob = next(p for p in metrics["people"] if p["name"] == "Bob")
+        assert ana["fell"] == 0
+        assert bob["fell"] == len(metrics["rounds"])
+
+    def test_compute_ko_match_stake(self):
+        match = {
+            "score_picks": [(1, 0), (0, 1)],
+            "winner_picks": ["México", "Sudáfrica"],
+        }
+        rnd = {"advance_points": 1}
+        ko_table = [
+            {"name": "A", "pts": 4, "rank": 2},
+            {"name": "B", "pts": 8, "rank": 1},
+        ]
+        stake = gd.compute_ko_match_stake(match, rnd, ["A", "B"], ko_table)
+        assert stake["max_one"] == 6
+        assert stake["picks"] == 2
+        assert stake["people"][0]["max_pts"] == 6

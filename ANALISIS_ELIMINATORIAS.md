@@ -3,7 +3,7 @@
 Esta guía describe **qué datos hay**, **qué calcula el dashboard hoy** y **qué
 queda por hacer** en la fase eliminatoria.
 
-Relacionado: `PROTOTYPE_ko_metrics.md` (variantes `?ko=B|C` del relato) y
+Relacionado: `PROTOTYPE_ko_metrics.md` (variantes `?ko=B|C` archivadas) y
 `README.md` (flujo general del dashboard).
 
 ---
@@ -37,7 +37,7 @@ columnas C/D para marcador, C para ganador / desempate / campeón / premios).
 | Celdas KO rellenas | **74,6 %** (1400/1876) |
 | Cuadro completo (R32→SF + campeón) | **18/28** |
 | Sin campeón | Tere y Edu, Nadia, Juanorro, Meg, Andy, Ben, Mile, Cami, Jaime, Emilio |
-| Resultados KO jugados | **1** — R32-M3: Canadá 0-1 Sudáfrica |
+| Resultados KO jugados | **1** — R32-M3: Sudáfrica 0-1 Canadá |
 | Consenso campeón | España 8 · Francia 5 · Argentina 2… |
 
 > Tras cada partido KO: rellenar `Real results` (p. ej. filas 132–134 para
@@ -53,55 +53,87 @@ En `generate_dashboard.py`:
 |---|---|---|
 | `parse_knockouts` | Lee porra KO por persona | ✅ |
 | `parse_knockout_results` | Lee resultados reales | ✅ |
-| `compute_knockout` | Consenso por cruce, cobertura, calendario FIFA | ✅ |
-| `compute_knockout_scoring` | Ranking de puntos KO (marcador + pases + premios) | ✅ (1 partido) |
-| **`compute_knockout_metrics`** | Métricas del relato (`D.knockout.metrics`) | ✅ **Fase 1** |
+| `compute_knockout` | Consenso, cobertura, calendario, picks, stake | ✅ |
+| `compute_knockout_scoring` | Ranking de puntos KO (marcador + pases + premios) | ✅ |
+| `compute_knockout_metrics` | Métricas del relato (`D.knockout.metrics`) | ✅ Fase 1 |
+| **`compute_ko_match_stake`** | Puntos y swing por persona en cruces sin jugar | ✅ **Fase 2** |
+| **`compute_ko_progression`** | Ranking KO partido a partido (`D.knockout.progression`) | ✅ **Fase 2** |
+| **`_ko_champion_fell_round`** | Supervivencia del campeón predicho | ✅ **Fase 2** |
 
 ### Vista producción (`?view=ko`)
 
 Una sola vista: el **relato** con datos reales (actos 1–9) + calendario completo al final.
 No hay variantes `?ko=A|B|C` ni barra flotante de prototipo.
 
-### Bracket (`koBracketBox` / Acto 1 del relato)
-
-- Termómetro por cruce con **barra doble** local/visitante (% sobre N).
-- Resultado real cuando existe.
-- Resolución de `W##` a medida que entran resultados (p. ej. Canadá en R16-M2).
-
 ---
 
-## 3. Fase 1 implementada — métricas reales en el relato
+## 3. Fase 1 — Métricas reales en el relato
 
-Las métricas salen de **`D.knockout.metrics`** (Python). El JS ya no genera datos demo.
-
-Bloque `compute_knockout_metrics()` → expuesto en `D.knockout.metrics`:
+Las métricas salen de **`D.knockout.metrics`**. El JS ya no genera datos demo.
 
 | Campo | Origen |
 |---|---|
 | `champRank` | Distribución de `outright.champion` |
 | `tsRank` | Distribución de `awards.top_scorer` |
 | `twins` | Similitud de `winner_picks` + campeón/sub/pichichi |
-| `chaosRank` / `people[].chaos` | Votos al **peor prestigio** del cruce (1.º=3, 2.º=2, 3.º=1) |
-| `grave` | Campeones cuyo equipo **ya no puede ganar** (fuera de R32 o eliminado KO) |
+| `chaosRank` / `people[].chaos` | Votos al peor prestigio del cruce |
+| `grave` | Campeones cuyo equipo ya no puede ganar |
 | `depth` | % de cuadros que llevan a cada selección a R16/QF/SF/Final/Campeón |
-| `people[]` | Ficha: campeón, sub, pichichi, caos, riesgo (`variance`), puntos KO |
-| `pool` | Selecciones del dossier interactivo (top prestigio R32) |
+| `people[]` | Ficha: campeón, sub, pichichi, caos, riesgo, puntos KO |
+| `pool` | Selecciones del dossier interactivo |
 
-**Acto 7 “El profeta”** usa el **ranking KO real** (`scoring.table`) cuando hay
-resultados; si no, aproximación por alineación con el consenso.
-
-### Qué sigue en demo / aproximado
-
-| Pieza | Motivo |
-|---|---|
-| **Supervivencia** (`koSurvivalCard`) | Datos reales de `metrics.people` cuando hay métricas; sin pill demo |
-| **Riesgo/recompensa** (scatter) | `variance` = picks contra consenso (aprox., no modelo probabilístico fino) |
-| **`exp` sin resultados KO** | Aproximación; con resultados = puntos reales del ranking |
-| **“Lo que te juegas hoy”** | Solo muestra techo de pts/partido; falta reparto por persona |
+**Acto 7 “El profeta”** usa el ranking KO real (`scoring.table`) cuando hay resultados.
 
 ---
 
-## 4. Checklist operativo durante el torneo
+## 4. Fase 2 — Implementada
+
+### 4.1 Supervivencia del campeón (`koSurvivalCard`)
+
+- **`people[].fell`**: ronda en la que cae tu **campeón predicho** (no el primer pase fallido del cuadro).
+- Rondas: Dieciseisavos → Octavos → Cuartos → Semis → Final → Campeón.
+- Fallar un cruce intermedio **no** te elimina si tu campeón sigue en el torneo.
+- Con R32-M3: quien tiene **Sudáfrica** como campeón cae en dieciseisavos; quien tiene España/Francia/etc. sigue verde.
+
+### 4.2 “Lo que te juegas hoy” (`buildHoy` + `koMatchStakeHtml`)
+
+Cada cruce KO en el JSON público incluye:
+
+| Campo | Contenido |
+|---|---|
+| `picks[]` | Marcador + ganador predicho por persona |
+| `outcome_dist` / `modal_scoreline` | Analítica agregada (como grupos) |
+| `stake` | `max_one`, `max_swing`, `people[]` con pts y swing en ranking KO |
+
+La pestaña **Hoy** muestra consenso de marcador, reparto 1/X/2, stake detallado y grid de apuestas.
+
+### 4.3 Subidón / batacazo (`D.knockout.progression`)
+
+- `compute_ko_progression()`: snapshot del ranking KO tras **cada partido jugado**.
+- Expuesto en **`D.knockout.progression`** (`table`, `progression[]` con `delta`, `round_pts`, etc.).
+- UI en **Acto 4** del relato: bloque “Subidón y batacazo del último cruce”.
+- El ranking general (`D.live`) sigue acumulando grupos + bonus + KO en un solo paso virtual.
+
+### 4.4 Últimos resultados
+
+Los cruces KO en **Últimos** ya mostraban pleno/signo/pase; sin cambio estructural, pero ahora
+conviven con la progression KO dedicada en el relato.
+
+---
+
+## 5. Qué sigue aproximado / pendiente (Fase 3)
+
+| Pieza | Motivo |
+|---|---|
+| **Riesgo/recompensa** (scatter) | `variance` = picks contra consenso, no probabilidad implícita |
+| **`exp` sin resultados KO** | Aproximación; con resultados = puntos reales |
+| Progression KO multi-jornada rica | Crece sola; con 1 partido hay un solo paso |
+| Bracket pueblo vs individuos, reventador, camino del campeón | Extras Fase 3 |
+| Premios honoríficos KO | El agorero, el manual, etc. |
+
+---
+
+## 6. Checklist operativo durante el torneo
 
 1. Pegar/completar porras KO en `Raw data`.
 2. Rellenar `Real results` según se juega.
@@ -110,24 +142,7 @@ resultados; si no, aproximación por alineación con el consenso.
 
 ---
 
-## 5. Next steps (prioridad)
-
-### Fase 2 — Con más partidos KO
-
-1. **Supervivencia real** — sustituir hash de `koSurvivalCard()` por eliminación
-   ronda a ronda del campeón/cuadro predicho.
-2. **“Lo que te juegas hoy”** — quién gana/pierde cuántos pts en el cruce del
-   día (ampliar `koMatchStakeHtml`).
-3. **Subidón/batacazo del día** — delta del ranking KO tras cada jornada (como
-   en grupos).
-
-### Fase 3 — Extras
-
-4. Bracket del pueblo vs individuos; el reventador; camino del campeón.
-5. Riesgo/recompensa con probabilidad implícita del consenso.
-6. Premios honoríficos KO (*El profeta* por aciertos, *El agorero*, *El manual*).
-
-### Datos pendientes
+## 7. Datos pendientes
 
 - Completar cuadro de los **10 participantes** sin campeón / con picks parciales.
 - Ir rellenando resultados KO en `Real results` partido a partido.
