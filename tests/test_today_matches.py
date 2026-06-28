@@ -415,6 +415,12 @@ class TestKnockoutData:
         assert "Resultado final" in gd.JS
         assert "koProgressionCard" in gd.JS
 
+    def test_nav_badges_use_match_counts_not_participants(self):
+        assert "if(key === 'groups') return D.hero.matches" in gd.JS
+        assert "D.recent_results && D.recent_results.total" in gd.JS
+        assert "if(key === 'groups') return N" not in gd.JS
+        assert "D.today.matches.length" not in gd.JS
+
     def test_knockout_matches_expose_picks_and_stake(self, computed_data):
         unplayed = computed_data["knockout"]["rounds"][0]["matches"][0]
         assert unplayed["code"] == "R32-M1"
@@ -497,7 +503,38 @@ class TestKnockoutData:
         assert ana["fell"] == 0
         assert bob["fell"] == len(metrics["rounds"])
 
-    def test_compute_ko_match_stake(self):
+    def test_knockout_bracket_precision_by_round(self, computed_data, workbook_data):
+        metrics = computed_data["knockout"]["metrics"]
+        assert metrics["bracketRounds"]
+        assert len(metrics["bracketRounds"]) == 5
+        match = workbook_data["knockouts"]["rounds"][0]["matches"][2]
+        result = workbook_data["knockout_results"]["matches"]["R32-M3"]
+        winner_key = gd._cmp_team(result["winner"])
+        ok_r32 = miss_r32 = drift_r16 = 0
+        for i, name in enumerate(workbook_data["names"]):
+            person = next(p for p in metrics["people"] if p["name"] == name)
+            pick = match["winner_picks"][i]
+            r32 = person["bracket"][0]
+            r16 = person["bracket"][1]
+            assert r32["total"] == 16
+            assert r16["total"] == 8
+            assert len(person["bracket"]) == 5
+            if gd._cmp_team(pick) == winner_key:
+                ok_r32 += 1
+                assert r32["hits"] == 1 and r32["misses"] == 0
+                assert r16["drift"] == 0
+            else:
+                miss_r32 += 1
+                assert r32["hits"] == 0 and r32["misses"] == 1
+                assert r16["drift"] >= 1
+                drift_r16 += 1
+        assert ok_r32 == 20
+        assert miss_r32 == 8
+        assert drift_r16 == 8
+
+    def test_knockout_dashboard_has_bracket_precision(self):
+        assert "koBracketPrecisionCard" in gd.JS
+        assert "koSurvivalCard" not in gd.JS
         match = {
             "score_picks": [(1, 0), (0, 1)],
             "winner_picks": ["México", "Sudáfrica"],

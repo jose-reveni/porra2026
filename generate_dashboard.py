@@ -1508,6 +1508,7 @@ KO_SURVIVAL_ROUNDS = [
     {"key": "final", "label_es": "Final", "label_en": "Final"},
     {"key": "champion", "label_es": "Campeón", "label_en": "Champion"},
 ]
+KO_BRACKET_ROUNDS = KO_SURVIVAL_ROUNDS[:-1]
 
 
 def _ko_public_pick_fields(match, names, n):
@@ -1650,6 +1651,125 @@ def _ko_champion_fell_round(person_idx, data):
                 return round_idx
 
     return 0
+
+
+def _ko_w_map_from_results(data):
+    """Ganadores reales por W-number según resultados cargados."""
+    w_map = {}
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            result = data["knockout_results"]["matches"].get(match["code"])
+            if w and result and result.get("winner"):
+                w_map[w] = _cmp_team(result["winner"])
+    return w_map
+
+
+def _ko_w_map_for_person(person_idx, data):
+    """Cuadro predicho de la persona (solo picks, sin sustituir por resultados reales)."""
+    w_map = {}
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            pick = match["winner_picks"][person_idx]
+            if w and pick:
+                w_map[w] = _cmp_team(pick)
+    return w_map
+
+
+def _ko_round_matches(raw, key):
+    if key == "final":
+        return [m for m in raw["final_matches"] if m["key"] == "final"]
+    rnd = next((r for r in raw["rounds"] if r["key"] == key), None)
+    return rnd["matches"] if rnd else []
+
+
+def _ko_fixture_pair(match, w_map):
+    """Par de selecciones (ordenado) que juegan el cruce, o None si no se resuelve."""
+    sides = []
+    for side in ("home", "away"):
+        val = match.get(f"fixture_{side}", "")
+        wm = re.match(r"^W(\d+)$", str(val))
+        if wm:
+            team = w_map.get(int(wm.group(1)))
+            if not team:
+                return None
+            sides.append(team)
+        elif val:
+            sides.append(_cmp_team(val))
+        else:
+            return None
+    return tuple(sorted(sides))
+
+
+def _ko_match_feeder_drift(match, actual_w, person_w):
+    """True si algún W del cruce ya diverge entre cuadro real y el predicho."""
+    for side in ("home", "away"):
+        val = match.get(f"fixture_{side}", "")
+        wm = re.match(r"^W(\d+)$", str(val))
+        if not wm:
+            continue
+        w = int(wm.group(1))
+        actual = actual_w.get(w)
+        person = person_w.get(w)
+        if actual and person and actual != person:
+            return True
+    return False
+
+
+def _ko_person_bracket_rounds(person_idx, data):
+    """Precisión del cuadro por fase, con desvío en ramas posteriores al fallo."""
+    raw = data["knockouts"]
+    results = data["knockout_results"]["matches"]
+    actual_w = _ko_w_map_from_results(data)
+    person_w = _ko_w_map_for_person(person_idx, data)
+    rounds = []
+
+    for rnd_meta in KO_BRACKET_ROUNDS:
+        matches = _ko_round_matches(raw, rnd_meta["key"])
+        total = len(matches)
+        hits = misses = drift = played = 0
+        for match in matches:
+            result = results.get(match["code"])
+            has_result = bool(result and result.get("winner"))
+            actual_pair = _ko_fixture_pair(match, actual_w)
+            person_pair = _ko_fixture_pair(match, person_w)
+
+            if _ko_match_feeder_drift(match, actual_w, person_w):
+                drift += 1
+                if has_result:
+                    played += 1
+                continue
+
+            if not actual_pair:
+                continue
+
+            if person_pair != actual_pair:
+                drift += 1
+                if has_result:
+                    played += 1
+                continue
+
+            if not has_result:
+                continue
+
+            played += 1
+            pick = match["winner_picks"][person_idx] if match.get("winner_picks") else None
+            if not pick:
+                continue
+            if _cmp_team(pick) == _cmp_team(result["winner"]):
+                hits += 1
+            else:
+                misses += 1
+
+        rounds.append({
+            "hits": hits,
+            "misses": misses,
+            "drift": drift,
+            "played": played,
+            "total": total,
+        })
+    return rounds
 
 
 def _iter_knockout_played_matches(data):
@@ -1940,7 +2060,10 @@ def compute_knockout_metrics(data):
         {"es": meta["label_es"], "en": meta["label_en"]}
         for meta in KO_SURVIVAL_ROUNDS
     ]
-    fell_alive = len(round_labels)
+    bracket_round_labels = [
+        {"es": meta["label_es"], "en": meta["label_en"]}
+        for meta in KO_BRACKET_ROUNDS
+    ]
 
     depth_teams = []
     seen = set()
@@ -1971,6 +2094,7 @@ def compute_knockout_metrics(data):
         champ_arr = [team_es(champ_pick), team_flag(champ_pick)] if champ_pick else ["–", "🏳️"]
         runner_arr = [team_es(runner_pick), team_flag(runner_pick)] if runner_pick else ["–", "🏳️"]
         fell = _ko_champion_fell_round(i, data)
+        bracket = _ko_person_bracket_rounds(i, data)
         people.append({
             "name": name,
             "champ": champ_arr,
@@ -1978,6 +2102,7 @@ def compute_knockout_metrics(data):
             "ts": ts_pick or "–",
             "chaos": chaos_counts[i],
             "fell": fell,
+            "bracket": bracket,
             "exp": exp,
             "variance": variance_counts[i],
         })
@@ -1987,6 +2112,7 @@ def compute_knockout_metrics(data):
     return {
         "people": people,
         "rounds": round_labels,
+        "bracketRounds": bracket_round_labels,
         "champRank": champ_rank,
         "tsRank": ts_rank,
         "depth": depth,
@@ -2819,10 +2945,9 @@ footer .brand svg{height:20px;width:auto}
 .today-match .tm-stat .lab{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
 .today-picks{margin-top:14px}
 .today-picks .tp-title{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
-.today-picks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
-.tp-item{display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(0,0,0,.12);border-radius:8px;font-size:.82rem}
-.tp-item .tp-name{color:var(--text);font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tp-item .tp-score{color:var(--mint);font-family:'Space Grotesk';font-weight:700;white-space:nowrap}
+.pick-groups{margin-top:4px}
+.pick-groups .result-person b{max-width:none}
+.pick-groups .result-box.draw .rb-count{color:var(--gold)}
 .recent-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;color:var(--muted);font-size:.86rem}
 .score-final{font-family:'Space Grotesk';font-weight:700;font-size:1.7rem;color:var(--gold);white-space:nowrap}
 .result-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:18px}
@@ -2840,7 +2965,6 @@ footer .brand svg{height:20px;width:auto}
 .no-today .next-match{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
 .no-today .next-date{color:var(--muted);font-size:.78rem;min-width:80px}
 @media(max-width:720px){.result-groups{grid-template-columns:1fr}}
-@media(max-width:560px){.today-match .tm-stats{grid-template-columns:1fr}.today-picks-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
 .trivia-block{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .trivia-item{background:rgba(0,0,0,.15);border-radius:12px;padding:12px 14px;font-size:.84rem;line-height:1.45}
 .trivia-item .trivia-flag{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
@@ -2921,10 +3045,16 @@ footer .brand svg{height:20px;width:auto}
 .surv-grid{display:grid;grid-template-columns:130px repeat(var(--rounds,5),1fr);gap:0 6px;align-items:center;min-width:560px}
 .surv-head{font:800 .66rem 'Space Grotesk';letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:8px}
 .surv-name{font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:5px 0}
-.surv-cell{height:12px;border-radius:4px;margin:3px 2px;background:rgba(122,252,208,.16)}
-.surv-cell.alive{background:linear-gradient(90deg,var(--mint2),var(--mint))}
-.surv-cell.out{background:rgba(255,142,125,.22)}
-.surv-cell.fell{background:#ff8e7d;box-shadow:0 0 0 2px rgba(255,142,125,.3)}
+.surv-cell{height:12px;border-radius:4px;margin:3px 2px;background:rgba(122,252,208,.1);position:relative;overflow:hidden}
+.surv-cell.br-stack{display:block}
+.surv-cell.br-stack .br-layer{position:absolute;inset:0}
+.surv-cell.br-stack .br-ok{background:linear-gradient(90deg,var(--mint2),var(--mint))}
+.surv-cell.br-stack .br-bad{background:#ff8e7d}
+.surv-cell.br-stack .br-drift{background:repeating-linear-gradient(-45deg,rgba(255,142,125,.35),rgba(255,142,125,.35) 4px,rgba(255,142,125,.08) 4px,rgba(255,142,125,.08) 8px)}
+.surv-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px;font-size:.74rem;color:var(--muted)}
+.surv-legend span{display:inline-flex;align-items:center;gap:6px}
+.surv-legend i{display:inline-block;width:18px;height:10px;border-radius:3px}
+.surv-legend .lg-grad{background:linear-gradient(90deg,var(--mint2) 0%,var(--mint) 70%,rgba(122,252,208,.1) 70%,#ff8e7d 100%)}
 .survive .surv-scroll{overflow-x:auto}
 
 /* ---- Eliminatorias: relato + métricas KO ---- */
@@ -3580,6 +3710,53 @@ function koMatchStakeHtml(m){
   </div>`;
 }
 
+function todayPicksHtml(picks, match){
+  if(!picks || !picks.length) return '';
+  const knockout = !!match.is_knockout;
+  const buckets = {'1': [], 'X': [], '2': [], '?': []};
+  picks.forEach(p => {
+    let key = '?';
+    if(p.home != null && p.away != null){
+      key = p.home > p.away ? '1' : p.home === p.away ? 'X' : '2';
+    }
+    buckets[key].push(p);
+  });
+  const sort = arr => [...arr].sort((a,b) => a.name.localeCompare(b.name, LANG==='es' ? 'es' : 'en'));
+  const pill = p => {
+    const score = p.home != null ? `${p.home}-${p.away}` : '–';
+    let extra = '';
+    if(knockout && p.home != null && p.away != null && p.home === p.away && p.winner){
+      extra = ` · ${p.winner_flag || ''} ${esc(team(p.winner))}`;
+    }
+    return `<span class="result-person"><b>${esc(p.name)}</b><span>${score}${extra}</span></span>`;
+  };
+  const people = arr => arr.length
+    ? arr.map(pill).join('')
+    : `<span class="muted">${L('Nadie','Nobody')}</span>`;
+  const homeLbl = esc(team(match.home));
+  const awayLbl = esc(team(match.away));
+  const boxes = [
+    {key: '1', cls: 'home-win', title: L(`Gana ${homeLbl}`, `Win ${homeLbl}`)},
+    {key: 'X', cls: 'draw', title: L('Empate', 'Draw')},
+    {key: '2', cls: 'away-win', title: L(`Gana ${awayLbl}`, `Win ${awayLbl}`)},
+  ];
+  let html = boxes.map(b => {
+    const list = sort(buckets[b.key]);
+    return `<div class="result-box ${b.cls}">
+      <div class="rb-title">${b.title} <span class="rb-count">${list.length}</span></div>
+      <div class="result-names">${people(list)}</div>
+    </div>`;
+  }).join('');
+  if(buckets['?'].length){
+    const list = sort(buckets['?']);
+    html += `<div class="result-box pick-empty">
+      <div class="rb-title">${L('Sin apuesta','No pick')} <span class="rb-count">${list.length}</span></div>
+      <div class="result-names">${people(list)}</div>
+    </div>`;
+  }
+  return `<div class="today-picks"><div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div><div class="result-groups pick-groups">${html}</div></div>`;
+}
+
 
 function buildHoy(){
   const s = section('hoy', L('⚽ Hoy','⚽ Today'),
@@ -3627,9 +3804,7 @@ function buildHoy(){
         <div class="tm-stat"><div class="val">${pct('X')}%</div><div class="lab">${L('Empate','Draw')}</div></div>
         <div class="tm-stat"><div class="val">${pct('2')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.away))}</div></div>
       </div>` : '';
-      const picksHtml = (m.picks || []).map(p =>
-        `<div class="tp-item"><span class="tp-name">${esc(p.name)}</span><span class="tp-score">${p.home!=null?p.home+'-'+p.away:'–'}${p.winner ? ' · '+ (p.winner_flag||'') + esc(team(p.winner)) : ''}</span></div>`
-      ).join('');
+      const picksHtml = todayPicksHtml(m.picks, m);
       s.appendChild(el('div','today-match reveal',
         `<div class="tm-head">
           <div class="tm-teams">${m.home_flag ? m.home_flag + ' ' : ''}${esc(team(m.home))} – ${esc(team(m.away))}${m.away_flag ? ' ' + m.away_flag : ''}</div>
@@ -3643,7 +3818,7 @@ function buildHoy(){
         </div>
         ${outcomeHtml}
         ${koMatchStakeHtml(m)}
-        ${picksHtml ? `<div class="today-picks"><div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div><div class="today-picks-grid">${picksHtml}</div></div>` : ''}
+        ${picksHtml}
         ${m.home_trivia && m.home_trivia.es ? `<div class="trivia-block">
         <div class="trivia-item">
           <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.home_flag} ${esc(team(m.home))}</div>
@@ -3661,9 +3836,7 @@ function buildHoy(){
     const uniqueHtml = m.most_unique_pick
       ? `<span class="muted">${L('🔥 El más atrevido:','🔥 Boldest call:')}</span> <b>${esc(m.most_unique_pick.name)}</b> <span class="mint">${m.most_unique_pick.score}</span>`
       : '';
-    const picksHtml = m.picks.map(p =>
-      `<div class="tp-item"><span class="tp-name">${esc(p.name)}</span><span class="tp-score">${p.home!=null?p.home+'-'+p.away:'–'}</span></div>`
-    ).join('');
+    const picksHtml = todayPicksHtml(m.picks, m);
     s.appendChild(el('div','today-match reveal',
       `<div class="tm-head">
         <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
@@ -3679,10 +3852,7 @@ function buildHoy(){
         <div class="tm-stat"><div class="val" style="font-size:1rem">${uniqueHtml||'–'}</div><div class="lab">${L('Pick único más salvaje','Wildest unique pick')}</div></div>
       </div>
       ${groupMatchStakeHtml(m)}
-      <div class="today-picks">
-        <div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div>
-        <div class="today-picks-grid">${picksHtml}</div>
-      </div>
+      ${picksHtml}
       <div class="trivia-block">
         <div class="trivia-item">
           <div class="trivia-flag">${L('🤯 ¿Sabías que…?','🤯 Did you know…?')} ${m.home_flag} ${esc(team(m.home))}</div>
@@ -4154,9 +4324,12 @@ function setView(v){
   rebuild(); window.scrollTo(0,0);
 }
 function viewBadge(key){
-  if(key === 'live') return (D.today && D.today.matches ? D.today.matches.length : 0) || '';
+  if(key === 'live'){
+    const n = (D.recent_results && D.recent_results.total) || (D.live && D.live.played) || 0;
+    return n || '';
+  }
   if(key === 'ko'){ const k = D.knockout || {}; return ((k.rounds||[]).reduce((a,r)=>a+(r.matches||[]).length,0) + (k.final_matches||[]).length) || ''; }
-  if(key === 'groups') return N;
+  if(key === 'groups') return D.hero.matches || '';
   return '';
 }
 function langBar(){
@@ -4377,29 +4550,51 @@ function koRoundLabel(r){
   return typeof r === 'string' ? r : L(r.es, r.en);
 }
 function koSection(){ const sec = el('section','sec'); wrap.appendChild(sec); return sec; }
-function koSurvivalCard(){
-  const dz = koMetricsData();
-  if(!dz || !dz.people || !dz.people.length){
-    return el('div','survive reveal',
-      `<p class="muted">${L('Sin datos de cuadro todavía.','No bracket data yet.')}</p>`);
+function koBracketCellHtml(cell, roundLabel){
+  const total = Math.max(1, cell.total || 1);
+  const okW = 100 * (cell.hits || 0) / total;
+  const badW = 100 * (cell.misses || 0) / total;
+  const driftOp = Math.min(1, (cell.drift || 0) / total * 1.6);
+  const layers = [];
+  if(okW > 0){
+    layers.push(`<span class="br-layer br-ok" style="width:${okW.toFixed(2)}%"></span>`);
   }
-  const rounds = dz.rounds.map(koRoundLabel);
-  const rows = dz.people.map(p => ({name: p.name, fell: p.fell})).sort((a,b) => b.fell - a.fell);
+  if(badW > 0){
+    layers.push(`<span class="br-layer br-bad" style="left:${okW.toFixed(2)}%;width:${badW.toFixed(2)}%"></span>`);
+  }
+  if((cell.drift || 0) > 0){
+    layers.push(`<span class="br-layer br-drift" style="opacity:${driftOp.toFixed(2)}"></span>`);
+  }
+  return `<div class="surv-cell br-stack" title="${esc(koBracketCellTip(roundLabel, cell))}">${layers.join('')}</div>`;
+}
+function koBracketCellTip(roundLabel, cell){
+  const total = cell.total || 0;
+  const bits = [];
+  if(cell.hits) bits.push(cell.hits + '/' + total + L(' aciertos',' hits'));
+  if(cell.misses) bits.push(cell.misses + '/' + total + L(' fallos',' misses'));
+  if(cell.drift) bits.push(cell.drift + L(' rama(s) desviada(s)',' off-branch tie(s)'));
+  if(!bits.length) return roundLabel + ': ' + L('sin resultados aún','no results yet');
+  return roundLabel + ': ' + bits.join(' · ');
+}
+function koBracketPrecisionCard(){
+  const dz = koMetricsData();
+  if(!dz || !dz.people || !dz.people.length || !dz.bracketRounds) return null;
+  const rounds = dz.bracketRounds.map(koRoundLabel);
+  const rows = dz.people.slice().sort((a,b) => a.name.localeCompare(b.name,'es'));
   const head = `<div class="surv-head"></div>` + rounds.map(r => `<div class="surv-head">${r}</div>`).join('');
-  const body = rows.map(r => {
-    const cells = rounds.map((_, i) => {
-      let cls = 'alive';
-      if(i === r.fell) cls = 'fell';
-      else if(i > r.fell) cls = 'out';
-      return `<div class="surv-cell ${cls}"></div>`;
-    }).join('');
-    return `<div class="surv-name">${esc(r.name)}</div>${cells}`;
+  const body = rows.map(p => {
+    const cells = (p.bracket || []).map((cell, i) => koBracketCellHtml(cell, rounds[i])).join('');
+    return `<div class="surv-name">${esc(p.name)}</div>${cells}`;
   }).join('');
+  const legend = `<div class="surv-legend">
+    <span><i class="lg-grad"></i>${L('Proporcional a la fase (1 fallo en 16 ≠ todo rojo)','Scaled to the round (1 miss in 16 ≠ all red)')}</span>
+    <span><i class="surv-cell"><span class="br-layer br-drift" style="opacity:.85;position:relative;display:block;height:100%"></span></i>${L('Rama desviada','Off-branch')}</span>
+  </div>`;
   return el('div','survive reveal',
-    `<h3>${L('¿Hasta dónde aguanta tu campeón?','How long does your champion last?')}</h3>
-     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que cae tu campeón predicho. Fallar un pase intermedio no te elimina si tu campeón sigue vivo.',
-        'Each row is one person; the red block marks the round your predicted champion is knocked out. A wrong pick elsewhere does not end your run if your champion is still alive.')}</p>
-     <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
+    `<h3>${L('Tu cuadro, fase a fase','Your bracket, round by round')}</h3>
+     <p class="muted" style="margin-bottom:14px">${L('Verde y rojo son proporcionales a los cruces de cada fase (16 en 1/16, 8 en octavos…). Rayado = tu rama ya no cuadra con el torneo real.',
+        'Green and red are proportional to ties in each round (16 in R32, 8 in R16…). Stripes = your branch no longer matches the real tournament.')}</p>
+     <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>${legend}`);
 }
 function koProgressionCard(k){
   const prog = k.progression;
@@ -4603,17 +4798,17 @@ function buildKoStoryBody(){
       + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
 
   if(koResultsStarted()){
-    const survivalAct = koAct(
-      L('Acto 4 · Supervivencia','Act 4 · Survival'),
-      L('¿Hasta dónde aguanta tu campeón?','How long does your champion last?'),
-      `<p class="kp-act-lead">${L('La línea de vida sigue a tu campeón predicho, no a cada acierto suelto del cuadro. Caes cuando ese equipo queda fuera del torneo.',
-                                'The lifeline follows your predicted champion, not every individual bracket pick. You\'re out when that team is eliminated.')}</p>`,
-      koSurvivalCard());
-    sec.appendChild(survivalAct);
+    const bracketAct = koAct(
+      L('Acto 4 · Tu cuadro','Act 4 · Your bracket'),
+      L('Precisión fase a fase','Round-by-round accuracy'),
+      `<p class="kp-act-lead">${L('Qué aciertas en cada ronda y dónde se desvía tu rama respecto al torneo real.',
+                                'What you get right each round and where your branch drifts off from the real tournament.')}</p>`,
+      koBracketPrecisionCard() || el('div','muted', L('Sin resultados KO todavía.','No knockout results yet.')));
+    sec.appendChild(bracketAct);
     const progCard = koProgressionCard(k);
     if(progCard){
       progCard.style.marginTop = '18px';
-      survivalAct.appendChild(progCard);
+      bracketAct.appendChild(progCard);
     }
   }
 

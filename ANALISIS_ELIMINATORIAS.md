@@ -59,6 +59,7 @@ En `generate_dashboard.py`:
 | **`compute_ko_match_stake`** | Puntos y swing por persona en cruces sin jugar | ✅ **Fase 2** |
 | **`compute_ko_progression`** | Ranking KO partido a partido (`D.knockout.progression`) | ✅ **Fase 2** |
 | **`_ko_champion_fell_round`** | Supervivencia del campeón predicho | ✅ **Fase 2** |
+| **`_ko_person_bracket_rounds`** | Precisión del cuadro por fase + desvío en rama | ✅ **Fase 2** |
 
 ### Vista producción (`?view=ko`)
 
@@ -88,12 +89,17 @@ Las métricas salen de **`D.knockout.metrics`**. El JS ya no genera datos demo.
 
 ## 4. Fase 2 — Implementada
 
-### 4.1 Supervivencia del campeón (`koSurvivalCard`)
+### 4.1 Tu cuadro, fase a fase (`koBracketPrecisionCard`)
 
-- **`people[].fell`**: ronda en la que cae tu **campeón predicho** (no el primer pase fallido del cuadro).
-- Rondas: Dieciseisavos → Octavos → Cuartos → Semis → Final → Campeón.
-- Fallar un cruce intermedio **no** te elimina si tu campeón sigue en el torneo.
-- Con R32-M3: quien tiene **Sudáfrica** como campeón cae en dieciseisavos; quien tiene España/Francia/etc. sigue verde.
+Una rejilla en el Acto 4 con columnas **1/16 → Final** (sin columna Campeón; eso sigue en fichas y cementerio):
+
+| Columna | Qué muestra |
+|---|---|
+| 1/16 → Final | Verde/rojo **proporcional** al total de cruces de la fase |
+| Rayado | Rama desviada tras un fallo upstream |
+
+- **`people[].bracket[]`**: `{hits, misses, drift, played, total}` por fase.
+- **`people[].fell`**: solo en fichas (“Tu campeón cae en…”).
 
 ### 4.2 “Lo que te juegas hoy” (`buildHoy` + `koMatchStakeHtml`)
 
