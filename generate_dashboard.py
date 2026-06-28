@@ -3944,6 +3944,8 @@ if __name__ == "__main__":
     analytics = compute(data)
     html = render_html(analytics, date.today().strftime("%d/%m/%Y"))
     Path(out).write_text(html, encoding="utf-8")
-    print(f"OK · {data['n']} participantes · {len(data['matches'])} partidos · "
-          f"resultados cargados: {len(data['results'])}")
+    ko_matches = sum(len(r["matches"]) for r in data["knockouts"]["rounds"]) + len(data["knockouts"]["final_matches"])
+    ko_results = len(data["knockout_results"]["matches"])
+    print(f"OK · {data['n']} participantes · grupos: {len(data['matches'])} partidos / {len(data['results'])} resultados · "
+          f"KO: {ko_matches} cruces / {ko_results} resultados")
     print(f"Dashboard escrito en: {out}  ({len(html) // 1024} KB)")

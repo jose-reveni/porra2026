@@ -251,7 +251,8 @@ class TestKnockoutData:
     def test_knockout_key_exists_in_computed_data(self, computed_data):
         knockout = computed_data["knockout"]
         assert {"ready", "filled", "total", "results_started", "rounds", "outright", "awards", "scoring"} <= set(knockout)
-        assert knockout["results_started"] is False
+        assert knockout["results_started"] is True
+        assert knockout["scoring"]["played"] == 1
 
     def test_knockout_consensus_shape(self, computed_data):
         champion = computed_data["knockout"]["outright"]["champion"]
