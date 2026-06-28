@@ -1238,6 +1238,7 @@ def compute_knockout(data):
         for m in rnd["matches"]:
             score = _score_consensus(m["score_picks"], n)
             winner = _text_consensus(m["winner_picks"], n)
+            result = data["knockout_results"]["matches"].get(m["code"])
             filled_rows += (
                 _filled_score_picks(m["score_picks"])
                 + _filled_text_picks(m["winner_picks"])
@@ -1247,6 +1248,7 @@ def compute_knockout(data):
                 "code": m["code"],
                 "score": score,
                 "winner": winner,
+                "result": _knockout_public_result(result),
                 **_knockout_public_schedule(m),
             })
         rounds.append({
@@ -1260,6 +1262,7 @@ def compute_knockout(data):
     final_matches = []
     for m in raw["final_matches"]:
         score = _score_consensus(m["score_picks"], n)
+        result = data["knockout_results"]["matches"].get(m["code"])
         filled_rows += _filled_score_picks(m["score_picks"])
         total_rows += n
         final_matches.append({
@@ -1268,6 +1271,7 @@ def compute_knockout(data):
             "label_es": m["label_es"],
             "label_en": m["label_en"],
             "score": score,
+            "result": _knockout_public_result(result),
             **_knockout_public_schedule(m),
         })
 
@@ -1406,6 +1410,19 @@ def _knockout_public_schedule(match):
         "city",
     )
     return {k: match.get(k, "") for k in keys}
+
+
+def _knockout_public_result(result):
+    if not result:
+        return None
+    out = {}
+    if "score" in result:
+        h, a = result["score"]
+        out["score"] = {"home": h, "away": a}
+    if result.get("winner"):
+        out["winner"] = team_es(result["winner"])
+        out["winner_flag"] = team_flag(result["winner"])
+    return out or None
 
 
 def _filled_score_picks(picks):
@@ -2772,6 +2789,9 @@ function buildHoy(){
   s.appendChild(el('div','today-date reveal', dateStr.charAt(0).toUpperCase() + dateStr.slice(1)));
   todayMatches.forEach(m => {
     if(m.is_knockout){
+      const resultHtml = m.result && m.result.score
+        ? `<div class="tm-stat"><div class="score-final">${m.result.score.home}-${m.result.score.away}</div><div class="lab">${L('Resultado final','Final result')}${m.result.winner ? ` · ${m.result.winner_flag || ''} ${esc(team(m.result.winner))}` : ''}</div></div>`
+        : '';
       const winnerHtml = m.winner && m.winner.value
         ? `<div class="tm-stat"><div class="val" style="font-size:1rem">${m.winner.flag || ''} ${esc(team(m.winner.value))}</div><div class="lab">${L('Consenso ganador','Winner consensus')} · ${pf(m.winner.agreement)} · ${m.winner.count}/${N}</div></div>`
         : '';
@@ -2780,8 +2800,9 @@ function buildHoy(){
           <div class="tm-teams">${m.home_flag ? m.home_flag + ' ' : ''}${esc(team(m.home))} – ${esc(team(m.away))}${m.away_flag ? ' ' + m.away_flag : ''}</div>
           <div class="tm-tags">${koTime(m)?`<span class="tm-time" title="${esc(koTz())}">⏱ ${esc(koTime(m))}${koNext(m)?` <span class="tm-next" title="${L('madrugada del día siguiente','after midnight, next day')}">+1</span>`:''}</span>`:''}<span class="tm-group">${L(m.phase_es || 'ELIMINATORIA', m.phase_en || 'KNOCKOUT')}</span></div>
         </div>
-        <div class="tm-stats" style="grid-template-columns:${winnerHtml?'1fr 1fr':'1fr'}">
+        <div class="tm-stats" style="grid-template-columns:repeat(${1 + (resultHtml ? 1 : 0) + (winnerHtml ? 1 : 0)},1fr)">
           <div class="tm-stat"><div class="val" style="font-size:1rem">${esc(m.venue || '')}</div><div class="lab">${esc(m.city || '')}</div></div>
+          ${resultHtml}
           ${winnerHtml}
         </div>
         ${koMatchStakeHtml(m)}`));

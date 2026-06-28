@@ -265,6 +265,15 @@ class TestKnockoutData:
         assert match["fixture_home"] == "Portugal"
         assert match["winner_picks"][0] == "Portugal"
 
+    def test_knockout_result_is_exposed_for_live_view(self, computed_data):
+        match = computed_data["knockout"]["rounds"][0]["matches"][2]
+        assert match["code"] == "R32-M3"
+        assert match["result"] == {
+            "score": {"home": 0, "away": 1},
+            "winner": "Canadá",
+            "winner_flag": "🇨🇦",
+        }
+
     def test_knockout_consensus_handles_empty_template(self):
         empty_xlsx = Path(__file__).resolve().parent.parent / "Porra_Admin_v4_EN.xlsx"
         empty_data = gd.compute(gd.parse_workbook(str(empty_xlsx)))
@@ -315,3 +324,4 @@ class TestKnockoutData:
         assert "eliminatorias" in gd.JS
         assert "m.winner.agreement || 0) * 100" not in gd.JS
         assert "bk-cbar split" in gd.JS
+        assert "Resultado final" in gd.JS
