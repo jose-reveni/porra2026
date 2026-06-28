@@ -134,6 +134,34 @@ def _extract_js_function(source, name):
     raise AssertionError(f"{name} JS function is incomplete")
 
 
+class TestTodayStake:
+    def test_played_group_match_has_no_stake(self, computed_data):
+        today = computed_data["today"]["matches"]
+        if not today:
+            pytest.skip("No today matches in workbook")
+        played = [m for m in today if m.get("stake") is None]
+        assert played, "Expected played matches without stake"
+
+    def test_compute_match_stake_for_unplayed_match(self):
+        match = {
+            "code": "GX-M1",
+            "picks": [
+                {"name": "A", "home": 1, "away": 0},
+                {"name": "B", "home": 0, "away": 1},
+            ],
+        }
+        live_table = [
+            {"name": "A", "pts": 10, "rank": 2},
+            {"name": "B", "pts": 12, "rank": 1},
+        ]
+        stake = gd.compute_match_stake(match, {}, live_table)
+        assert stake == {"max_swing": 1, "max_points": 8, "picks": 2}
+
+    def test_stake_section_removed_from_js(self):
+        assert "buildStakeToday" not in gd.JS
+        assert "koStakeHtml" not in gd.JS
+
+
 class TestRecentResultsData:
     def test_recent_results_key_exists(self, computed_data):
         assert "recent_results" in computed_data
@@ -213,19 +241,33 @@ class TestKnockoutData:
     def test_knockout_schedule_is_attached(self, computed_data):
         first = computed_data["knockout"]["rounds"][0]["matches"][0]
         assert first["code"] == "R32-M1"
-        assert first["fixture_home"] == "Sudáfrica"
-        assert first["fixture_away"] == "Canadá"
-        assert first["date"] == "2026-06-28"
-        assert first["time_es"] == "21:00"
-        assert first["time_uk"] == "20:00"
-        assert first["venue"] == "Los Angeles Stadium"
+        assert first["fixture_home"] == "Alemania"
+        assert first["fixture_away"] == "Paraguay"
+        assert first["date"] == "2026-06-29"
+        assert first["time_es"] == "22:30"
+        assert first["time_uk"] == "21:30"
+        assert first["venue"] == "Boston Stadium"
 
     def test_knockout_key_exists_in_computed_data(self, computed_data):
         knockout = computed_data["knockout"]
-        assert {"ready", "filled", "total", "rounds", "outright", "awards", "scoring"} <= set(knockout)
+        assert {"ready", "filled", "total", "results_started", "rounds", "outright", "awards", "scoring"} <= set(knockout)
+        assert knockout["results_started"] is False
 
-    def test_knockout_consensus_handles_empty_template(self, computed_data):
+    def test_knockout_consensus_shape(self, computed_data):
         champion = computed_data["knockout"]["outright"]["champion"]
+        assert {"value", "count", "agreement", "dist"} <= set(champion)
+        assert champion["agreement"] >= 0
+
+    def test_knockout_round_of_32_winner_comes_from_score(self, workbook_data):
+        match = workbook_data["knockouts"]["rounds"][0]["matches"][4]
+        assert match["code"] == "R32-M5"
+        assert match["fixture_home"] == "Portugal"
+        assert match["winner_picks"][0] == "Portugal"
+
+    def test_knockout_consensus_handles_empty_template(self):
+        empty_xlsx = Path(__file__).resolve().parent.parent / "Porra_Admin_v4_EN.xlsx"
+        empty_data = gd.compute(gd.parse_workbook(str(empty_xlsx)))
+        champion = empty_data["knockout"]["outright"]["champion"]
         assert champion["value"] is None
         assert champion["agreement"] == 0
 
@@ -262,11 +304,13 @@ class TestKnockoutData:
 
         knockout = gd.compute_knockout(data)
 
-        assert knockout["filled"] == 8
-        assert knockout["total"] == 8
+        assert knockout["filled"] == 6
+        assert knockout["total"] == 6
         assert knockout["pct"] == 100.0
 
     def test_knockout_dashboard_section_is_registered(self):
         assert "buildEliminatorias" in gd.JS
         assert "todayScheduleMatches" in gd.JS
         assert "eliminatorias" in gd.JS
+        assert "m.winner.agreement || 0) * 100" not in gd.JS
+        assert "bk-cbar split" in gd.JS

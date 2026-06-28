@@ -64,33 +64,34 @@ AWARD_ROWS = {
 # kickoff_et guarda el instante base en Eastern Time; el dashboard lo muestra
 # como hora peninsular española (ES) o británica (EN), igual que la fase de grupos.
 KNOCKOUT_MATCH_SCHEDULE = {
-    "R32-M1": {"home": "South Africa", "away": "Canada", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-06-28T15:00"},
-    "R32-M2": {"home": "Brazil", "away": "Japan", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-06-29T13:00"},
-    "R32-M3": {"home": "Germany", "away": "Paraguay", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-06-29T16:30"},
+    # Code order follows the knockout template copied into Raw data.
+    "R32-M1": {"home": "Germany", "away": "Paraguay", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-06-29T16:30"},
+    "R32-M2": {"home": "France", "away": "Sweden", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-06-30T17:00"},
+    "R32-M3": {"home": "South Africa", "away": "Canada", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-06-28T15:00"},
     "R32-M4": {"home": "Netherlands", "away": "Morocco", "venue": "Monterrey Stadium", "city": "Monterrey", "kickoff_et": "2026-06-29T21:00"},
-    "R32-M5": {"home": "Côte d'Ivoire", "away": "Norway", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-06-30T13:00"},
-    "R32-M6": {"home": "France", "away": "Sweden", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-06-30T17:00"},
-    "R32-M7": {"home": "Mexico", "away": "Ecuador", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-06-30T21:00"},
-    "R32-M8": {"home": "England", "away": "Congo DR", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-01T12:00"},
-    "R32-M9": {"home": "Belgium", "away": "Senegal", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-01T16:00"},
-    "R32-M10": {"home": "USA", "away": "Bosnia and Herzegovina", "venue": "San Francisco Bay Area Stadium", "city": "San Francisco Bay Area", "kickoff_et": "2026-07-01T20:00"},
-    "R32-M11": {"home": "Spain", "away": "Austria", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-02T15:00"},
-    "R32-M12": {"home": "Portugal", "away": "Croatia", "venue": "Toronto Stadium", "city": "Toronto", "kickoff_et": "2026-07-02T19:00"},
-    "R32-M13": {"home": "Switzerland", "away": "Algeria", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-02T23:00"},
+    "R32-M5": {"home": "Portugal", "away": "Croatia", "venue": "Toronto Stadium", "city": "Toronto", "kickoff_et": "2026-07-02T19:00"},
+    "R32-M6": {"home": "Spain", "away": "Austria", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-02T15:00"},
+    "R32-M7": {"home": "USA", "away": "Bosnia and Herzegovina", "venue": "San Francisco Bay Area Stadium", "city": "San Francisco Bay Area", "kickoff_et": "2026-07-01T20:00"},
+    "R32-M8": {"home": "Belgium", "away": "Senegal", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-01T16:00"},
+    "R32-M9": {"home": "Brazil", "away": "Japan", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-06-29T13:00"},
+    "R32-M10": {"home": "Côte d'Ivoire", "away": "Norway", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-06-30T13:00"},
+    "R32-M11": {"home": "Mexico", "away": "Ecuador", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-06-30T21:00"},
+    "R32-M12": {"home": "England", "away": "Congo DR", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-01T12:00"},
+    "R32-M13": {"home": "Argentina", "away": "Cabo Verde", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-03T18:00"},
     "R32-M14": {"home": "Australia", "away": "Egypt", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-03T14:00"},
-    "R32-M15": {"home": "Argentina", "away": "Cabo Verde", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-03T18:00"},
+    "R32-M15": {"home": "Switzerland", "away": "Algeria", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-02T23:00"},
     "R32-M16": {"home": "Colombia", "away": "Ghana", "venue": "Kansas City Stadium", "city": "Kansas City", "kickoff_et": "2026-07-03T21:30"},
-    "R16-M1": {"home": "W73", "away": "W75", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-07-04T13:00"},
-    "R16-M2": {"home": "W74", "away": "W77", "venue": "Philadelphia Stadium", "city": "Philadelphia", "kickoff_et": "2026-07-04T17:00"},
-    "R16-M3": {"home": "W76", "away": "W78", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-05T16:00"},
+    "R16-M1": {"home": "W73", "away": "W74", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-07-04T13:00"},
+    "R16-M2": {"home": "W75", "away": "W76", "venue": "Philadelphia Stadium", "city": "Philadelphia", "kickoff_et": "2026-07-04T17:00"},
+    "R16-M3": {"home": "W77", "away": "W78", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-05T16:00"},
     "R16-M4": {"home": "W79", "away": "W80", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-07-05T20:00"},
-    "R16-M5": {"home": "W83", "away": "W84", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-06T15:00"},
-    "R16-M6": {"home": "W81", "away": "W82", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-06T20:00"},
-    "R16-M7": {"home": "W86", "away": "W88", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-07T12:00"},
-    "R16-M8": {"home": "W85", "away": "W87", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-07T16:00"},
+    "R16-M5": {"home": "W81", "away": "W82", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-06T15:00"},
+    "R16-M6": {"home": "W83", "away": "W84", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-06T20:00"},
+    "R16-M7": {"home": "W85", "away": "W86", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-07T12:00"},
+    "R16-M8": {"home": "W87", "away": "W88", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-07T16:00"},
     "QF-M1": {"home": "W89", "away": "W90", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-07-09T16:00"},
-    "QF-M2": {"home": "W93", "away": "W94", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-10T15:00"},
-    "QF-M3": {"home": "W91", "away": "W92", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-11T17:00"},
+    "QF-M2": {"home": "W91", "away": "W92", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-10T15:00"},
+    "QF-M3": {"home": "W93", "away": "W94", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-11T17:00"},
     "QF-M4": {"home": "W95", "away": "W96", "venue": "Kansas City Stadium", "city": "Kansas City", "kickoff_et": "2026-07-11T21:00"},
     "SF-M1": {"home": "W97", "away": "W98", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-14T15:00"},
     "SF-M2": {"home": "W99", "away": "W100", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-15T15:00"},
@@ -103,6 +104,7 @@ FIFA_TEAM_ALIASES = {
     "Cabo Verde": "Cape Verde",
     "Congo DR": "DR Congo",
     "Côte d'Ivoire": "Ivory Coast",
+    "Morrocco": "Morocco",
 }
 
 MATCH_DATES = {
@@ -487,14 +489,21 @@ TRIVIA = {
 def team_es(name):
     if name is None:
         return None
-    name = str(name).strip()
+    name = _team_key(name)
     return TEAMS.get(name, (name, "🏳️"))[0]
 
 
 def team_flag(name):
     if name is None:
         return "🏳️"
-    return TEAMS.get(str(name).strip(), (name, "🏳️"))[1]
+    return TEAMS.get(_team_key(name), (name, "🏳️"))[1]
+
+
+def _team_key(name):
+    name = str(name).strip()
+    if name in ES2EN:
+        return ES2EN[name]
+    return FIFA_TEAM_ALIASES.get(name, name)
 
 
 def knockout_schedule_info(code):
@@ -707,25 +716,32 @@ def parse_knockouts(raw, participants):
             penalty_row = score_row + 1
             winner_row = score_row + 2
             code = f"{rnd['code']}-M{i + 1}"
+            schedule = knockout_schedule_info(code)
+            score_picks = [
+                (_num(raw.cell(score_row, p["home_col"]).value),
+                 _num(raw.cell(score_row, p["away_col"]).value))
+                for p in participants
+            ]
+            tiebreaker_picks = [
+                _text(raw.cell(penalty_row, p["home_col"]).value)
+                for p in participants
+            ]
+            raw_winner_picks = [
+                _text(raw.cell(winner_row, p["home_col"]).value)
+                for p in participants
+            ]
             matches.append({
                 "code": code,
                 "score_row": score_row,
                 "penalty_row": penalty_row,
                 "winner_row": winner_row,
-                "score_picks": [
-                    (_num(raw.cell(score_row, p["home_col"]).value),
-                     _num(raw.cell(score_row, p["away_col"]).value))
-                    for p in participants
-                ],
-                "penalty_picks": [
-                    _text(raw.cell(penalty_row, p["home_col"]).value)
-                    for p in participants
-                ],
+                "score_picks": score_picks,
+                "penalty_picks": tiebreaker_picks,
                 "winner_picks": [
-                    _text(raw.cell(winner_row, p["home_col"]).value)
-                    for p in participants
+                    _knockout_winner_pick(schedule, score, tiebreaker, raw_winner)
+                    for score, tiebreaker, raw_winner in zip(score_picks, tiebreaker_picks, raw_winner_picks)
                 ],
-                **knockout_schedule_info(code),
+                **schedule,
             })
         rounds.append({**rnd, "matches": matches})
 
@@ -760,6 +776,29 @@ def parse_knockouts(raw, participants):
         }
 
     return {"rounds": rounds, "final_matches": final_matches, "outright": outright, "awards": awards}
+
+
+def _knockout_winner_pick(schedule, score, tiebreaker, raw_winner):
+    home = schedule.get("fixture_home_en") or schedule.get("fixture_home")
+    away = schedule.get("fixture_away_en") or schedule.get("fixture_away")
+    if not home or not away or home.startswith(("W", "RU")) or away.startswith(("W", "RU")):
+        return raw_winner
+
+    h, a = score
+    if h is None or a is None:
+        return raw_winner
+    if h > a:
+        return home
+    if a > h:
+        return away
+    if tiebreaker:
+        side = _cmp_text(tiebreaker)
+        if side == "home":
+            return home
+        if side == "away":
+            return away
+        return tiebreaker
+    return raw_winner
 
 
 def parse_knockout_results(wb):
@@ -1130,6 +1169,9 @@ def compute(data):
         live = compute_live(data, matches)
 
     today = compute_today(data, matches)
+    if live:
+        for m in today["matches"]:
+            m["stake"] = compute_match_stake(m, data["results"], live["table"])
     recent_results = compute_recent_results(data, matches)
     knockout = compute_knockout(data)
 
@@ -1195,18 +1237,15 @@ def compute_knockout(data):
         match_rows = []
         for m in rnd["matches"]:
             score = _score_consensus(m["score_picks"], n)
-            penalties = _text_consensus(m["penalty_picks"], n)
             winner = _text_consensus(m["winner_picks"], n)
             filled_rows += (
                 _filled_score_picks(m["score_picks"])
-                + _filled_text_picks(m["penalty_picks"])
                 + _filled_text_picks(m["winner_picks"])
             )
-            total_rows += n * 3
+            total_rows += n * 2
             match_rows.append({
                 "code": m["code"],
                 "score": score,
-                "penalties": penalties,
                 "winner": winner,
                 **_knockout_public_schedule(m),
             })
@@ -1221,19 +1260,14 @@ def compute_knockout(data):
     final_matches = []
     for m in raw["final_matches"]:
         score = _score_consensus(m["score_picks"], n)
-        penalties = _text_consensus(m["penalty_picks"], n)
-        filled_rows += (
-            _filled_score_picks(m["score_picks"])
-            + _filled_text_picks(m["penalty_picks"])
-        )
-        total_rows += n * 2
+        filled_rows += _filled_score_picks(m["score_picks"])
+        total_rows += n
         final_matches.append({
             "key": m["key"],
             "code": m["code"],
             "label_es": m["label_es"],
             "label_en": m["label_en"],
             "score": score,
-            "penalties": penalties,
             **_knockout_public_schedule(m),
         })
 
@@ -1262,11 +1296,14 @@ def compute_knockout(data):
         }
 
     scoring = compute_knockout_scoring(data)
+    kr = data["knockout_results"]
+    results_started = bool(kr["matches"] or kr["outright"] or kr["awards"])
     return {
         "ready": filled_rows > 0,
         "filled": filled_rows,
         "total": total_rows,
         "pct": round(100 * filled_rows / total_rows, 1) if total_rows else 0,
+        "results_started": results_started,
         "rounds": rounds,
         "final_matches": final_matches,
         "outright": outright,
@@ -1285,7 +1322,6 @@ def compute_knockout_scoring(data):
     totals = [0] * n
     exact = [0] * n
     outcome_hits = [0] * n
-    penalty_hits = [0] * n
     advance_hits = [0] * n
 
     def add_score_points(match, result):
@@ -1318,7 +1354,6 @@ def compute_knockout_scoring(data):
             if not result:
                 continue
             add_score_points(match, result)
-            add_text_points(match["penalty_picks"], result.get("penalties"), 1, penalty_hits)
             add_text_points(match["winner_picks"], result.get("winner"), rnd["advance_points"], advance_hits)
 
     for match in data["knockouts"]["final_matches"]:
@@ -1326,7 +1361,6 @@ def compute_knockout_scoring(data):
         if not result:
             continue
         add_score_points(match, result)
-        add_text_points(match["penalty_picks"], result.get("penalties"), 1, penalty_hits)
 
     for key, meta in data["knockouts"]["outright"].items():
         actual = results["outright"].get(key)
@@ -1343,7 +1377,6 @@ def compute_knockout_scoring(data):
                 "pts": totals[i],
                 "exact": exact[i],
                 "outcomes": outcome_hits[i],
-                "penalties": penalty_hits[i],
                 "advance": advance_hits[i],
             }
             for i in range(n)
@@ -1708,6 +1741,37 @@ def compute_today(data, matches):
     return {"matches": all_matches}
 
 
+def compute_match_stake(match, results, live_table):
+    """Cuánto puede mover el ranking un partido de grupos aún sin jugar."""
+    if match["code"] in results or not live_table:
+        return None
+    max_swing = 0
+    picks = 0
+    rank_rows = {r["name"]: r for r in live_table}
+    for pick in match["picks"]:
+        h, a = pick["home"], pick["away"]
+        if h is None:
+            continue
+        picks += 1
+        row = rank_rows.get(pick["name"])
+        if not row:
+            continue
+        new_pts = row["pts"] + 4
+        new_rank = 1 + sum(
+            1 for r in live_table
+            if r["pts"] > new_pts
+            or (r["pts"] == new_pts and r["name"].lower() < pick["name"].lower())
+        )
+        max_swing = max(max_swing, row["rank"] - new_rank)
+    if not picks:
+        return None
+    return {
+        "max_swing": max_swing,
+        "max_points": picks * 4,
+        "picks": picks,
+    }
+
+
 # --------------------------------------------------------------------------
 # main (parte de verificación; el render se añade después)
 # --------------------------------------------------------------------------
@@ -2036,6 +2100,9 @@ footer .brand svg{height:20px;width:auto}
 .bk-side.dim{color:var(--muted);font-weight:600}
 .bk-cbar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);margin:7px 0 2px;overflow:hidden}
 .bk-cbar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
+.bk-cbar.split{display:flex}
+.bk-cbar.split span{flex:none}
+.bk-cbar .away{background:var(--gold)}
 .bk-tip{color:var(--muted);font-size:.68rem;margin-top:4px}
 /* --- mobile: round chips + full-width match list --- */
 .bk-mobile{display:none}
@@ -2089,6 +2156,7 @@ footer .brand svg{height:20px;width:auto}
 .kp-twin-bar{flex:1;height:8px;border-radius:4px;background:rgba(122,252,208,.12);overflow:hidden;min-width:60px}
 .kp-twin-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
 .kp-stake{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.kp-stake.tm-stake{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .kp-stake .swing{font:800 1.8rem 'Space Grotesk';color:var(--gold)}
 .kp-act{padding:46px 0;border-bottom:1px solid var(--line)}
 .kp-act-kicker{font:800 .8rem 'Space Grotesk';letter-spacing:.16em;text-transform:uppercase;color:var(--mint);margin-bottom:10px}
@@ -2652,11 +2720,33 @@ function todayScheduleMatches(){
   return groupMatches.concat(knockoutMatches);
 }
 
+function groupMatchStakeHtml(m){
+  const st = m.stake;
+  if(!st) return '';
+  return `<div class="kp-stake tm-stake">
+    <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego en el ranking','At stake in the standings')}</div>
+      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} ${st.max_points} ${L('pts repartibles','pts on the table')} · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div></div>
+    <div style="text-align:right"><div class="swing">±${st.max_swing}</div>
+      <div class="muted" style="font-size:.82rem">${L('puestos que puedes ganar','places you could gain')}</div></div>
+  </div>`;
+}
+
+function koMatchStakeHtml(m){
+  const rnd = ((D.knockout && D.knockout.rounds) || []).find(r => (r.matches || []).some(x => x.code === m.code));
+  if(!rnd) return '';
+  const adv = rnd.advance_points || 0;
+  const maxOne = 3 + 2 + 1 + adv;
+  return `<div class="kp-stake tm-stake">
+    <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego (eliminatorias)','At stake (knockouts)')}</div>
+      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${maxOne} ${L('pts/persona','pts/person')} (+${adv} ${L('por pase','per advance')})</div></div>
+  </div>`;
+}
+
 
 function buildHoy(){
   const s = section('hoy', L('⚽ Hoy','⚽ Today'),
     L('Los partidos de hoy','Today\'s matches'),
-    L('Qué se juega hoy y qué ha puesto cada uno.','What\'s on today and what everyone predicted.'));
+    L('Qué se juega hoy, qué ha puesto cada uno y cuánto puede mover el ranking.','What\'s on today, everyone\'s picks, and how much the standings can swing.'));
   const allM = todayScheduleMatches();
   const todayStr = matchdayDateStr(new Date());
   const todayMatches = allM.filter(m => m.date === todayStr)
@@ -2693,7 +2783,8 @@ function buildHoy(){
         <div class="tm-stats" style="grid-template-columns:${winnerHtml?'1fr 1fr':'1fr'}">
           <div class="tm-stat"><div class="val" style="font-size:1rem">${esc(m.venue || '')}</div><div class="lab">${esc(m.city || '')}</div></div>
           ${winnerHtml}
-        </div>`));
+        </div>
+        ${koMatchStakeHtml(m)}`));
       return;
     }
     const o = m.outcome_dist, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
@@ -2718,6 +2809,7 @@ function buildHoy(){
         <div class="tm-stat"><div class="val">${m.modal_scoreline}</div><div class="lab">${L('Marcador más repetido','Most common scoreline')} (${pf(Math.round(m.modal_scoreline_share*100))})</div></div>
         <div class="tm-stat"><div class="val" style="font-size:1rem">${uniqueHtml||'–'}</div><div class="lab">${L('Pick único más salvaje','Wildest unique pick')}</div></div>
       </div>
+      ${groupMatchStakeHtml(m)}
       <div class="today-picks">
         <div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div>
         <div class="today-picks-grid">${picksHtml}</div>
@@ -2942,8 +3034,7 @@ function buildEliminatorias(){
   }
   function matchCard(m){
     const winner = k.ready && m.winner ? `<div class="ko-mini">${L('Consenso ganador','Winner consensus')}: <b>${consensusName(m.winner)}</b> · ${agreement(m.winner)}</div>` : '';
-    const scoring = k.ready && m.score ? `<span class="ko-pill"><span class="ko-score">${m.score.value || '–'}</span> ${L('90 min','90 min')}</span>
-        <span class="ko-pill">${L('Penaltis','Pens')}: <b>${m.penalties.value || '–'}</b></span>` : '';
+    const scoring = k.ready && m.score && m.score.value ? `<span class="ko-pill"><span class="ko-score">${m.score.value}</span> ${L('90 min','90 min')}</span>` : '';
     return `<div class="ko-match">
       <div class="ko-code">${m.code} · ${m.date || '–'}</div>
       <div class="ko-main">${fixtureName(m,'home')} <span class="muted">vs</span> ${fixtureName(m,'away')}</div>
@@ -3209,7 +3300,7 @@ function renderView(view){
     buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
     buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
   }
-  else { buildHoy(); buildStakeToday(); buildAciertos(); buildUltimos(); }
+  else { buildHoy(); buildAciertos(); buildUltimos(); }
 }
 
 /* ---- BRACKET VISUALIZATION ----
@@ -3228,17 +3319,35 @@ function bkMatchNode(m, opts){
   opts = opts || {};
   const k = D.knockout || {};
   const ready = k.ready && m.winner && m.winner.value;
-  const pct = ready ? Math.round((m.winner.agreement || 0) * 100) : 0;
+  const pct = ready ? Math.round(m.winner.agreement || 0) : 0;
+  const norm = v => (v || '').toString().trim().toLowerCase();
+  const distCount = value => ((m.winner && m.winner.dist) || [])
+    .filter(x => norm(x.value) === norm(value))
+    .reduce((a, x) => a + (x.count || 0), 0);
+  const realSide = side => {
+    const name = m['fixture_'+side] || '';
+    return name && !/^W\d+$/.test(name) && !/^RU\d+$/.test(name) ? name : '';
+  };
+  const homeName = realSide('home'), awayName = realSide('away');
+  const homeCount = ready && homeName ? distCount(homeName) : 0;
+  const awayCount = ready && awayName ? distCount(awayName) : 0;
+  const hasSplit = ready && homeName && awayName && (homeCount || awayCount);
+  const homePct = N ? Math.round(homeCount / N * 100) : 0;
+  const awayPct = N ? Math.round(awayCount / N * 100) : 0;
   const sideHtml = (side) => {
     const flag = m['fixture_'+side+'_flag'] || '';
     const name = m['fixture_'+side] || '–';
+    const count = side === 'home' ? homeCount : awayCount;
+    const sidePct = side === 'home' ? homePct : awayPct;
     const isPick = ready && m.winner.value === name;
     return `<div class="bk-side${ready && !isPick ? ' dim' : ''}">`
       + `<span class="bk-flag">${flag}</span><span class="bk-nm">${esc(team(name))}</span>`
-      + `${isPick ? `<span class="bk-pct">${pct}%</span>` : ''}</div>`;
+      + `${count ? `<span class="bk-pct">${sidePct}%</span>` : ''}</div>`;
   };
   const consensus = ready
-    ? `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`
+    ? (hasSplit
+      ? `<div class="bk-cbar split"><span class="home" style="width:${homePct}%"></span><span class="away" style="width:${awayPct}%"></span></div>`
+      : `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`)
       + `<div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
     : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`;
   const cls = opts.cls ? ' ' + opts.cls : '';
@@ -3370,7 +3479,10 @@ function buildBracket(){
   }
   s.appendChild(box);
 }
-/* survival timeline — DEMO data until real picks are uploaded */
+/* survival timeline — hidden until real knockout results land */
+function koResultsStarted(){
+  return !!(D.knockout && D.knockout.results_started);
+}
 function koSurvivalCard(){
   const rounds = [
     L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion'),
@@ -3398,6 +3510,7 @@ function koSurvivalCard(){
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
 }
 function buildSurvival(){
+  if(!koResultsStarted()) return;
   const s = el('section','sec'); s.id = 'survive-wrap';
   s.appendChild(koSurvivalCard());
   wrap.appendChild(s);
@@ -3627,21 +3740,6 @@ function koPichichiHtml(dz){
       <div class="bar-track"><div class="bar-fill" data-w="${(t.count/mx*100).toFixed(0)}"></div></div>
       <div class="bar-val" data-count="${t.count}">0</div></div>`).join('');
 }
-function koStakeHtml(){
-  return `<div class="kp-stake" style="margin-top:12px">
-      <div><div style="font:800 1.2rem 'Space Grotesk'">🇪🇸 ${esc(team('Spain'))} <span class="muted">vs</span> 🇭🇷 ${esc(team('Croatia'))}</div>
-        <div class="muted" style="font-size:.82rem">${L('cruce de ejemplo · cuartos','demo tie · QF')}</div></div>
-      <div style="text-align:right"><div class="swing">±18 pts</div>
-        <div class="muted" style="font-size:.82rem">${L('máx. vuelco en el ranking','max ranking swing')}</div></div>
-    </div>`;
-}
-function buildStakeToday(){
-  const s = section('stake-hoy', L('🔥 En juego','🔥 At stake'),
-    L('Lo que te juegas hoy','What\'s at stake today'),
-    L('Cuánto puede moverse el ranking con los partidos de hoy. (Datos de ejemplo hasta que arranque la eliminatoria.)',
-      'How much the ranking can swing with today\'s matches. (Demo data until the knockouts kick off.)'));
-  s.appendChild(el('div','card reveal', koStakeHtml()));
-}
 function koFichasBody(dz){
   const twinOf = {};
   dz.twins.forEach(t => { if(!twinOf[t.a]) twinOf[t.a] = {name:t.b, sim:t.sim}; if(!twinOf[t.b]) twinOf[t.b] = {name:t.a, sim:t.sim}; });
@@ -3735,13 +3833,15 @@ function buildKoVariantC(){
       `<div class="kp-act-viz"><span class="k">${L('🎲 Índice de caos','🎲 Chaos index')}</span>${koChaosBarsHtml(dz)}</div>`
       + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
 
-  // Acto 3 — supervivencia: línea de vida real incrustada
-  sec.appendChild(koAct(
-    L('Acto 4 · Supervivencia','Act 4 · Survival'),
-    L('¿Hasta dónde aguantas?','How far do you last?'),
-    `<p class="kp-act-lead">${L('A medida que entren los resultados reales, esta línea de vida marca dónde se rompe el cuadro de cada uno.',
-                              "As real results land, this lifeline marks where each person's bracket breaks.")}</p>`,
-    koSurvivalCard()));
+  // Acto 3 — supervivencia: línea de vida real incrustada (solo con resultados KO)
+  if(koResultsStarted()){
+    sec.appendChild(koAct(
+      L('Acto 4 · Supervivencia','Act 4 · Survival'),
+      L('¿Hasta dónde aguantas?','How far do you last?'),
+      `<p class="kp-act-lead">${L('A medida que entren los resultados reales, esta línea de vida marca dónde se rompe el cuadro de cada uno.',
+                                "As real results land, this lifeline marks where each person's bracket breaks.")}</p>`,
+      koSurvivalCard()));
+  }
 
   // Acto 4 — almas gemelas: quién piensa como quién
   sec.appendChild(koAct(

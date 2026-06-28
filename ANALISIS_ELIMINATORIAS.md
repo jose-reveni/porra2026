@@ -21,7 +21,7 @@ su nombre en la fila 6.
 | Marcadores de grupos | 7–78 | 72 partidos (ya cargado) |
 | Clasificación de grupos (1.º/2.º/3.º) | 80–115 | quién pasa (ya cargado) |
 | 8 mejores terceros | 117–124 | (ya cargado) |
-| **R32** (16 cruces × score/penaltis/ganador) | 126–173 | **porra KO** |
+| **R32** (16 cruces × score/desempate/ganador) | 126–173 | **porra KO** |
 | **R16** (8 cruces) | 175–198 | **porra KO** |
 | **Cuartos** (4 cruces) | 200–211 | **porra KO** |
 | **Semis** (2 cruces) | 213–218 | **porra KO** |
@@ -30,7 +30,7 @@ su nombre en la fila 6.
 | **Pichichi / Balón de Oro** | 228 / 229 | **porra KO** |
 
 Los **resultados reales** se rellenan en la hoja **`Real results`** (misma
-disposición de filas; columnas C/D para el marcador, C para ganador / penaltis /
+disposición de filas; columnas C/D para el marcador, C para ganador / desempate /
 campeón / premios) a medida que se juegan los partidos.
 
 > Hoy mismo, las filas KO (126–229) están **vacías**: por eso el prototipo usa
@@ -43,7 +43,7 @@ campeón / premios) a medida que se juegan los partidos.
 En `generate_dashboard.py`:
 
 - `parse_knockouts(raw, participants)` — lee la porra KO de cada persona:
-  `score_picks`, `penalty_picks`, `winner_picks` por cruce, y `outright`
+  `score_picks`, desempate si hay empate, `winner_picks` por cruce, y `outright`
   (campeón, subcampeón) y `awards` (pichichi, balón de oro).
 - `parse_knockout_results(wb)` — lee los resultados reales de `Real results`.
 - `compute_knockout(data)` — consenso por cruce (`_score_consensus`,
@@ -51,7 +51,7 @@ En `generate_dashboard.py`:
   Devuelve `D.knockout` con `rounds`, `final_matches`, `outright`, `awards`,
   `pct`/`filled` (cobertura de carga) y `ready` (true en cuanto hay ≥1 dato).
 - `compute_knockout_scoring(data)` — cuando hay resultados reales, calcula el
-  **ranking de puntos KO** (3 por signo a 90', +2 exacto, +1 penaltis, y los
+  **ranking de puntos KO** (3 por signo a 90', +2 exacto, y los
   puntos por avance: R16 +1, QF +2, SF +4, finalista +6, 3.º +4, subcampeón +8,
   campeón +12, pichichi +8, balón de oro +8).
 
