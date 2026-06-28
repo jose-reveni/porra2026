@@ -237,13 +237,24 @@ class TestLiveProgressionData:
             pytest.skip("Workbook has no knockout results loaded")
 
         ko_step = live["progression"][-1]
-        assert ko_step["code"] == "KO"
+        assert ko_step["code"] == "R32-M3"
         assert ko_step["kind"] == "ko"
         assert ko_step["label_es"] == "Eliminatorias"
+        assert ko_step["phase_es"] == "Dieciseisavos"
+        assert ko_step["home"] == "Sudáfrica"
+        assert ko_step["away"] == "Canadá"
+        assert ko_step["result"] == {"home": 0, "away": 1, "outcome": "2"}
         assert {"ko_pts", "round_ko_pts", "round_exact", "round_sign", "round_advance"} <= set(
             ko_step["table"][0]
         )
         assert ko_step["table"][0]["pts"] == live["table"][0]["pts"]
+
+    def test_race_hover_shows_standings_and_knockout_sources(self):
+        assert "round_standings_pts" in gd.JS
+        assert "round_thirds_pts" in gd.JS
+        assert "round_ko_pts" in gd.JS
+        assert "round_advance" in gd.JS
+        assert "pleno KO" in gd.JS
 
     def test_live_progression_rows_have_rank_and_delta(self, computed_data, workbook_data):
         live = computed_data["live"]
@@ -285,9 +296,14 @@ class TestKnockoutData:
 
     def test_knockout_key_exists_in_computed_data(self, computed_data):
         knockout = computed_data["knockout"]
-        assert {"ready", "filled", "total", "results_started", "rounds", "outright", "awards", "scoring"} <= set(knockout)
+        assert {"ready", "filled", "total", "results_started", "rounds", "outright", "awards", "scoring", "metrics"} <= set(knockout)
         assert knockout["results_started"] is True
         assert knockout["scoring"]["played"] == 1
+        metrics = knockout["metrics"]
+        assert metrics is not None
+        assert metrics["champRank"][0]["team"] == "España"
+        assert metrics["champRank"][0]["count"] == 8
+        assert len(metrics["people"]) == len(computed_data["cards"])
 
     def test_knockout_consensus_shape(self, computed_data):
         champion = computed_data["knockout"]["outright"]["champion"]

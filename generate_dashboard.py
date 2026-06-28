@@ -1349,6 +1349,7 @@ def compute_knockout(data):
     scoring = compute_knockout_scoring(data)
     kr = data["knockout_results"]
     results_started = bool(kr["matches"] or kr["outright"] or kr["awards"])
+    metrics = compute_knockout_metrics(data) if filled_rows > 0 else None
     return {
         "ready": filled_rows > 0,
         "filled": filled_rows,
@@ -1360,6 +1361,7 @@ def compute_knockout(data):
         "outright": outright,
         "awards": awards,
         "scoring": scoring,
+        "metrics": metrics,
     }
 
 
@@ -1437,6 +1439,239 @@ def compute_knockout_scoring(data):
     for i, row in enumerate(table, 1):
         row["rank"] = i
     return {"table": table, "played": sum(1 for v in results["matches"].values() if "score" in v)}
+
+
+def _team_prestige(data):
+    """Prestigio por consenso de clasificación (1.º=3, 2.º=2, 3.º=1)."""
+    pos_weight = {1: 3, 2: 2, 3: 1}
+    prestige = Counter()
+    for pos in data.get("qualifiers", {}).values():
+        for slot, picks in pos.items():
+            w = pos_weight.get(slot, 1)
+            for pick in picks:
+                if pick:
+                    prestige[_cmp_text(team_es(pick))] += w
+    return prestige
+
+
+def _ko_alive_teams(data):
+    """Equipos que aún pueden ganar el torneo (en R32 y sin derrota KO)."""
+    alive = set()
+    for rnd in data["knockouts"]["rounds"]:
+        if rnd["key"] != "r32":
+            continue
+        for match in rnd["matches"]:
+            for side in ("home", "away"):
+                name = match.get(f"fixture_{side}", "")
+                if name and not str(name).startswith("W"):
+                    alive.add(_cmp_text(team_es(name)))
+
+    results = data["knockout_results"]["matches"]
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            result = results.get(match["code"])
+            if not result or not result.get("winner"):
+                continue
+            winner_key = _cmp_text(team_es(result["winner"]))
+            for side in ("home", "away"):
+                name = match.get(f"fixture_{side}", "")
+                if name and not str(name).startswith("W"):
+                    side_key = _cmp_text(team_es(name))
+                    if side_key != winner_key:
+                        alive.discard(side_key)
+    return alive
+
+
+def _ko_team_pair(match):
+    home = match.get("fixture_home", "")
+    away = match.get("fixture_away", "")
+    if not home or not away or str(home).startswith("W") or str(away).startswith("W"):
+        return None, None
+    return team_es(home), team_es(away)
+
+
+def _ko_underdog_key(home_es, away_es, prestige):
+    home_key = _cmp_text(home_es)
+    away_key = _cmp_text(away_es)
+    if prestige.get(home_key, 0) <= prestige.get(away_key, 0):
+        return home_key
+    return away_key
+
+
+def _ko_pick_similarity(i, j, raw, outright, awards):
+    same = 0
+    total = 0
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            wi = match["winner_picks"][i]
+            wj = match["winner_picks"][j]
+            if wi and wj:
+                total += 1
+                if _cmp_text(wi) == _cmp_text(wj):
+                    same += 1
+    sim = round(100 * same / total, 1) if total else 0.0
+    bonus = 0
+    for key, pts in (("champion", 15), ("runner_up", 10)):
+        meta = outright.get(key)
+        if not meta:
+            continue
+        pi = meta["picks"][i]
+        pj = meta["picks"][j]
+        if pi and pj and _cmp_text(pi) == _cmp_text(pj):
+            bonus += pts
+    ts_i = awards["top_scorer"]["picks"][i] if awards.get("top_scorer") else None
+    ts_j = awards["top_scorer"]["picks"][j] if awards.get("top_scorer") else None
+    if ts_i and ts_j and _cmp_text(ts_i) == _cmp_text(ts_j):
+        bonus += 10
+    return min(99.0, round(sim * 0.7 + bonus, 1))
+
+
+def _ko_depth_row(team_name, raw, n):
+    team_key = _cmp_text(team_es(team_name))
+    by_round = {rnd["key"]: 0 for rnd in raw["rounds"]}
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            for pick in match["winner_picks"]:
+                if pick and _cmp_text(pick) == team_key:
+                    by_round[rnd["key"]] += 1
+
+    champ_picks = raw["outright"]["champion"]["picks"]
+    champ_count = sum(1 for p in champ_picks if p and _cmp_text(p) == team_key)
+    pct = lambda c: round(100 * c / n, 1) if n else 0
+    return {
+        "team": team_es(team_name),
+        "flag": team_flag(team_name),
+        "r16": pct(by_round.get("r32", 0)),
+        "qf": pct(by_round.get("r16", 0)),
+        "sf": pct(by_round.get("qf", 0)),
+        "fin": pct(by_round.get("sf", 0)),
+        "champ": pct(champ_count),
+    }
+
+
+def compute_knockout_metrics(data):
+    """Métricas del relato KO (variantes B/C) derivadas de las porras reales."""
+    names = data["names"]
+    n = data["n"]
+    raw = data["knockouts"]
+    outright = raw["outright"]
+    awards = raw["awards"]
+    prestige = _team_prestige(data)
+    alive = _ko_alive_teams(data)
+    scoring_by_name = {}
+    if data.get("knockout_results"):
+        scoring = compute_knockout_scoring(data)
+        if scoring:
+            scoring_by_name = {row["name"]: row for row in scoring["table"]}
+
+    champ_consensus = _text_consensus(outright["champion"]["picks"], n)
+    champ_rank = [
+        {"team": row["value"], "flag": row["flag"], "count": row["count"]}
+        for row in champ_consensus.get("dist", [])
+    ]
+
+    ts_counter = Counter(p for p in awards.get("top_scorer", {}).get("picks", []) if p)
+    ts_rank = [{"name": t, "count": c} for t, c in ts_counter.most_common(8)]
+
+    chaos_counts = [0] * n
+    variance_counts = [0] * n
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            home_es, away_es = _ko_team_pair(match)
+            if not home_es:
+                continue
+            underdog = _ko_underdog_key(home_es, away_es, prestige)
+            consensus = _text_consensus(match["winner_picks"], n).get("value")
+            consensus_key = _cmp_text(consensus) if consensus else None
+            for i, pick in enumerate(match["winner_picks"]):
+                if not pick:
+                    continue
+                pick_key = _cmp_text(pick)
+                if pick_key == underdog:
+                    chaos_counts[i] += 1
+                if consensus_key and pick_key != consensus_key:
+                    variance_counts[i] += 1
+
+    twin_pairs = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            sim = _ko_pick_similarity(i, j, raw, outright, awards)
+            if sim >= 45:
+                twin_pairs.append({"a": names[i], "b": names[j], "sim": sim})
+    twin_pairs.sort(key=lambda x: (-x["sim"], x["a"], x["b"]))
+
+    grave = []
+    for i, pick in enumerate(outright["champion"]["picks"]):
+        if not pick:
+            continue
+        pick_es = team_es(pick)
+        if _cmp_text(pick_es) not in alive:
+            grave.append({"name": names[i], "champ": pick_es, "flag": team_flag(pick)})
+
+    round_labels = [
+        {"es": "Octavos", "en": "R16"},
+        {"es": "Cuartos", "en": "QF"},
+        {"es": "Semis", "en": "SF"},
+        {"es": "Final", "en": "Final"},
+        {"es": "Campeón", "en": "Champion"},
+    ]
+    fell_alive = len(round_labels)
+
+    depth_teams = []
+    seen = set()
+    for rnd in raw["rounds"]:
+        if rnd["key"] != "r32":
+            continue
+        for match in rnd["matches"]:
+            for side in ("home", "away"):
+                name = match.get(f"fixture_{side}", "")
+                if not name or str(name).startswith("W"):
+                    continue
+                key = _cmp_text(team_es(name))
+                if key not in seen:
+                    seen.add(key)
+                    depth_teams.append(name)
+    depth_teams.sort(key=lambda t: (-prestige.get(_cmp_text(team_es(t)), 0), team_es(t)))
+    depth = [_ko_depth_row(t, raw, n) for t in depth_teams[:12]]
+
+    people = []
+    for i, name in enumerate(names):
+        champ_pick = outright["champion"]["picks"][i]
+        runner_pick = outright.get("runner_up", {}).get("picks", [None] * n)[i]
+        ts_pick = awards.get("top_scorer", {}).get("picks", [None] * n)[i]
+        score_row = scoring_by_name.get(name, {})
+        exp = score_row.get("pts", 0)
+        if not exp and champ_pick:
+            exp = max(1, 8 - variance_counts[i] // 3)
+        champ_arr = [team_es(champ_pick), team_flag(champ_pick)] if champ_pick else ["–", "🏳️"]
+        runner_arr = [team_es(runner_pick), team_flag(runner_pick)] if runner_pick else ["–", "🏳️"]
+        fell = fell_alive
+        if champ_pick and _cmp_text(team_es(champ_pick)) not in alive:
+            fell = fell_alive - 1
+        people.append({
+            "name": name,
+            "champ": champ_arr,
+            "runner": runner_arr,
+            "ts": ts_pick or "–",
+            "chaos": chaos_counts[i],
+            "fell": fell,
+            "exp": exp,
+            "variance": variance_counts[i],
+        })
+
+    chaos_rank = sorted(people, key=lambda p: (-p["chaos"], p["name"].lower()))
+
+    return {
+        "people": people,
+        "rounds": round_labels,
+        "champRank": champ_rank,
+        "tsRank": ts_rank,
+        "depth": depth,
+        "twins": twin_pairs,
+        "grave": grave,
+        "chaosRank": chaos_rank,
+        "pool": [[row["team"], row["flag"], row["champ"]] for row in depth[:12]],
+    }
 
 
 def _knockout_public_schedule(match):
@@ -1679,6 +1914,7 @@ def compute_live(data, matches):
     ko_rows_by_name = {row["name"]: row for row in ko["table"]} if ko else {}
     ko_pts_by_name = {name: row["pts"] for name, row in ko_rows_by_name.items()}
     if ko_pts_by_name:
+        latest_ko_match = _latest_knockout_result_match(data)
         before_pts = pts[:]
         for i, name in enumerate(names):
             pts[i] += ko_pts_by_name.get(name, 0)
@@ -1694,17 +1930,20 @@ def compute_live(data, matches):
             row["round_exact"] = ko_row.get("exact", 0)
             row["round_sign"] = ko_row.get("outcomes", 0)
             row["round_advance"] = ko_row.get("advance", 0)
-        progression.append({
+        step = {
             "idx": len(progression) + 1,
             "code": "KO",
             "virtual": True,
             "kind": "ko",
             "label_es": "Eliminatorias",
             "label_en": "Knockouts",
-            "date": _latest_knockout_result_date(data),
+            "date": latest_ko_match["date"] if latest_ko_match else "",
             "group": "",
             "table": rows,
-        })
+        }
+        if latest_ko_match:
+            step.update(latest_ko_match)
+        progression.append(step)
 
     final_delta_by_name = {
         row["name"]: row.get("delta", 0)
@@ -1743,13 +1982,40 @@ def compute_live(data, matches):
     }
 
 
-def _latest_knockout_result_date(data):
-    result_codes = set(data["knockout_results"]["matches"])
-    dates = []
+def _latest_knockout_result_match(data):
+    results = data["knockout_results"]["matches"]
+    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    played = []
+
+    def add_match(m, phase_es, phase_en):
+        result = results.get(m["code"])
+        if not result or "score" not in result:
+            return
+        rh, ra = result["score"]
+        pub = _knockout_public_schedule(m)
+        resolve_knockout_fixture(pub, winner_by_w)
+        played.append({
+            "code": m["code"],
+            "date": pub["date"],
+            "dt": pub.get("dt", ""),
+            "home": pub["fixture_home"],
+            "away": pub["fixture_away"],
+            "home_en": pub["fixture_home_en"],
+            "away_en": pub["fixture_away_en"],
+            "home_flag": pub["fixture_home_flag"],
+            "away_flag": pub["fixture_away_flag"],
+            "phase_es": phase_es,
+            "phase_en": phase_en,
+            "result": {"home": rh, "away": ra, "outcome": outcome(rh, ra)},
+        })
+
     for rnd in data["knockouts"]["rounds"]:
-        dates.extend(m["date"] for m in rnd["matches"] if m["code"] in result_codes and m.get("date"))
-    dates.extend(m["date"] for m in data["knockouts"]["final_matches"] if m["code"] in result_codes and m.get("date"))
-    return max(dates) if dates else ""
+        for m in rnd["matches"]:
+            add_match(m, rnd["label_es"], rnd["label_en"])
+    for m in data["knockouts"]["final_matches"]:
+        add_match(m, m["label_es"], m["label_en"])
+    played.sort(key=lambda m: (m["date"], m.get("dt", ""), m["code"]), reverse=True)
+    return played[0] if played else None
 
 
 def compute_recent_results(data, matches, limit=6):
@@ -2098,6 +2364,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .race-row .race-tip .rt-item b{font-family:'Space Grotesk';font-size:1.12rem;line-height:1;color:var(--text)}
 .race-row .race-tip .rt-pleno b{color:var(--gold)}
 .race-row .race-tip .rt-sign b{color:var(--mint)}
+.race-row .race-tip .rt-step b,.race-row .race-tip .rt-bonus b{color:#75e0ff}
 .race-row:hover{z-index:30;cursor:default}
 .race-row:hover .race-tip{opacity:1;transform:translateX(-50%) translateY(0)}
 .rank-matrix{display:grid;gap:3px;align-items:center;width:max-content;min-width:100%}
@@ -2330,7 +2597,7 @@ footer .brand svg{height:20px;width:auto}
 .surv-cell.fell{background:#ff8e7d;box-shadow:0 0 0 2px rgba(255,142,125,.3)}
 .survive .surv-scroll{overflow-x:auto}
 
-/* ---- KO METRICS PROTOTYPE (throwaway, ?ko=A|B|C) — delete once a layout wins ---- */
+/* ---- Eliminatorias: relato + métricas KO ---- */
 .koproto-note{background:rgba(255,210,122,.12);border:1px solid rgba(255,210,122,.3);color:var(--gold);
   border-radius:12px;padding:11px 15px;font-size:.86rem;margin-bottom:18px}
 .kp-dossier{background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:18px;padding:18px}
@@ -2467,12 +2734,17 @@ function liveHistory(){ return (D.live && D.live.progression) || []; }
 function latestSnapshot(){ const h = liveHistory(); return h[h.length - 1] || null; }
 function matchTitle(m){
   if(!m) return '–';
+  if(m.virtual && m.kind === 'ko' && m.result && m.home){
+    return `${m.home_flag} ${esc(team(m.home))} ${m.result.home}-${m.result.away} ${esc(team(m.away))} ${m.away_flag}`;
+  }
   if(m.virtual) return L(m.label_es || 'Clasificados de grupo', m.label_en || 'Group standings');
   return `${m.home_flag} ${esc(team(m.home))} ${m.result.home}-${m.result.away} ${esc(team(m.away))} ${m.away_flag}`;
 }
 function snapshotSubtitle(snap){
   if(snap.virtual){
-    const label = snap.kind === 'ko' ? L('Eliminatorias','Knockouts') : L('Cierre fase de grupos','End of group stage');
+    const label = snap.kind === 'ko'
+      ? L(snap.phase_es || 'Eliminatorias', snap.phase_en || 'Knockouts')
+      : L('Cierre fase de grupos','End of group stage');
     return snap.date ? `${snap.date} · ${label}` : label;
   }
   return `${snap.date} · ${L('Grupo','Group')} ${snap.group}`;
@@ -2513,12 +2785,25 @@ function smoothPath(points){
   }
   return d;
 }
+function tipItem(value, label, cls){
+  return `<span class="rt-item ${cls || ''}"><b>${value}</b>${label}</span>`;
+}
 function rankTip(r){
-  return `<div class="race-tip">
-    <span class="rt-item rt-pleno"><b>${r.exact || 0}</b>${L('plenos','exact')}</span>
-    <span class="rt-item rt-sign"><b>${r.sign || 0}</b>${L('aciertos','outcomes')}</span>
-    <span class="rt-item"><b>${r.pts}</b>pts</span>
-  </div>`;
+  const items = [
+    tipItem(r.exact || 0, L('plenos','exact'), 'rt-pleno'),
+    tipItem(r.sign || 0, L('signos','outcomes'), 'rt-sign'),
+    tipItem(r.pts, 'pts')
+  ];
+  if(r.round_pts) items.push(tipItem('+'+r.round_pts, L('este paso','this step'), 'rt-step'));
+  if(r.round_standings_pts) items.push(tipItem('+'+r.round_standings_pts, L('clasif.','standings'), 'rt-bonus'));
+  if(r.round_thirds_pts) items.push(tipItem('+'+r.round_thirds_pts, L('3.ºs','thirds'), 'rt-bonus'));
+  if(r.round_ko_pts){
+    items.push(tipItem('+'+r.round_ko_pts, 'KO', 'rt-bonus'));
+    if(r.round_exact) items.push(tipItem(r.round_exact, L('pleno KO','KO exact'), 'rt-pleno'));
+    if(r.round_sign) items.push(tipItem(r.round_sign, L('signo KO','KO outcome'), 'rt-sign'));
+    if(r.round_advance) items.push(tipItem(r.round_advance, L('pase','advance'), 'rt-bonus'));
+  }
+  return `<div class="race-tip">${items.join('')}</div>`;
 }
 function rankSummaryText(r){
   return `${r.exact || 0} ${L('plenos','exact')} · ${r.sign || 0} ${L('aciertos','outcomes')} · ${r.pts} pts`;
@@ -3235,85 +3520,102 @@ function buildEliminatorias(){
     L('Calendario descargado de FIFA: cruces, fechas, horas y sedes de la fase eliminatoria. Encima aparecerá el consenso cuando se rellene el Excel.',
       'Schedule pulled from FIFA: ties, dates, kick-off times and venues for the knockout stage. Consensus appears above once the Excel is filled.'));
 
-  function consensusName(c){ return c && c.value ? `${c.flag || ''} ${esc(team(c.value))}` : '–'; }
-  function agreement(c){ return c && c.count ? `${pf(c.agreement)} · ${c.count}/${N}` : L('sin datos','no data'); }
-  function miniDist(c){
-    if(!c || !c.dist || !c.dist.length) return '';
-    return c.dist.slice(0,3).map(x => `${x.flag || ''} ${esc(team(x.value))} <span class="n">${x.count}</span>`).join('');
-  }
-  function fixtureName(m, side){
-    const flag = m[`fixture_${side}_flag`] || '';
-    const name = m[`fixture_${side}`] || '–';
-    return `${flag ? flag + ' ' : ''}${esc(team(name))}`;
-  }
-  function fixtureTime(m){
-    const t = koTime(m);
-    if(!t) return '';
-    return `${t}${koNext(m) ? `<sup class="tm-next">+1</sup>` : ''} · ${koTz()}`;
-  }
-  function matchCard(m){
-    const winner = k.ready && m.winner ? `<div class="ko-mini">${L('Consenso ganador','Winner consensus')}: <b>${consensusName(m.winner)}</b> · ${agreement(m.winner)}</div>` : '';
-    const scoring = k.ready && m.score && m.score.value ? `<span class="ko-pill"><span class="ko-score">${m.score.value}</span> ${L('90 min','90 min')}</span>` : '';
-    return `<div class="ko-match">
-      <div class="ko-code">${m.code} · ${m.date || '–'}</div>
-      <div class="ko-main">${fixtureName(m,'home')} <span class="muted">vs</span> ${fixtureName(m,'away')}</div>
-      <div class="ko-mini">${fixtureTime(m)}${m.venue ? ` · ${esc(m.venue)}` : ''}</div>
-      ${winner}
-      <div class="ko-pills">${scoring}</div>
-    </div>`;
-  }
-
   if(!k.ready){
     s.appendChild(el('div','card teaser reveal',
       `<div class="em">🧩</div><h3 style="margin:10px 0 6px">${L('Calendario de eliminatorias cargado','Knockout schedule loaded')}</h3>
        <p class="muted">${L('Los cruces, fechas y horas salen de FIFA; el Excel solo aporta las predicciones y resultados. Cuando pegues las eliminatorias, aparecerá también el consenso.',
         'Fixtures, dates and kick-off times come from FIFA; the Excel only supplies predictions and results. Paste knockout picks to show consensus too.')}</p>`));
   } else {
-    const champ = k.outright.champion || {};
-    const runner = k.outright.runner_up || {};
-    const topScorer = k.awards.top_scorer || {};
-    const summary = el('div','ko-summary reveal');
-    summary.innerHTML = `
-      <div class="card ko-hero"><span class="k">${L('🏆 Campeón más apostado','🏆 Most-picked champion')}</span>
-        <div class="fav">${consensusName(champ)}</div><div class="muted">${agreement(champ)}</div>
-        <div class="ko-pills">${miniDist(champ)}</div></div>
-      <div class="card"><span class="k">${L('🥈 Subcampeón','🥈 Runner-up')}</span><h3>${consensusName(runner)}</h3><p class="muted">${agreement(runner)}</p></div>
-      <div class="card"><span class="k">${L('👟 Máximo goleador','👟 Top scorer')}</span><h3>${consensusName(topScorer)}</h3><p class="muted">${agreement(topScorer)}</p></div>`;
-    s.appendChild(summary);
-
-    const progress = el('div','card reveal');
-    progress.innerHTML = `<span class="k">${L('Progreso de carga','Pick coverage')}</span>
-      <div class="bar-row" style="grid-template-columns:minmax(84px,170px) 1fr 70px;padding-top:14px">
-        <div class="bar-name">${L('Eliminatorias','Knockouts')}</div>
-        <div class="bar-track"><div class="bar-fill gold" data-w="${k.pct}"></div></div>
-        <div class="bar-val">${fmt(k.filled)}/${fmt(k.total)}</div>
-      </div>`;
-    s.appendChild(progress);
-
-    if(k.scoring && k.scoring.table && k.scoring.table.length){
-      const ranking = el('div','card reveal'); ranking.style.marginTop = '22px';
-      const mx = k.scoring.table[0].pts || 1;
-      ranking.innerHTML = `<span class="k">${L('Marcador eliminatorio','Knockout scoring')}</span>`;
-      k.scoring.table.slice(0,12).forEach(r => ranking.appendChild(el('div','bar-row',
-        `<div class="bar-rank">${r.rank}</div><div class="bar-name">${r.rank===1?'👑 ':''}${esc(r.name)}
-          <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.advance} ${L('pases/premios','advances/awards')})</span></div>
-         <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
-         <div class="bar-val" data-count="${r.pts}">0</div>`)));
-      s.appendChild(ranking);
-    }
+    s.appendChild(koSummaryBlock(k));
   }
+  buildEliminatoriasSchedule(s);
+}
 
+function koConsensusName(c){ return c && c.value ? `${c.flag || ''} ${esc(team(c.value))}` : '–'; }
+function koAgreement(c){ return c && c.count ? `${pf(c.agreement)} · ${c.count}/${N}` : L('sin datos','no data'); }
+function koMiniDist(c){
+  if(!c || !c.dist || !c.dist.length) return '';
+  return c.dist.slice(0,3).map(x => `${x.flag || ''} ${esc(team(x.value))} <span class="n">${x.count}</span>`).join('');
+}
+function koFixtureName(m, side){
+  const flag = m[`fixture_${side}_flag`] || m[`resolved_${side}_flag`] || '';
+  const name = m[`resolved_${side}`] || m[`fixture_${side}`] || '–';
+  return `${flag ? flag + ' ' : ''}${esc(team(name))}`;
+}
+function koFixtureTime(m){
+  const t = koTime(m);
+  if(!t) return '';
+  return `${t}${koNext(m) ? `<sup class="tm-next">+1</sup>` : ''} · ${koTz()}`;
+}
+function koMatchCardHtml(m, k){
+  const winner = k.ready && m.winner && m.winner.value
+    ? `<div class="ko-mini">${L('Consenso ganador','Winner consensus')}: <b>${koConsensusName(m.winner)}</b> · ${koAgreement(m.winner)}</div>` : '';
+  const scoring = k.ready && m.score && m.score.value
+    ? `<span class="ko-pill"><span class="ko-score">${m.score.value}</span> ${L('90 min','90 min')}</span>` : '';
+  const result = m.result && m.result.score
+    ? `<span class="ko-pill"><span class="ko-score">${m.result.score.home}-${m.result.score.away}</span> ${L('real','FT')}</span>` : '';
+  return `<div class="ko-match">
+    <div class="ko-code">${m.code} · ${m.date || '–'}</div>
+    <div class="ko-main">${koFixtureName(m,'home')} <span class="muted">vs</span> ${koFixtureName(m,'away')}</div>
+    <div class="ko-mini">${koFixtureTime(m)}${m.venue ? ` · ${esc(m.venue)}` : ''}</div>
+    ${winner}
+    <div class="ko-pills">${scoring}${result}</div>
+  </div>`;
+}
+function koSummaryBlock(k){
+  const champ = k.outright.champion || {};
+  const runner = k.outright.runner_up || {};
+  const topScorer = k.awards.top_scorer || {};
+  const box = el('div','ko-summary reveal');
+  box.innerHTML = `
+    <div class="card ko-hero"><span class="k">${L('🏆 Campeón más apostado','🏆 Most-picked champion')}</span>
+      <div class="fav">${koConsensusName(champ)}</div><div class="muted">${koAgreement(champ)}</div>
+      <div class="ko-pills">${koMiniDist(champ)}</div></div>
+    <div class="card"><span class="k">${L('🥈 Subcampeón','🥈 Runner-up')}</span><h3>${koConsensusName(runner)}</h3><p class="muted">${koAgreement(runner)}</p></div>
+    <div class="card"><span class="k">${L('👟 Máximo goleador','👟 Top scorer')}</span><h3>${koConsensusName(topScorer)}</h3><p class="muted">${koAgreement(topScorer)}</p></div>`;
+  return box;
+}
+function koCoverageBlock(k){
+  if(!k.ready) return null;
+  const progress = el('div','card reveal');
+  progress.innerHTML = `<span class="k">${L('Progreso de carga','Pick coverage')}</span>
+    <div class="bar-row" style="grid-template-columns:minmax(84px,170px) 1fr 70px;padding-top:14px">
+      <div class="bar-name">${L('Eliminatorias','Knockouts')}</div>
+      <div class="bar-track"><div class="bar-fill gold" data-w="${k.pct}"></div></div>
+      <div class="bar-val">${fmt(k.filled)}/${fmt(k.total)}</div>
+    </div>`;
+  return progress;
+}
+function koScoringBlock(k){
+  if(!k.scoring || !k.scoring.table || !k.scoring.table.length) return null;
+  const ranking = el('div','card reveal');
+  const mx = k.scoring.table[0].pts || 1;
+  ranking.innerHTML = `<span class="k">${L('Marcador eliminatorio','Knockout scoring')}</span>`;
+  k.scoring.table.slice(0,12).forEach(r => ranking.appendChild(el('div','bar-row',
+    `<div class="bar-rank">${r.rank}</div><div class="bar-name">${r.rank===1?'👑 ':''}${esc(r.name)}
+      <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.advance} ${L('pases/premios','advances/awards')})</span></div>
+     <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
+     <div class="bar-val" data-count="${r.pts}">0</div>`)));
+  return ranking;
+}
+function buildEliminatoriasSchedule(parent){
+  const k = D.knockout || {};
+  const s = parent || section('ko-schedule', L('📅 Calendario completo','📅 Full schedule'),
+    L('Cruces y consenso','Fixtures and consensus'),
+    L('Todos los partidos de la fase eliminatoria con horario y apuestas agregadas.',
+      'Every knockout tie with kick-off time and aggregated picks.'));
   (k.rounds || []).forEach(r => {
     const block = el('div','ko-round reveal');
     block.innerHTML = `<h3>${L(r.label_es, r.label_en)} <span class="muted" style="font-size:.82rem">+${r.advance_points} ${L('puntos por pase','pts per advance')}</span></h3>
-      <div class="ko-grid">${r.matches.map(matchCard).join('')}</div>`;
+      <div class="ko-grid">${r.matches.map(m => koMatchCardHtml(m, k)).join('')}</div>`;
     s.appendChild(block);
   });
   if(k.final_matches && k.final_matches.length){
     const finals = el('div','ko-round reveal');
-    finals.innerHTML = `<h3>${L('Finales','Final weekend')}</h3><div class="ko-grid">${k.final_matches.map(matchCard).join('')}</div>`;
+    finals.innerHTML = `<h3>${L('Finales','Final weekend')}</h3><div class="ko-grid">${k.final_matches.map(m => koMatchCardHtml(m, k)).join('')}</div>`;
     s.appendChild(finals);
   }
+  if(!parent) return;
 }
 
 /* ---- PARTIDOS ---- */
@@ -3508,13 +3810,7 @@ function buildTopBar(activeView){
   wrap.appendChild(bar);
 }
 function renderView(view){
-  if(view === 'ko'){
-    const kv = currentKoVariant();           // throwaway KO metrics prototype (?ko=A|B|C)
-    if(kv === 'A'){ buildKoIntro('A'); buildBracket(); buildKoDossier(); buildSurvival(); }
-    else if(kv === 'B'){ buildKoVariantB(); }
-    else if(kv === 'C'){ buildKoVariantC(); }
-    else { buildBracket(); buildSurvival(); buildEliminatorias(); }
-  }
+  if(view === 'ko') buildKnockouts();
   else if(view === 'groups'){
     buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
     buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
@@ -3698,32 +3994,24 @@ function koBracketBox(){
   ensureBracketResize();
   return box;
 }
-function buildBracket(){
-  const s = section('bracket', L('🧩 Cuadro','🧩 Bracket'),
-    L('El cuadro de eliminatorias','The knockout bracket'),
-    L('Cruces oficiales de FIFA. Cuando haya apuestas subidas, cada cruce muestra el % de consenso del ganador y el marcador más probable.',
-      'Official FIFA ties. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.'));
-  const box = koBracketBox();
-  if(!box){
-    s.appendChild(el('div','card teaser reveal',
-      `<div class="em">🧩</div><p class="muted">${L('Aún no hay calendario de eliminatorias.','No knockout schedule yet.')}</p>`));
-    return;
-  }
-  s.appendChild(box);
-}
-/* survival timeline — hidden until real knockout results land */
 function koResultsStarted(){
   return !!(D.knockout && D.knockout.results_started);
 }
+function koMetricsData(){
+  return (D.knockout && D.knockout.metrics) || null;
+}
+function koRoundLabel(r){
+  return typeof r === 'string' ? r : L(r.es, r.en);
+}
+function koSection(){ const sec = el('section','sec'); wrap.appendChild(sec); return sec; }
 function koSurvivalCard(){
-  const rounds = [
-    L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion'),
-  ];
-  const names = (D.cards || []).map(c => c.name).slice(0, 16);
-  // deterministic pseudo "fell at round" purely to show the SHAPE of the viz
-  const hash = str => { let h = 0; for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) & 0xffff; } return h; };
-  const rows = names.map(nm => ({ name: nm, fell: hash(nm) % (rounds.length + 1) }))
-    .sort((a,b) => b.fell - a.fell);
+  const dz = koMetricsData();
+  if(!dz || !dz.people || !dz.people.length){
+    return el('div','survive reveal',
+      `<p class="muted">${L('Sin datos de cuadro todavía.','No bracket data yet.')}</p>`);
+  }
+  const rounds = dz.rounds.map(koRoundLabel);
+  const rows = dz.people.map(p => ({name: p.name, fell: p.fell})).sort((a,b) => b.fell - a.fell);
   const head = `<div class="surv-head"></div>` + rounds.map(r => `<div class="surv-head">${r}</div>`).join('');
   const body = rows.map(r => {
     const cells = rounds.map((_, i) => {
@@ -3735,146 +4023,25 @@ function koSurvivalCard(){
     return `<div class="surv-name">${esc(r.name)}</div>${cells}`;
   }).join('');
   return el('div','survive reveal',
-    `<span class="demo-pill">${L('datos de ejemplo','demo data')}</span>
-     <h3>${L('¿Hasta dónde aguanta el pronóstico de cada uno?','How far does each person\'s bracket survive?')}</h3>
-     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que su cuadro se rompe. Se rellenará con las apuestas reales.',
-        'Each row is a person; the red block marks the round where their bracket breaks. Will fill with real picks.')}</p>
+    `<h3>${L('¿Hasta dónde aguanta el pronóstico de cada uno?','How far does each person\'s bracket survive?')}</h3>
+     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que su campeón ya no puede ganar el torneo.',
+        'Each row is a person; the red block marks the round where their champion can no longer win the tournament.')}</p>
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
 }
-function buildSurvival(){
-  if(!koResultsStarted()) return;
-  const s = el('section','sec'); s.id = 'survive-wrap';
-  s.appendChild(koSurvivalCard());
-  wrap.appendChild(s);
-}
-
-/* ====================================================================
-   KO METRICS PROTOTYPE — THROWAWAY. Three radically different layouts of
-   the knockout analytics, switchable via ?ko=A|B|C with the floating bar.
-   Everything runs on DEMO data because real knockout picks aren't uploaded
-   yet. When a layout wins, fold it into buildEliminatorias and delete the
-   rest (CSS marked "KO METRICS PROTOTYPE" + these functions + the renderView
-   / rebuild hooks below).
-   ==================================================================== */
-const KO_VARIANTS = {
-  A: ['Cuadro vivo', 'Living bracket'],
-  B: ['Sala de mandos', 'Control room'],
-  C: ['El relato', 'The story'],
-};
-function currentKoVariant(){
-  const raw = new URLSearchParams(location.search).get('ko');
-  const key = raw ? raw.toUpperCase() : '';
-  return KO_VARIANTS[key] ? key : null;
-}
-function koVariantLabel(key){ const x = KO_VARIANTS[key] || KO_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
-function setKoVariant(next){
-  const url = new URL(location.href);
-  url.searchParams.set('view', 'ko');
-  url.searchParams.set('ko', next);
-  history.replaceState(null, '', url);
-  rebuild(); window.scrollTo(0, 0);
-}
-function cycleKoVariant(dir){
-  const keys = Object.keys(KO_VARIANTS);
-  const idx = keys.indexOf(currentKoVariant() || 'A');
-  setKoVariant(keys[(idx + dir + keys.length) % keys.length]);
-}
-let koKeyReady = false;
-function ensureKoKeys(){
-  if(koKeyReady) return;
-  document.addEventListener('keydown', e => {
-    if(currentView() !== 'ko' || !currentKoVariant()) return;
-    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
-    if(tag === 'input' || tag === 'textarea' || (document.activeElement && document.activeElement.isContentEditable)) return;
-    if(e.key === 'ArrowLeft'){ e.preventDefault(); cycleKoVariant(-1); }
-    if(e.key === 'ArrowRight'){ e.preventDefault(); cycleKoVariant(1); }
-  });
-  koKeyReady = true;
-}
-function renderKoSwitcher(){
-  if(currentView() !== 'ko' || !currentKoVariant()) return;
-  const old = document.querySelector('.proto-switcher'); if(old) old.remove();
-  ensureKoKeys();
-  const bar = el('div','proto-switcher',
-    `<button type="button" data-dir="-1" aria-label="${L('Variante anterior','Previous variant')}">‹</button>
-     <span>${koVariantLabel(currentKoVariant())}</span>
-     <button type="button" data-dir="1" aria-label="${L('Variante siguiente','Next variant')}">›</button>`);
-  bar.addEventListener('click', e => { const b = e.target.closest('button[data-dir]'); if(b) cycleKoVariant(Number(b.dataset.dir)); });
-  document.body.appendChild(bar);
-}
-function koSection(){ const sec = el('section','sec'); wrap.appendChild(sec); return sec; }
-let _koDemo = null;
-function koDemoData(){
-  if(_koDemo) return _koDemo;
-  const names = (D.cards || []).map(c => c.name);
-  const pool = [
-    ['Spain','🇪🇸',9],['France','🇫🇷',9],['Brazil','🇧🇷',8],['Argentina','🇦🇷',8],
-    ['England','🏴󠁧󠁢󠁥󠁮󠁧󠁿',7],['Germany','🇩🇪',6],['Portugal','🇵🇹',6],['Netherlands','🇳🇱',5],
-    ['Belgium','🇧🇪',4],['USA','🇺🇸',3],['Croatia','🇭🇷',3],['Uruguay','🇺🇾',2],
-  ];
-  const hash = (s, salt) => { let h = salt >>> 0; for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0; return h; };
-  const pick = (s, salt) => {
-    const total = pool.reduce((a,p) => a + p[2], 0);
-    let r = hash(s, salt) % total;
-    for(const p of pool){ if(r < p[2]) return p; r -= p[2]; }
-    return pool[0];
-  };
-  const players = ['Mbappé','Lamine Yamal','Vinícius','Haaland','Kane','Messi','Musiala','Bellingham'];
-  const rounds = [L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion')];
-  const people = names.map(nm => ({
-    name: nm,
-    champ: pick(nm, 1),
-    runner: pick(nm, 2),
-    ts: players[hash(nm, 3) % players.length],
-    chaos: hash(nm, 4) % 9,
-    fell: hash(nm, 5) % (rounds.length + 1),
-    exp: 42 + (hash(nm, 6) % 52),
-    variance: 9 + (hash(nm, 7) % 38),
-  }));
-  const champDist = {};
-  people.forEach(p => { const key = p.champ[0]; (champDist[key] = champDist[key] || {flag:p.champ[1], count:0}).count++; });
-  const champRank = Object.entries(champDist).map(([t,v]) => ({team:t, flag:v.flag, count:v.count})).sort((a,b) => b.count - a.count);
-  const tsDist = {};
-  people.forEach(p => { tsDist[p.ts] = (tsDist[p.ts] || 0) + 1; });
-  const tsRank = Object.entries(tsDist).map(([t,c]) => ({name:t, count:c})).sort((a,b) => b.count - a.count);
-  const depth = pool.map(p => ({ team:p[0], flag:p[1],
-    r16: Math.min(100, 58 + p[2]*4), qf: Math.min(98, 34 + p[2]*5), sf: Math.min(92, 16 + p[2]*6),
-    fin: Math.min(82, 7 + p[2]*6), champ: Math.min(68, 2 + p[2]*5) }));
-  const twins = [];
-  for(let i=0;i<people.length;i++) for(let j=i+1;j<people.length;j++){
-    const a = people[i], b = people[j]; let sim = 0;
-    if(a.champ[0] === b.champ[0]) sim += 45;
-    if(a.runner[0] === b.runner[0]) sim += 30;
-    if(a.ts === b.ts) sim += 25;
-    if(sim >= 45) twins.push({a:a.name, b:b.name, sim:Math.min(99, sim)});
+function buildKnockouts(){
+  const k = D.knockout || {};
+  if(!k.ready || !k.metrics){
+    buildEliminatorias();
+    return;
   }
-  twins.sort((x,y) => y.sim - x.sim);
-  const outTeams = new Set(['Belgium','USA','Uruguay']);   // DEMO: pretend these are knocked out
-  const grave = people.filter(p => outTeams.has(p.champ[0])).map(p => ({name:p.name, champ:p.champ[0], flag:p.champ[1]}));
-  const chaosRank = people.slice().sort((a,b) => b.chaos - a.chaos);
-  _koDemo = {people, rounds, champRank, tsRank, depth, twins, grave, chaosRank, pool};
-  return _koDemo;
-}
-function koDemoBanner(){
-  return el('div','koproto-note reveal',
-    `⚠️ ${L('Datos de ejemplo: las apuestas de eliminatorias aún no están subidas. Esto enseña la pinta, no los números reales.',
-            'Demo data: knockout picks are not uploaded yet. This shows the look, not the real numbers.')}`);
-}
-function buildKoIntro(key){
-  const titles = {
-    A:[L('Cuadro vivo','Living bracket'),
-       L('El cuadro manda. Explora cada selección y mira hasta dónde la lleva la oficina, con la línea de supervivencia debajo.',
-         'The bracket leads. Poke each team to see how far the office takes them, survival line below.')],
-    B:[L('Sala de mandos','Control room'),
-       L('Todas las métricas de un vistazo: campeón del pueblo, índice de caos, riesgo/recompensa, gemelos de cuadro y el cementerio.',
-         "Every metric at a glance: people's champion, chaos index, risk/reward, bracket twins and the graveyard.")],
-    C:[L('El relato','The story'),
-       L('La eliminatoria contada como una historia que bajas con el scroll: cada acto, una métrica con su gráfica.',
-         'The knockouts told as a story you scroll through: each act, a metric with its own chart.')],
-  };
-  const t = titles[key] || titles.A;
-  const s = section('ko-proto', L('05 · Eliminatorias','05 · Knockouts'), t[0], t[1]);
-  s.appendChild(koDemoBanner());
+  buildKoStoryBody();
+  buildEliminatoriasSchedule();
+  const coverage = koCoverageBlock(k);
+  if(coverage){
+    const s = el('section','sec');
+    s.appendChild(coverage);
+    wrap.appendChild(s);
+  }
 }
 let _koTipEl = null, _koTipReady = false;
 function ensureScatterTip(){
@@ -3916,33 +4083,9 @@ function koScatter(people){
     <text x="${pad}" y="12" text-anchor="middle">${L('↑ riesgo','↑ risk')}</text>
     ${dots}</svg>`;
 }
-function buildKoDossier(){
-  const dz = koDemoData();
-  const s = koSection();
-  s.appendChild(el('div','sec-head reveal',
-    `<div class="kicker">${L('Dossier de selección','Team dossier')}</div>
-     <h2>${L('¿Hasta dónde la ve la oficina?','How far does the office see them?')}</h2>`));
-  const chips = dz.depth.map((d,i) => `<button class="kp-teamchip${i===0?' on':''}" data-i="${i}">${d.flag} ${esc(team(d.team))}</button>`).join('');
-  const dossier = el('div','kp-dossier reveal', `<div class="kp-chips">${chips}</div><div class="kp-dossier-body"></div>`);
-  const bodyEl = dossier.querySelector('.kp-dossier-body');
-  const renderPanel = i => {
-    const d = dz.depth[i];
-    const rows = [['R16',d.r16],['QF',d.qf],['SF',d.sf],[L('Final','Final'),d.fin],[L('Campeón','Champ'),d.champ]];
-    bodyEl.innerHTML = `<div class="kp-dossier-head">${d.flag} ${esc(team(d.team))} — ${L('% de cuadros que la llevan a…','% of brackets taking them to…')}</div>`
-      + rows.map(([lab,v]) => `<div class="bar-row"><div class="bar-name">${lab}</div>
-          <div class="bar-track"><div class="bar-fill" data-w="${v}" style="width:${v}%"></div></div>
-          <div class="bar-val">${v}%</div></div>`).join('');
-  };
-  dossier.querySelector('.kp-chips').addEventListener('click', e => {
-    const b = e.target.closest('.kp-teamchip'); if(!b) return;
-    dossier.querySelectorAll('.kp-teamchip').forEach(x => x.classList.toggle('on', x === b));
-    renderPanel(+b.dataset.i);
-  });
-  renderPanel(0);
-  s.appendChild(dossier);
-}
-/* ---- reusable demo-metric fragments (shared by variants B and C) ---- */
+/* ---- métricas KO (fragmentos reutilizables del relato) ---- */
 function koChampBarsHtml(dz){
+  if(!dz.champRank || !dz.champRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
   const mx = dz.champRank[0].count || 1;
   return dz.champRank.map((c,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
       <div class="bar-name">${c.flag} ${esc(team(c.team))}</div>
@@ -3950,6 +4093,7 @@ function koChampBarsHtml(dz){
       <div class="bar-val" data-count="${c.count}">0</div></div>`).join('');
 }
 function koChaosBarsHtml(dz){
+  if(!dz.chaosRank || !dz.chaosRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
   const mx = dz.chaosRank[0].chaos || 1;
   return dz.chaosRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
       <div class="bar-name" style="color:${personColor(p.name)}">${esc(p.name)}</div>
@@ -3957,15 +4101,17 @@ function koChaosBarsHtml(dz){
       <div class="bar-val" data-count="${p.chaos}">0</div></div>`).join('');
 }
 function koTwinsHtml(dz){
+  if(!dz.twins || !dz.twins.length) return `<p class="muted">${L('Ningún par supera el 45 % de similitud.','No pair clears 45% similarity.')}</p>`;
   return dz.twins.slice(0,6).map(t => `<div class="kp-twin-row"><span>${esc(t.a)} · ${esc(t.b)}</span>
       <div class="kp-twin-bar"><span style="width:${t.sim}%"></span></div><span class="pct">${t.sim}%</span></div>`).join('');
 }
 function koGraveHtml(dz){
-  return dz.grave.length
+  return (dz.grave && dz.grave.length)
     ? dz.grave.map(g => `<div class="kp-grave-card"><div class="x">⚰️</div><div class="nm">${esc(g.name)}</div><div class="ch">${g.flag} ${esc(team(g.champ))}</div></div>`).join('')
     : `<p class="muted">${L('Nadie enterrado… todavía.','Nobody buried… yet.')}</p>`;
 }
 function koPichichiHtml(dz){
+  if(!dz.tsRank || !dz.tsRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
   const mx = dz.tsRank[0].count || 1;
   return dz.tsRank.slice(0,6).map((t,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
       <div class="bar-name">${esc(t.name)}</div>
@@ -3974,13 +4120,13 @@ function koPichichiHtml(dz){
 }
 function koFichasBody(dz){
   const twinOf = {};
-  dz.twins.forEach(t => { if(!twinOf[t.a]) twinOf[t.a] = {name:t.b, sim:t.sim}; if(!twinOf[t.b]) twinOf[t.b] = {name:t.a, sim:t.sim}; });
+  (dz.twins || []).forEach(t => { if(!twinOf[t.a]) twinOf[t.a] = {name:t.b, sim:t.sim}; if(!twinOf[t.b]) twinOf[t.b] = {name:t.a, sim:t.sim}; });
   const box = el('div','kp-fichas-wrap');
   const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
   const grid = el('div','grid g3');
   dz.people.slice().sort((a,b) => a.name.localeCompare(b.name,'es')).forEach(p => {
     const survives = p.fell >= dz.rounds.length;
-    const fellTxt = survives ? L('aguanta hasta el final','lasts to the end') : dz.rounds[p.fell];
+    const fellTxt = survives ? L('aguanta hasta el final','lasts to the end') : koRoundLabel(dz.rounds[p.fell]);
     const tw = twinOf[p.name];
     const card = el('div','ficha'); card.dataset.name = p.name.toLowerCase();
     card.innerHTML = `
@@ -4007,53 +4153,44 @@ function koAct(kicker, title, leadHtml, bodyEl){
   if(bodyEl) a.appendChild(bodyEl);
   return a;
 }
-function buildKoVariantB(){
-  buildKoIntro('B');
-  const dz = koDemoData();
-  const champ = koSection();
-  champ.appendChild(el('div','card reveal',
-    `<span class="k">${L('🏆 El campeón del pueblo','🏆 The people\'s champion')}</span>` + koChampBarsHtml(dz)));
-  const g = el('div','grid g2 reveal'); g.style.marginTop = '22px';
-  g.innerHTML =
-    `<div class="card"><span class="k">${L('🎲 Índice de caos (sorpresas en el cuadro)','🎲 Chaos index (upsets in the bracket)')}</span>${koChaosBarsHtml(dz)}</div>`
-    + `<div class="card"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>
-       <p class="muted" style="font-size:.82rem;margin:6px 0 10px">${L('Cada punto es una persona: a la derecha, más puntos esperados; arriba, más a cara o cruz.','Each dot is a person: right = more expected points; up = more boom-or-bust.')}</p>${koScatter(dz.people)}</div>`
-    + `<div class="card"><span class="k">${L('👯 Gemelos de cuadro','👯 Bracket twins')}</span>${koTwinsHtml(dz)}</div>`
-    + `<div class="card"><span class="k">${L('⚰️ El cementerio (su campeón ya está fuera)','⚰️ The graveyard (their champion is already out)')}</span><div class="kp-grave" style="margin-top:12px">${koGraveHtml(dz)}</div></div>`;
-  wrap.appendChild(g);
-  const pich = koSection();
-  pich.appendChild(el('div','card reveal',
-    `<span class="k">${L('👟 Pichichi del pueblo','👟 People\'s top scorer')}</span>${koPichichiHtml(dz)}`));
-}
-function buildKoVariantC(){
-  buildKoIntro('C');
-  const dz = koDemoData();
-  const top = dz.champRank[0], second = dz.champRank[1] || {count:0, team:'', flag:''};
-  const bold = dz.chaosRank[0], safe = dz.chaosRank[dz.chaosRank.length - 1];
-  const prophet = dz.people.slice().sort((a,b) => b.exp - a.exp)[0];
+function buildKoStoryBody(){
+  const dz = koMetricsData();
+  const k = D.knockout || {};
+  if(!dz) return;
+  const top = dz.champRank[0] || {count:0, team:'–', flag:'🏳️'};
+  const second = dz.champRank[1] || {count:0, team:'–', flag:'🏳️'};
+  const bold = dz.chaosRank[0] || {name:'–', chaos:0};
+  const safe = dz.chaosRank[dz.chaosRank.length - 1] || bold;
+  const prophetRow = k.scoring && k.scoring.table && k.scoring.table[0];
+  const prophet = prophetRow
+    ? {name: prophetRow.name, exp: prophetRow.pts, demo: false}
+    : {name: (dz.people.slice().sort((a,b) => b.exp - a.exp)[0] || {name:'–', exp:0}).name,
+       exp: (dz.people.slice().sort((a,b) => b.exp - a.exp)[0] || {exp:0}).exp, demo: true};
   const sec = koSection();
 
-  // Acto 1 — el cuadro: el bracket de la variante A, incrustado en el relato
   const bracketBox = koBracketBox();
   if(bracketBox){
     sec.appendChild(koAct(
       L('Acto 1 · El cuadro','Act 1 · The bracket'),
       L('El camino hacia la final','The road to the final'),
-      `<p class="kp-act-lead">${L('El cuadro oficial de FIFA. Cuando suban las apuestas, cada cruce mostrará el % de consenso del ganador y el marcador más probable.',
-                                'The official FIFA bracket. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.')}</p>`,
+      `<p class="kp-act-lead">${k.ready
+        ? L('El cuadro oficial de FIFA. Cada cruce muestra el % de consenso del ganador y el marcador más probable.',
+            'The official FIFA bracket. Each tie shows the winner consensus % and the most likely scoreline.')
+        : L('El cuadro oficial de FIFA. Cuando suban las apuestas, cada cruce mostrará el % de consenso del ganador y el marcador más probable.',
+            'The official FIFA bracket. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.')}</p>`,
       bracketBox));
   }
 
-  // Acto 2 — consenso: titular grande + reparto completo de campeón
-  sec.appendChild(koAct(
-    L('Acto 2 · El consenso','Act 2 · The consensus'),
-    L('El pueblo ha hablado','The people have spoken'),
-    `<div class="kp-act-num">${top.flag} ${esc(team(top.team))}</div>
-     <p class="kp-act-lead">${L(top.count + ' de ' + N + ' coronan a ' + team(top.team) + '. El siguiente, ' + team(second.team) + ', se queda en ' + second.count + '.',
-                               top.count + ' of ' + N + ' crown ' + team(top.team) + '. Next up, ' + team(second.team) + ', stalls at ' + second.count + '.')}</p>`,
-    el('div','kp-act-viz', `<span class="k">${L('🏆 Reparto del título','🏆 Title split')}</span>${koChampBarsHtml(dz)}`)));
+  if(top.count){
+    sec.appendChild(koAct(
+      L('Acto 2 · El consenso','Act 2 · The consensus'),
+      L('El pueblo ha hablado','The people have spoken'),
+      `<div class="kp-act-num">${top.flag} ${esc(team(top.team))}</div>
+       <p class="kp-act-lead">${L(top.count + ' de ' + N + ' coronan a ' + team(top.team) + '. El siguiente, ' + team(second.team) + ', se queda en ' + second.count + '.',
+                                 top.count + ' of ' + N + ' crown ' + team(top.team) + '. Next up, ' + team(second.team) + ', stalls at ' + second.count + '.')}</p>`,
+      el('div','kp-act-viz', `<span class="k">${L('🏆 Reparto del título','🏆 Title split')}</span>${koChampBarsHtml(dz)}`)));
+  }
 
-  // Acto 2 — carácter: duo + índice de caos + scatter riesgo/recompensa
   sec.appendChild(koAct(
     L('Acto 3 · Carácter','Act 3 · Character'),
     L('Valientes contra los de manual','The bold vs the by-the-book'),
@@ -4065,25 +4202,22 @@ function buildKoVariantC(){
       `<div class="kp-act-viz"><span class="k">${L('🎲 Índice de caos','🎲 Chaos index')}</span>${koChaosBarsHtml(dz)}</div>`
       + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
 
-  // Acto 3 — supervivencia: línea de vida real incrustada (solo con resultados KO)
   if(koResultsStarted()){
     sec.appendChild(koAct(
       L('Acto 4 · Supervivencia','Act 4 · Survival'),
       L('¿Hasta dónde aguantas?','How far do you last?'),
-      `<p class="kp-act-lead">${L('A medida que entren los resultados reales, esta línea de vida marca dónde se rompe el cuadro de cada uno.',
-                                "As real results land, this lifeline marks where each person's bracket breaks.")}</p>`,
+      `<p class="kp-act-lead">${L('La línea de vida marca dónde deja de ser posible que tu campeón gane el torneo.',
+                                'The lifeline marks where your champion can no longer win the tournament.')}</p>`,
       koSurvivalCard()));
   }
 
-  // Acto 4 — almas gemelas: quién piensa como quién
   sec.appendChild(koAct(
     L('Acto 5 · Almas gemelas','Act 5 · Soulmates'),
     L('¿Quién piensa como quién?','Who thinks like whom?'),
-    `<p class="kp-act-lead">${L('Cuadros casi calcados: mismo campeón, mismo subcampeón, mismo pichichi.',
-                              'Near-identical brackets: same champion, same runner-up, same top scorer.')}</p>`,
+    `<p class="kp-act-lead">${L('Cuadros casi calcados: mismos pases, mismo campeón, mismo pichichi.',
+                              'Near-identical brackets: same advances, champion and top scorer.')}</p>`,
     el('div','kp-act-viz', koTwinsHtml(dz))));
 
-  // Acto 5 — el cementerio
   const graveBody = el('div','kp-grave', koGraveHtml(dz));
   graveBody.style.marginTop = '18px';
   sec.appendChild(koAct(
@@ -4092,24 +4226,59 @@ function buildKoVariantC(){
     `<p class="kp-act-lead">${L('Su campeón ya está fuera. Un minuto de silencio.','Their champion is already out. A minute of silence.')}</p>`,
     graveBody));
 
-  // Acto 6 — el profeta + pichichi
-  const a6 = koAct(
+  const prophetBody = el('div','kp-act-viz');
+  prophetBody.innerHTML = `<span class="k">${L('👟 Pichichi del pueblo','👟 People\'s top scorer')}</span>${koPichichiHtml(dz)}`;
+  const scoringBlock = koScoringBlock(k);
+  if(scoringBlock){
+    scoringBlock.style.marginTop = '18px';
+    prophetBody.appendChild(scoringBlock);
+  }
+  sec.appendChild(koAct(
     L('Acto 7 · El profeta','Act 7 · The prophet'),
-    L('El que más puntos promete','The one promising the most points'),
+    L('El que más puntos lleva','The one leading on points'),
     `<div class="kp-act-num" style="color:${personColor(prophet.name)}">${esc(prophet.name)}</div>
-     <p class="kp-act-lead">${L('Valor esperado ' + prophet.exp + ' pts en la fase final (demo).', 'Expected value ' + prophet.exp + ' pts in the final phase (demo).')}</p>`,
-    el('div','kp-act-viz', `<span class="k">${L('👟 Pichichi del pueblo','👟 People\'s top scorer')}</span>${koPichichiHtml(dz)}`));
-  sec.appendChild(a6);
+     <p class="kp-act-lead">${prophet.demo
+       ? L('Valor esperado ' + prophet.exp + ' pts en la fase final (aprox.).', 'Expected value ' + prophet.exp + ' pts in the final phase (approx.).')
+       : L(prophet.exp + ' pts en eliminatorias tras ' + (k.scoring.played || 0) + ' partido(s).',
+           prophet.exp + ' knockout pts after ' + (k.scoring.played || 0) + ' match(es).')}</p>`,
+    prophetBody));
 
-  // Acto 8 — las fichas: directorio por persona, como en la fase de grupos
-  const a8 = koAct(
-    L('Acto 8 · Las fichas','Act 8 · The cards'),
+  if(dz.depth && dz.depth.length){
+    sec.appendChild(koAct(
+      L('Acto 8 · Profundidad','Act 8 · Depth'),
+      L('¿Hasta dónde la ve la oficina?','How far does the office see them?'),
+      `<p class="kp-act-lead">${L('Por selección: % de cuadros que la llevan a cada ronda.',
+                                'Per team: % of brackets taking them to each round.')}</p>`,
+      (() => {
+        const chips = dz.depth.map((d,i) => `<button class="kp-teamchip${i===0?' on':''}" data-i="${i}">${d.flag} ${esc(team(d.team))}</button>`).join('');
+        const dossier = el('div','kp-dossier', `<div class="kp-chips">${chips}</div><div class="kp-dossier-body"></div>`);
+        const bodyEl = dossier.querySelector('.kp-dossier-body');
+        const renderPanel = i => {
+          const d = dz.depth[i];
+          const rows = [['R16',d.r16],['QF',d.qf],['SF',d.sf],[L('Final','Final'),d.fin],[L('Campeón','Champ'),d.champ]];
+          bodyEl.innerHTML = `<div class="kp-dossier-head">${d.flag} ${esc(team(d.team))} — ${L('% de cuadros que la llevan a…','% of brackets taking them to…')}</div>`
+            + rows.map(([lab,v]) => `<div class="bar-row"><div class="bar-name">${lab}</div>
+                <div class="bar-track"><div class="bar-fill" data-w="${v}" style="width:${v}%"></div></div>
+                <div class="bar-val">${v}%</div></div>`).join('');
+        };
+        dossier.querySelector('.kp-chips').addEventListener('click', e => {
+          const b = e.target.closest('.kp-teamchip'); if(!b) return;
+          dossier.querySelectorAll('.kp-teamchip').forEach(x => x.classList.toggle('on', x === b));
+          renderPanel(+b.dataset.i);
+        });
+        renderPanel(0);
+        return dossier;
+      })()));
+  }
+
+  const aCards = koAct(
+    L('Acto 9 · Las fichas','Act 9 · The cards'),
     L('La ficha de cada uno 🪪',"Everyone's card 🪪"),
     `<p class="kp-act-lead">${L('Resumen por persona: su campeón, su pichichi, lo loco que va su cuadro y hasta dónde aguanta. Busca tu nombre.',
                               'A summary per person: their champion, top scorer, how wild their bracket is and how far it lasts. Search your name.')}</p>`,
     koFichasBody(dz));
-  a8.style.borderBottom = '0';
-  sec.appendChild(a8);
+  aCards.style.borderBottom = '0';
+  sec.appendChild(aCards);
 }
 
 /* ---- BUILD / REBUILD ---- */
@@ -4126,7 +4295,6 @@ function rebuild(){
   buildFooter();
   observeAll();
   renderPrototypeSwitcher();
-  renderKoSwitcher();
 }
 rebuild();
 """
