@@ -43,7 +43,13 @@ cualquier sitio y se abre en cualquier navegador. (Para verlo con todo el estilo
 necesita conexión la primera vez, porque carga las fuentes de Google Fonts; sin
 internet usa fuentes del sistema.)
 
-**Bilingüe:** arriba a la izquierda hay un selector **ES / EN** que traduce toda
+**Navegación por pestañas:** arriba hay tres pestañas — **En directo**
+(partido del día, ranking en vivo y últimos resultados), **Eliminatorias**
+(cuadro de brackets, supervivencia de pronósticos y marcador KO) y **Fase de
+grupos** (todo el análisis: rebeldía, afinidad, estilo, fichas, palmarés). El
+estado vive en `?view=live|ko|groups`.
+
+**Bilingüe:** arriba a la derecha hay un selector **ES / EN** que traduce toda
 la interfaz *y* los nombres de selección al vuelo. Arranca en español.
 
 ## Reejecutable durante el torneo

@@ -1566,23 +1566,8 @@ body{background:radial-gradient(1200px 800px at 75% -10%,#0a4a56 0%,var(--bg) 45
 h1,h2,h3,.disp{font-family:'Space Grotesk','Inter',system-ui,sans-serif;font-weight:700;letter-spacing:-.01em;line-height:1.05}
 a{color:inherit}
 .mint{color:var(--mint)}.muted{color:var(--muted)}
-/* NAV */
-nav.rail{position:fixed;top:0;left:0;height:100vh;width:188px;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
-  border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(0,26,31,.6),transparent);backdrop-filter:blur(6px);z-index:40;overflow-y:auto}
-nav.rail .brand{color:var(--mint);height:26px;margin-bottom:18px;display:block}
-nav.rail .brand svg{height:26px;width:auto}
-.langtoggle{display:flex;gap:4px;margin-bottom:16px;background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:10px;padding:3px}
-.langtoggle button{flex:1;border:0;background:transparent;color:var(--muted);font:600 .78rem 'Space Grotesk',sans-serif;
-  padding:6px 0;border-radius:7px;cursor:pointer;letter-spacing:.05em;transition:.18s}
-.langtoggle button.on{background:var(--mint);color:#012}
-nav.rail a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:var(--muted);
-  text-decoration:none;font-size:.82rem;font-weight:600;transition:.2s}
-nav.rail a .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.5;transition:.2s}
-nav.rail a:hover{color:var(--text);background:rgba(122,252,208,.05)}
-nav.rail a.active{color:var(--mint);background:rgba(122,252,208,.1)}
-nav.rail a.active .dot{opacity:1;box-shadow:0 0 10px var(--mint)}
-.nav-group-label{color:rgba(226,246,239,.54);font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.11em;margin:12px 10px 2px}
-.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px 0 calc(188px + 40px)}
+/* APP WRAP — top-tab structure (see top bar styles below) */
+.wrap{margin:0;padding:0 0 80px}
 /* HERO */
 header.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;padding-top:40px}
 .hero .eyebrow{color:var(--mint);font-weight:700;letter-spacing:.22em;text-transform:uppercase;font-size:.78rem;margin-bottom:18px}
@@ -1793,13 +1778,7 @@ footer{border-top:1px solid var(--line);padding:36px 0 60px;color:var(--muted);f
 footer .brand{color:var(--mint);height:20px;display:inline-block;vertical-align:middle;margin-right:8px}
 footer .brand svg{height:20px;width:auto}
 @media(max-width:900px){
-  nav.rail{flex-direction:row;width:100%;height:auto;top:auto;bottom:0;padding:8px;overflow-x:auto;gap:2px;
-    border-right:0;border-top:1px solid var(--line)}
-  nav.rail .brand{display:none}
-  nav.rail a{font-size:.7rem;padding:7px 9px}nav.rail a .dot{display:none}
-  .nav-group-label{display:none}
-  .langtoggle{margin-bottom:0;flex:0 0 auto;order:-1}
-  .wrap{padding:0 18px 70px}
+  .wrap{padding:0 0 70px}
   .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium,.ko-summary{grid-template-columns:1fr}
   .chips{grid-template-columns:repeat(2,1fr)}
   .race-layout{grid-template-columns:1fr}
@@ -1853,6 +1832,57 @@ footer .brand svg{height:20px;width:auto}
 .trivia-item .trivia-flag{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
 .trivia-item .trivia-text{color:var(--text)}
 @media(max-width:560px){.trivia-block{grid-template-columns:1fr}}
+/* ============================================================
+   APP SHELL — top tabs (En directo / Eliminatorias / Fase de grupos)
+   + knockout bracket visualization.
+   ============================================================ */
+.proto-shell{position:sticky;top:0;z-index:80;background:rgba(2,18,21,.86);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.proto-shell-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 22px;flex-wrap:wrap}
+.proto-shell .brand{display:flex;align-items:center;color:var(--mint);height:26px}
+.proto-shell .brand svg{height:26px;width:auto}
+.proto-tabs{display:flex;gap:6px;flex:1;flex-wrap:wrap}
+.proto-tab{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);border-radius:999px;
+  padding:9px 16px;font:800 .82rem 'Space Grotesk';cursor:pointer;display:flex;align-items:center;gap:8px}
+.proto-tab .pt-em{font-size:.95rem}
+.proto-tab.on{background:var(--mint);border-color:transparent;color:#001a1f}
+.proto-tab .pt-badge{font-size:.66rem;background:rgba(0,0,0,.18);color:inherit;border-radius:999px;padding:1px 7px}
+.proto-tab.on .pt-badge{background:rgba(0,26,31,.18)}
+.proto-lang{display:flex;gap:4px}
+.proto-lang button{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:8px;padding:5px 9px;font:800 .72rem 'Space Grotesk';cursor:pointer}
+.proto-lang button.on{background:var(--mint);color:#001a1f;border-color:transparent}
+.proto-body{max-width:1180px;margin:0 auto;padding:0 22px}
+/* bracket visualization */
+.bracket-wrap{background:linear-gradient(160deg,rgba(0,26,31,.45),rgba(6,58,68,.5));border:1px solid var(--line);
+  border-radius:20px;padding:20px;overflow-x:auto;margin-top:8px}
+.bracket{display:flex;gap:34px;min-width:max-content;align-items:stretch}
+.bk-col{display:flex;flex-direction:column;justify-content:space-around;gap:14px;min-width:188px}
+.bk-col-head{font:800 .72rem 'Space Grotesk';letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:2px}
+.bk-match{position:relative;background:rgba(0,0,0,.22);border:1px solid rgba(122,252,208,.16);border-radius:12px;padding:10px}
+.bk-match.final{border-color:rgba(255,210,122,.4);background:linear-gradient(160deg,rgba(255,210,122,.12),rgba(0,0,0,.25))}
+.bk-match::after{content:'';position:absolute;top:50%;right:-34px;width:34px;height:1px;background:rgba(122,252,208,.22)}
+.bk-col:last-child .bk-match::after{display:none}
+.bk-code{font:700 .64rem 'Space Grotesk';color:var(--muted);letter-spacing:.06em;margin-bottom:6px;display:flex;justify-content:space-between}
+.bk-side{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:700;padding:3px 0}
+.bk-side .bk-flag{width:18px;text-align:center}
+.bk-side .bk-pct{margin-left:auto;font:800 .72rem 'Space Grotesk';color:var(--mint)}
+.bk-side.dim{color:var(--muted);font-weight:600}
+.bk-cbar{height:5px;border-radius:999px;background:rgba(255,255,255,.08);margin:7px 0 2px;overflow:hidden}
+.bk-cbar span{display:block;height:100%;background:linear-gradient(90deg,var(--mint2),var(--mint))}
+.bk-tip{color:var(--muted);font-size:.7rem;margin-top:4px}
+/* survival timeline */
+.survive{margin-top:22px;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:18px;padding:20px}
+.survive h3{font:800 1.1rem 'Space Grotesk';margin-bottom:4px}
+.survive .demo-pill{display:inline-block;font:800 .64rem 'Space Grotesk';letter-spacing:.05em;text-transform:uppercase;
+  background:rgba(255,210,122,.15);color:var(--gold);border-radius:999px;padding:3px 9px;margin-bottom:14px}
+.surv-grid{display:grid;grid-template-columns:130px repeat(var(--rounds,5),1fr);gap:0 6px;align-items:center;min-width:560px}
+.surv-head{font:800 .66rem 'Space Grotesk';letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:8px}
+.surv-name{font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:5px 0}
+.surv-cell{height:12px;border-radius:4px;margin:3px 2px;background:rgba(122,252,208,.16)}
+.surv-cell.alive{background:linear-gradient(90deg,var(--mint2),var(--mint))}
+.surv-cell.out{background:rgba(255,142,125,.22)}
+.surv-cell.fell{background:#ff8e7d;box-shadow:0 0 0 2px rgba(255,142,125,.3)}
+.survive .surv-scroll{overflow-x:auto}
+@media(max-width:560px){.proto-shell-inner{padding:10px 14px}.proto-body{padding:0 14px}}
 """
 
 JS = r"""
@@ -1890,11 +1920,6 @@ function animateCount(node){
 }
 function el(t,c,h){ const e = document.createElement(t); if(c) e.className=c; if(h!=null) e.innerHTML=h; return e; }
 
-const NAV_GROUPS = [
-  {label:['Jornada','Matchday'], items:[['hoy','Hoy','Today'],['aciertos','Ranking','Ranking'],['ultimos','Últimos','Latest']]},
-  {label:['La quiniela','The pool'], items:[['inicio','Resumen','Overview'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['eliminatorias','Eliminatorias','Knockouts'],['partidos','Partidos','Matches']]},
-  {label:['Participantes','Players'], items:[['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards']]},
-];
 const LABELS = {
   goleador:['🥅 Goleador','🥅 Goal machine'], cerrojo:['🔒 Cerrojo','🔒 Parked bus'],
   empate:['🤝 Amigo del empate','🤝 Draw lover'], rebelde:['🐺 Rebelde','🐺 Maverick'],
@@ -2301,24 +2326,6 @@ function buildRankingMatrixVariant(s){
     ${renderRankingState(finalRows, total)}`);
   s.appendChild(card);
 }
-
-/* ---- NAV (built once, labels re-rendered on language change) ---- */
-const rail = el('nav','rail');
-document.body.appendChild(rail);
-function renderRail(){
-  const navHtml = NAV_GROUPS.map(g =>
-    `<div class="nav-group-label">${L(g.label[0],g.label[1])}</div>` +
-    g.items.map(([id,es,en]) => `<a href="#${id}" data-id="${id}"><span class="dot"></span>${L(es,en)}</a>`).join('')
-  ).join('');
-  rail.innerHTML = `<a class="brand" href="#hoy">${logo}</a>` +
-    `<div class="langtoggle"><button data-l="es">ES</button><button data-l="en">EN</button></div>` +
-    navHtml;
-  const on = rail.querySelector('[data-l="'+LANG+'"]'); if (on) on.classList.add('on');
-}
-rail.addEventListener('click', e => {
-  const b = e.target.closest('button[data-l]');
-  if (b && b.dataset.l !== LANG){ LANG = b.dataset.l; rebuild(); }
-});
 
 /* shared tooltip for the matrix */
 const tip = el('div'); tip.id = 'mtip'; document.body.appendChild(tip);
@@ -2872,12 +2879,142 @@ function observeAll(){
     o.unobserve(e.target);
   }}); }, {threshold:.12});
   wrap.querySelectorAll('.reveal').forEach(n => io.observe(n));
-  const navlinks = {}; rail.querySelectorAll('a[data-id]').forEach(a => navlinks[a.dataset.id] = a);
-  const navio = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting){
-    Object.values(navlinks).forEach(a => a.classList.remove('active'));
-    if(navlinks[e.target.id]) navlinks[e.target.id].classList.add('active');
-  }}); }, {rootMargin:'-45% 0px -50% 0px'});
-  wrap.querySelectorAll('header.hero,section.sec').forEach(sec => navio.observe(sec));
+}
+
+/* ============================================================
+   APP STRUCTURE — top tabs: En directo / Eliminatorias / Fase de grupos.
+   View state lives in ?view=; default is the live (matchday) view.
+   ============================================================ */
+const VIEWS = [
+  {key:'live',   es:'En directo',     en:'Live',        em:'⚽'},
+  {key:'ko',     es:'Eliminatorias',  en:'Knockouts',   em:'🧩'},
+  {key:'groups', es:'Fase de grupos', en:'Group stage', em:'📊'},
+];
+function currentView(){
+  const r = new URLSearchParams(location.search).get('view');
+  return VIEWS.some(v => v.key === r) ? r : 'live';
+}
+function setView(v){
+  const u = new URL(location.href);
+  u.searchParams.set('view', v);
+  history.replaceState(null, '', u);
+  rebuild(); window.scrollTo(0,0);
+}
+function viewBadge(key){
+  if(key === 'live') return (D.today && D.today.matches ? D.today.matches.length : 0) || '';
+  if(key === 'ko'){ const k = D.knockout || {}; return ((k.rounds||[]).reduce((a,r)=>a+(r.matches||[]).length,0) + (k.final_matches||[]).length) || ''; }
+  if(key === 'groups') return N;
+  return '';
+}
+function langBar(){
+  return `<div class="proto-lang"><button data-l="es"${LANG==='es'?' class="on"':''}>ES</button><button data-l="en"${LANG==='en'?' class="on"':''}>EN</button></div>`;
+}
+function buildTopBar(activeView){
+  const tabs = VIEWS.map(v => {
+    const badge = viewBadge(v.key);
+    return `<button class="proto-tab${v.key===activeView?' on':''}" data-view="${v.key}">
+      <span class="pt-em">${v.em}</span>${L(v.es, v.en)}${badge!==''?`<span class="pt-badge">${badge}</span>`:''}</button>`;
+  }).join('');
+  const bar = el('div','proto-shell',
+    `<div class="proto-shell-inner">
+       <a class="brand" href="#" data-view="live">${logo}</a>
+       <div class="proto-tabs">${tabs}</div>
+       ${langBar()}
+     </div>`);
+  bar.addEventListener('click', e => {
+    const lb = e.target.closest('button[data-l]');
+    if(lb){ if(lb.dataset.l !== LANG){ LANG = lb.dataset.l; rebuild(); } return; }
+    const t = e.target.closest('[data-view]');
+    if(t){ e.preventDefault(); setView(t.dataset.view); }
+  });
+  wrap.appendChild(bar);
+}
+function renderView(view){
+  if(view === 'ko'){ buildBracket(); buildSurvival(); buildEliminatorias(); }
+  else if(view === 'groups'){
+    buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
+    buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
+  }
+  else { buildHoy(); buildAciertos(); buildUltimos(); }
+}
+
+/* ---- BRACKET VISUALIZATION ---- */
+function bkSideName(m, side){
+  const flag = m['fixture_'+side+'_flag'] || '';
+  const name = m['fixture_'+side] || '–';
+  return {flag, name};
+}
+function bkMatchNode(m, isFinal){
+  const k = D.knockout || {};
+  const ready = k.ready && m.winner && m.winner.value;
+  const pct = ready ? Math.round((m.winner.agreement || 0) * 100) : 0;
+  const sideHtml = (side) => {
+    const s = bkSideName(m, side);
+    const isPick = ready && m.winner.value === s.name;
+    return `<div class="bk-side${ready && !isPick ? ' dim' : ''}">
+      <span class="bk-flag">${s.flag}</span><span>${esc(team(s.name))}</span>
+      ${isPick ? `<span class="bk-pct">${pct}%</span>` : ''}</div>`;
+  };
+  const consensus = ready
+    ? `<div class="bk-cbar"><span style="width:${pct}%"></span></div>
+       <div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
+    : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`;
+  return `<div class="bk-match${isFinal ? ' final' : ''}">
+    <div class="bk-code"><span>${m.code || ''}</span><span>${m.date || ''}</span></div>
+    ${sideHtml('home')}${sideHtml('away')}
+    ${consensus}</div>`;
+}
+function buildBracket(){
+  const k = D.knockout || {};
+  const s = section('bracket', L('🧩 Cuadro','🧩 Bracket'),
+    L('El cuadro de eliminatorias','The knockout bracket'),
+    L('Cruces oficiales de FIFA. Cuando haya apuestas subidas, cada cruce muestra el % de consenso del ganador y el marcador más probable.',
+      'Official FIFA ties. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.'));
+  const cols = [];
+  (k.rounds || []).forEach(r => {
+    cols.push(`<div class="bk-col"><div class="bk-col-head">${L(r.label_es, r.label_en)}</div>
+      ${(r.matches || []).map(m => bkMatchNode(m, false)).join('')}</div>`);
+  });
+  if(k.final_matches && k.final_matches.length){
+    cols.push(`<div class="bk-col"><div class="bk-col-head">${L('Finales','Finals')}</div>
+      ${k.final_matches.map(m => bkMatchNode(m, true)).join('')}</div>`);
+  }
+  if(!cols.length){
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">🧩</div><p class="muted">${L('Aún no hay calendario de eliminatorias.','No knockout schedule yet.')}</p>`));
+    return;
+  }
+  s.appendChild(el('div','bracket-wrap reveal', `<div class="bracket">${cols.join('')}</div>`));
+}
+/* survival timeline — DEMO data until real picks are uploaded */
+function buildSurvival(){
+  const s = el('section','sec'); s.id = 'survive-wrap';
+  const rounds = [
+    L('Octavos','R16'), L('Cuartos','QF'), L('Semis','SF'), L('Final','Final'), L('Campeón','Champion'),
+  ];
+  const names = (D.cards || []).map(c => c.name).slice(0, 16);
+  // deterministic pseudo "fell at round" purely to show the SHAPE of the viz
+  const hash = str => { let h = 0; for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) & 0xffff; } return h; };
+  const rows = names.map(nm => ({ name: nm, fell: hash(nm) % (rounds.length + 1) }))
+    .sort((a,b) => b.fell - a.fell);
+  const head = `<div class="surv-head"></div>` + rounds.map(r => `<div class="surv-head">${r}</div>`).join('');
+  const body = rows.map(r => {
+    const cells = rounds.map((_, i) => {
+      let cls = 'alive';
+      if(i === r.fell) cls = 'fell';
+      else if(i > r.fell) cls = 'out';
+      return `<div class="surv-cell ${cls}"></div>`;
+    }).join('');
+    return `<div class="surv-name">${esc(r.name)}</div>${cells}`;
+  }).join('');
+  const card = el('div','survive reveal',
+    `<span class="demo-pill">${L('datos de ejemplo','demo data')}</span>
+     <h3>${L('¿Hasta dónde aguanta el pronóstico de cada uno?','How far does each person\'s bracket survive?')}</h3>
+     <p class="muted" style="margin-bottom:14px">${L('Cada fila es una persona; el bloque rojo marca la ronda en la que su cuadro se rompe. Se rellenará con las apuestas reales.',
+        'Each row is a person; the red block marks the round where their bracket breaks. Will fill with real picks.')}</p>
+     <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>`);
+  s.appendChild(card);
+  wrap.appendChild(s);
 }
 
 /* ---- BUILD / REBUILD ---- */
@@ -2885,9 +3022,13 @@ function rebuild(){
   clearRaceTimer();
   if(wrap) wrap.remove();
   wrap = el('div','wrap'); document.body.appendChild(wrap);
-  renderRail();
-  buildHoy(); buildAciertos(); buildUltimos(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
-  buildEliminatorias(); buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildFooter();
+  const view = currentView();
+  buildTopBar(view);
+  const body = el('div','proto-body'); wrap.appendChild(body);
+  const prevWrap = wrap; wrap = body;     // route section() appends into the centred body
+  renderView(view);
+  wrap = prevWrap;
+  buildFooter();
   observeAll();
   renderPrototypeSwitcher();
 }
