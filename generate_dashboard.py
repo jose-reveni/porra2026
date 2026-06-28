@@ -40,6 +40,71 @@ GROUP_MATCH_ROWS = range(7, 79)  # 72 partidos de fase de grupos
 QUALIFIER_ROWS = range(80, 116)  # 1st/2nd/3rd de cada grupo (A..L)
 THIRDS_ROWS = range(117, 125)    # 8 mejores terceros
 
+KNOCKOUT_ROUNDS = [
+    {"key": "r32", "code": "R32", "label_es": "Dieciseisavos", "label_en": "Round of 32", "first_row": 126, "matches": 16, "advance_points": 1},
+    {"key": "r16", "code": "R16", "label_es": "Octavos", "label_en": "Round of 16", "first_row": 175, "matches": 8, "advance_points": 2},
+    {"key": "qf", "code": "QF", "label_es": "Cuartos", "label_en": "Quarter-finals", "first_row": 200, "matches": 4, "advance_points": 4},
+    {"key": "sf", "code": "SF", "label_es": "Semifinales", "label_en": "Semi-finals", "first_row": 213, "matches": 2, "advance_points": 6},
+]
+FINAL_MATCHES = [
+    {"key": "third_place_match", "code": "3P", "label_es": "Tercer puesto", "label_en": "Third-place match", "score_row": 220, "penalty_row": 221},
+    {"key": "final", "code": "FINAL", "label_es": "Final", "label_en": "Final", "score_row": 223, "penalty_row": 224},
+]
+SPECIAL_OUTRIGHT_ROWS = {
+    "third_place": {"row": 222, "label_es": "Tercer puesto", "label_en": "Third place", "points": 4},
+    "champion": {"row": 225, "label_es": "Campeón", "label_en": "Champion", "points": 12},
+    "runner_up": {"row": 226, "label_es": "Subcampeón", "label_en": "Runner-up", "points": 8},
+}
+AWARD_ROWS = {
+    "top_scorer": {"row": 228, "label_es": "Máximo goleador", "label_en": "Top scorer", "points": 8},
+    "ballon_dor": {"row": 229, "label_es": "Balón de Oro", "label_en": "Ballon d'Or", "points": 8},
+}
+
+# Calendario oficial FIFA descargado de la página de fixtures el 2026-06-28.
+# kickoff_et guarda el instante base en Eastern Time; el dashboard lo muestra
+# como hora peninsular española (ES) o británica (EN), igual que la fase de grupos.
+KNOCKOUT_MATCH_SCHEDULE = {
+    "R32-M1": {"home": "South Africa", "away": "Canada", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-06-28T15:00"},
+    "R32-M2": {"home": "Brazil", "away": "Japan", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-06-29T13:00"},
+    "R32-M3": {"home": "Germany", "away": "Paraguay", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-06-29T16:30"},
+    "R32-M4": {"home": "Netherlands", "away": "Morocco", "venue": "Monterrey Stadium", "city": "Monterrey", "kickoff_et": "2026-06-29T21:00"},
+    "R32-M5": {"home": "Côte d'Ivoire", "away": "Norway", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-06-30T13:00"},
+    "R32-M6": {"home": "France", "away": "Sweden", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-06-30T17:00"},
+    "R32-M7": {"home": "Mexico", "away": "Ecuador", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-06-30T21:00"},
+    "R32-M8": {"home": "England", "away": "Congo DR", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-01T12:00"},
+    "R32-M9": {"home": "Belgium", "away": "Senegal", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-01T16:00"},
+    "R32-M10": {"home": "USA", "away": "Bosnia and Herzegovina", "venue": "San Francisco Bay Area Stadium", "city": "San Francisco Bay Area", "kickoff_et": "2026-07-01T20:00"},
+    "R32-M11": {"home": "Spain", "away": "Austria", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-02T15:00"},
+    "R32-M12": {"home": "Portugal", "away": "Croatia", "venue": "Toronto Stadium", "city": "Toronto", "kickoff_et": "2026-07-02T19:00"},
+    "R32-M13": {"home": "Switzerland", "away": "Algeria", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-02T23:00"},
+    "R32-M14": {"home": "Australia", "away": "Egypt", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-03T14:00"},
+    "R32-M15": {"home": "Argentina", "away": "Cabo Verde", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-03T18:00"},
+    "R32-M16": {"home": "Colombia", "away": "Ghana", "venue": "Kansas City Stadium", "city": "Kansas City", "kickoff_et": "2026-07-03T21:30"},
+    "R16-M1": {"home": "W73", "away": "W75", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-07-04T13:00"},
+    "R16-M2": {"home": "W74", "away": "W77", "venue": "Philadelphia Stadium", "city": "Philadelphia", "kickoff_et": "2026-07-04T17:00"},
+    "R16-M3": {"home": "W76", "away": "W78", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-05T16:00"},
+    "R16-M4": {"home": "W79", "away": "W80", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-07-05T20:00"},
+    "R16-M5": {"home": "W83", "away": "W84", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-06T15:00"},
+    "R16-M6": {"home": "W81", "away": "W82", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-06T20:00"},
+    "R16-M7": {"home": "W86", "away": "W88", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-07T12:00"},
+    "R16-M8": {"home": "W85", "away": "W87", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-07T16:00"},
+    "QF-M1": {"home": "W89", "away": "W90", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-07-09T16:00"},
+    "QF-M2": {"home": "W93", "away": "W94", "venue": "Los Angeles Stadium", "city": "Los Angeles", "kickoff_et": "2026-07-10T15:00"},
+    "QF-M3": {"home": "W91", "away": "W92", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-11T17:00"},
+    "QF-M4": {"home": "W95", "away": "W96", "venue": "Kansas City Stadium", "city": "Kansas City", "kickoff_et": "2026-07-11T21:00"},
+    "SF-M1": {"home": "W97", "away": "W98", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-14T15:00"},
+    "SF-M2": {"home": "W99", "away": "W100", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-15T15:00"},
+    "3P": {"home": "RU101", "away": "RU102", "venue": "Miami Stadium", "city": "Miami", "kickoff_et": "2026-07-18T17:00"},
+    "FINAL": {"home": "W101", "away": "W102", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-19T15:00"},
+}
+
+FIFA_TEAM_ALIASES = {
+    "Bosnia and Herzegovina": "Bosnia-Herz.",
+    "Cabo Verde": "Cape Verde",
+    "Congo DR": "DR Congo",
+    "Côte d'Ivoire": "Ivory Coast",
+}
+
 MATCH_DATES = {
     "GA-M1": "2026-06-11", "GA-M2": "2026-06-11",
     "GA-M3": "2026-06-18", "GA-M4": "2026-06-18",
@@ -432,6 +497,55 @@ def team_flag(name):
     return TEAMS.get(str(name).strip(), (name, "🏳️"))[1]
 
 
+def knockout_schedule_info(code):
+    item = KNOCKOUT_MATCH_SCHEDULE.get(code)
+    if not item:
+        return {
+            "fixture_home": "",
+            "fixture_away": "",
+            "fixture_home_flag": "",
+            "fixture_away_flag": "",
+            "date": "",
+            "time_es": "",
+            "time_uk": "",
+            "next_es": False,
+            "next_uk": False,
+            "dt": "",
+            "venue": "",
+            "city": "",
+        }
+
+    base = datetime.fromisoformat(item["kickoff_et"])
+    home = _fixture_team(item["home"])
+    away = _fixture_team(item["away"])
+    out = {
+        "fixture_home": home["name"],
+        "fixture_away": away["name"],
+        "fixture_home_en": home["name_en"],
+        "fixture_away_en": away["name_en"],
+        "fixture_home_flag": home["flag"],
+        "fixture_away_flag": away["flag"],
+        "date": (base + _ET_OFFSETS["es"]).date().isoformat(),
+        "dt": (base + _ET_OFFSETS["es"]).isoformat(),
+        "venue": item["venue"],
+        "city": item["city"],
+    }
+    for lang, off in _ET_OFFSETS.items():
+        local = base + off
+        out[f"time_{lang}"] = local.strftime("%H:%M")
+        out[f"next_{lang}"] = local.date().isoformat() != out["date"]
+    return out
+
+
+def _fixture_team(name):
+    if not name:
+        return {"name": "", "name_en": "", "flag": ""}
+    if name.startswith(("W", "RU")):
+        return {"name": name, "name_en": name, "flag": ""}
+    canonical = FIFA_TEAM_ALIASES.get(name, name)
+    return {"name": team_es(canonical), "name_en": canonical, "flag": team_flag(canonical)}
+
+
 # --------------------------------------------------------------------------
 # Parsing
 # --------------------------------------------------------------------------
@@ -511,6 +625,9 @@ def parse_workbook(path):
         picks = [raw.cell(r, p["home_col"]).value for p in participants]
         thirds.append(picks)
 
+    knockouts = parse_knockouts(raw, participants)
+    knockout_results = parse_knockout_results(wb)
+
     # ¿Hay resultados reales?
     results = parse_results(wb)
 
@@ -522,6 +639,8 @@ def parse_workbook(path):
         "qualifiers": qualifiers,
         "thirds": thirds,
         "results": results,
+        "knockouts": knockouts,
+        "knockout_results": knockout_results,
     }
 
 
@@ -539,6 +658,124 @@ def parse_results(wb):
         if h is not None and a is not None:
             out[code] = (h, a)
     return out
+
+
+def parse_knockouts(raw, participants):
+    rounds = []
+    for rnd in KNOCKOUT_ROUNDS:
+        matches = []
+        for i in range(rnd["matches"]):
+            score_row = rnd["first_row"] + i * 3
+            penalty_row = score_row + 1
+            winner_row = score_row + 2
+            code = f"{rnd['code']}-M{i + 1}"
+            matches.append({
+                "code": code,
+                "score_row": score_row,
+                "penalty_row": penalty_row,
+                "winner_row": winner_row,
+                "score_picks": [
+                    (_num(raw.cell(score_row, p["home_col"]).value),
+                     _num(raw.cell(score_row, p["away_col"]).value))
+                    for p in participants
+                ],
+                "penalty_picks": [
+                    _text(raw.cell(penalty_row, p["home_col"]).value)
+                    for p in participants
+                ],
+                "winner_picks": [
+                    _text(raw.cell(winner_row, p["home_col"]).value)
+                    for p in participants
+                ],
+                **knockout_schedule_info(code),
+            })
+        rounds.append({**rnd, "matches": matches})
+
+    final_matches = []
+    for match in FINAL_MATCHES:
+        final_matches.append({
+            **match,
+            **knockout_schedule_info(match["code"]),
+            "score_picks": [
+                (_num(raw.cell(match["score_row"], p["home_col"]).value),
+                 _num(raw.cell(match["score_row"], p["away_col"]).value))
+                for p in participants
+            ],
+            "penalty_picks": [
+                _text(raw.cell(match["penalty_row"], p["home_col"]).value)
+                for p in participants
+            ],
+        })
+
+    outright = {}
+    for key, meta in SPECIAL_OUTRIGHT_ROWS.items():
+        outright[key] = {
+            **meta,
+            "picks": [_text(raw.cell(meta["row"], p["home_col"]).value) for p in participants],
+        }
+
+    awards = {}
+    for key, meta in AWARD_ROWS.items():
+        awards[key] = {
+            **meta,
+            "picks": [_text(raw.cell(meta["row"], p["home_col"]).value) for p in participants],
+        }
+
+    return {"rounds": rounds, "final_matches": final_matches, "outright": outright, "awards": awards}
+
+
+def parse_knockout_results(wb):
+    rr = wb["Real results"]
+    out = {"matches": {}, "outright": {}, "awards": {}}
+
+    for rnd in KNOCKOUT_ROUNDS:
+        for i in range(rnd["matches"]):
+            score_row = rnd["first_row"] + i * 3
+            code = f"{rnd['code']}-M{i + 1}"
+            entry = _knockout_result_entry(rr, score_row, score_row + 1, score_row + 2)
+            if entry:
+                out["matches"][code] = entry
+
+    for match in FINAL_MATCHES:
+        entry = _knockout_result_entry(rr, match["score_row"], match["penalty_row"])
+        if entry:
+            out["matches"][match["code"]] = entry
+
+    for key, meta in SPECIAL_OUTRIGHT_ROWS.items():
+        value = _text(rr.cell(meta["row"], 3).value)
+        if value:
+            out["outright"][key] = value
+
+    for key, meta in AWARD_ROWS.items():
+        value = _text(rr.cell(meta["row"], 3).value)
+        if value:
+            out["awards"][key] = value
+
+    return out
+
+
+def _knockout_result_entry(sheet, score_row, penalty_row=None, winner_row=None):
+    entry = {}
+    h = _num(sheet.cell(score_row, 3).value)
+    a = _num(sheet.cell(score_row, 4).value)
+    if h is not None and a is not None:
+        entry["score"] = (h, a)
+    if penalty_row is not None:
+        penalties = _text(sheet.cell(penalty_row, 3).value)
+        if penalties:
+            entry["penalties"] = penalties
+    if winner_row is not None:
+        winner = _text(sheet.cell(winner_row, 3).value)
+        if winner:
+            entry["winner"] = winner
+    return entry
+
+
+def _text(v):
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
 
 
 def _num(v):
@@ -856,6 +1093,7 @@ def compute(data):
 
     today = compute_today(data, matches)
     recent_results = compute_recent_results(data, matches)
+    knockout = compute_knockout(data)
 
     return {
         "es2en": ES2EN,
@@ -881,6 +1119,7 @@ def compute(data):
         "live": live,
         "today": today,
         "recent_results": recent_results,
+        "knockout": knockout,
     }
 
 
@@ -904,6 +1143,240 @@ def style_label(st, rebel_index):
     if rebel_index <= 25:
         return "borrego"
     return "equilibrado"
+
+
+def compute_knockout(data):
+    names = data["names"]
+    n = data["n"]
+    raw = data["knockouts"]
+
+    total_rows = 0
+    filled_rows = 0
+    rounds = []
+    for rnd in raw["rounds"]:
+        match_rows = []
+        for m in rnd["matches"]:
+            score = _score_consensus(m["score_picks"], n)
+            penalties = _text_consensus(m["penalty_picks"], n)
+            winner = _text_consensus(m["winner_picks"], n)
+            filled_rows += (
+                _filled_score_picks(m["score_picks"])
+                + _filled_text_picks(m["penalty_picks"])
+                + _filled_text_picks(m["winner_picks"])
+            )
+            total_rows += n * 3
+            match_rows.append({
+                "code": m["code"],
+                "score": score,
+                "penalties": penalties,
+                "winner": winner,
+                **_knockout_public_schedule(m),
+            })
+        rounds.append({
+            "key": rnd["key"],
+            "label_es": rnd["label_es"],
+            "label_en": rnd["label_en"],
+            "advance_points": rnd["advance_points"],
+            "matches": match_rows,
+        })
+
+    final_matches = []
+    for m in raw["final_matches"]:
+        score = _score_consensus(m["score_picks"], n)
+        penalties = _text_consensus(m["penalty_picks"], n)
+        filled_rows += (
+            _filled_score_picks(m["score_picks"])
+            + _filled_text_picks(m["penalty_picks"])
+        )
+        total_rows += n * 2
+        final_matches.append({
+            "key": m["key"],
+            "code": m["code"],
+            "label_es": m["label_es"],
+            "label_en": m["label_en"],
+            "score": score,
+            "penalties": penalties,
+            **_knockout_public_schedule(m),
+        })
+
+    outright = {}
+    for key, meta in raw["outright"].items():
+        consensus = _text_consensus(meta["picks"], n)
+        filled_rows += _filled_text_picks(meta["picks"])
+        total_rows += n
+        outright[key] = {
+            "label_es": meta["label_es"],
+            "label_en": meta["label_en"],
+            "points": meta["points"],
+            **consensus,
+        }
+
+    awards = {}
+    for key, meta in raw["awards"].items():
+        consensus = _text_consensus(meta["picks"], n)
+        filled_rows += _filled_text_picks(meta["picks"])
+        total_rows += n
+        awards[key] = {
+            "label_es": meta["label_es"],
+            "label_en": meta["label_en"],
+            "points": meta["points"],
+            **consensus,
+        }
+
+    scoring = compute_knockout_scoring(data)
+    return {
+        "ready": filled_rows > 0,
+        "filled": filled_rows,
+        "total": total_rows,
+        "pct": round(100 * filled_rows / total_rows, 1) if total_rows else 0,
+        "rounds": rounds,
+        "final_matches": final_matches,
+        "outright": outright,
+        "awards": awards,
+        "scoring": scoring,
+    }
+
+
+def compute_knockout_scoring(data):
+    results = data["knockout_results"]
+    if not (results["matches"] or results["outright"] or results["awards"]):
+        return None
+
+    names = data["names"]
+    n = data["n"]
+    totals = [0] * n
+    exact = [0] * n
+    outcome_hits = [0] * n
+    penalty_hits = [0] * n
+    advance_hits = [0] * n
+
+    def add_score_points(match, result):
+        if "score" not in result:
+            return
+        rh, ra = result["score"]
+        for i, (h, a) in enumerate(match["score_picks"]):
+            if h is None or a is None:
+                continue
+            if outcome(h, a) == outcome(rh, ra):
+                totals[i] += 3
+                outcome_hits[i] += 1
+                if h == rh and a == ra:
+                    totals[i] += 2
+                    exact[i] += 1
+
+    def add_text_points(picks, actual, points, bucket=None):
+        if not actual:
+            return
+        actual_key = _cmp_text(actual)
+        for i, pick in enumerate(picks):
+            if pick and _cmp_text(pick) == actual_key:
+                totals[i] += points
+                if bucket is not None:
+                    bucket[i] += 1
+
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            result = results["matches"].get(match["code"])
+            if not result:
+                continue
+            add_score_points(match, result)
+            add_text_points(match["penalty_picks"], result.get("penalties"), 1, penalty_hits)
+            add_text_points(match["winner_picks"], result.get("winner"), rnd["advance_points"], advance_hits)
+
+    for match in data["knockouts"]["final_matches"]:
+        result = results["matches"].get(match["code"])
+        if not result:
+            continue
+        add_score_points(match, result)
+        add_text_points(match["penalty_picks"], result.get("penalties"), 1, penalty_hits)
+
+    for key, meta in data["knockouts"]["outright"].items():
+        actual = results["outright"].get(key)
+        add_text_points(meta["picks"], actual, meta["points"], advance_hits)
+
+    for key, meta in data["knockouts"]["awards"].items():
+        actual = results["awards"].get(key)
+        add_text_points(meta["picks"], actual, meta["points"], advance_hits)
+
+    table = sorted(
+        [
+            {
+                "name": names[i],
+                "pts": totals[i],
+                "exact": exact[i],
+                "outcomes": outcome_hits[i],
+                "penalties": penalty_hits[i],
+                "advance": advance_hits[i],
+            }
+            for i in range(n)
+        ],
+        key=lambda x: (-x["pts"], x["name"].lower()),
+    )
+    for i, row in enumerate(table, 1):
+        row["rank"] = i
+    return {"table": table, "played": sum(1 for v in results["matches"].values() if "score" in v)}
+
+
+def _knockout_public_schedule(match):
+    keys = (
+        "fixture_home",
+        "fixture_away",
+        "fixture_home_en",
+        "fixture_away_en",
+        "fixture_home_flag",
+        "fixture_away_flag",
+        "date",
+        "time_es",
+        "time_uk",
+        "next_es",
+        "next_uk",
+        "dt",
+        "venue",
+        "city",
+    )
+    return {k: match.get(k, "") for k in keys}
+
+
+def _filled_score_picks(picks):
+    return sum(1 for h, a in picks if h is not None and a is not None)
+
+
+def _filled_text_picks(picks):
+    return sum(1 for p in picks if p)
+
+
+def _score_consensus(picks, n):
+    counter = Counter(f"{h}-{a}" for h, a in picks if h is not None and a is not None)
+    if not counter:
+        return {"value": None, "count": 0, "agreement": 0, "dist": []}
+    value, count = counter.most_common(1)[0]
+    return {
+        "value": value,
+        "count": count,
+        "agreement": round(100 * count / n, 1) if n else 0,
+        "dist": [{"value": k, "count": v} for k, v in counter.most_common(5)],
+    }
+
+
+def _text_consensus(picks, n):
+    counter = Counter(team_es(p) for p in picks if p)
+    if not counter:
+        return {"value": None, "flag": "🏳️", "count": 0, "agreement": 0, "dist": []}
+    value, count = counter.most_common(1)[0]
+    return {
+        "value": value,
+        "flag": _flag_es(value),
+        "count": count,
+        "agreement": round(100 * count / n, 1) if n else 0,
+        "dist": [
+            {"value": k, "flag": _flag_es(k), "count": v}
+            for k, v in counter.most_common(5)
+        ],
+    }
+
+
+def _cmp_text(v):
+    return str(v).strip().casefold()
 
 
 def compute_live(data, matches):
@@ -1276,6 +1749,20 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .gcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
 .gcard .gl{font-family:'Space Grotesk';color:var(--muted);font-size:.8rem;letter-spacing:.1em}
 .gcard .fav{font-size:1.15rem;font-weight:700;margin:4px 0 10px;display:flex;align-items:center;gap:8px}
+/* knockouts */
+.ko-summary{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-bottom:22px}
+.ko-hero{background:linear-gradient(160deg,rgba(255,210,122,.14),rgba(122,252,208,.08));border:1px solid rgba(255,210,122,.3)}
+.ko-hero .fav{font-family:'Space Grotesk';font-size:2rem;font-weight:800;color:var(--gold);margin:8px 0 4px}
+.ko-round{margin-top:22px}
+.ko-round h3{font-size:1.15rem;margin-bottom:12px}
+.ko-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.ko-match{background:rgba(0,0,0,.14);border:1px solid rgba(122,252,208,.12);border-radius:13px;padding:12px}
+.ko-code{font-family:'Space Grotesk';font-size:.76rem;color:var(--muted);letter-spacing:.08em;margin-bottom:7px}
+.ko-main{font-weight:800;font-size:1rem;min-height:1.45em}
+.ko-mini{color:var(--muted);font-size:.78rem;margin-top:5px}
+.ko-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.ko-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:rgba(255,255,255,.045);font-size:.8rem}
+.ko-score{font-family:'Space Grotesk';font-weight:800;color:var(--mint)}
 /* fichas */
 .search{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);color:var(--text);
   border-radius:12px;padding:11px 15px;font-size:.95rem;margin-bottom:20px;font-family:inherit}
@@ -1313,7 +1800,7 @@ footer .brand svg{height:20px;width:auto}
   .nav-group-label{display:none}
   .langtoggle{margin-bottom:0;flex:0 0 auto;order:-1}
   .wrap{padding:0 18px 70px}
-  .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium{grid-template-columns:1fr}
+  .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium,.ko-summary{grid-template-columns:1fr}
   .chips{grid-template-columns:repeat(2,1fr)}
   .race-layout{grid-template-columns:1fr}
   .proto-switcher{bottom:62px}
@@ -1405,7 +1892,7 @@ function el(t,c,h){ const e = document.createElement(t); if(c) e.className=c; if
 
 const NAV_GROUPS = [
   {label:['Jornada','Matchday'], items:[['hoy','Hoy','Today'],['aciertos','Ranking','Ranking'],['ultimos','Últimos','Latest']]},
-  {label:['La quiniela','The pool'], items:[['inicio','Resumen','Overview'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['partidos','Partidos','Matches']]},
+  {label:['La quiniela','The pool'], items:[['inicio','Resumen','Overview'],['rebeldia','Rebeldía','Maverick'],['gemelas','Afinidad','Affinity'],['estilo','Estilo','Style'],['favoritos','Favoritos','Favourites'],['eliminatorias','Eliminatorias','Knockouts'],['partidos','Partidos','Matches']]},
   {label:['Participantes','Players'], items:[['lobo','Lobo solitario','Lone wolf'],['fichas','Fichas','Profiles'],['premios','Palmarés','Awards']]},
 ];
 const LABELS = {
@@ -1874,11 +2361,28 @@ function buildHero(){
 }
 
 /* ---- HOY ---- */
+function todayScheduleMatches(){
+  const groupMatches = (D.today && D.today.matches) || [];
+  const koRounds = ((D.knockout && D.knockout.rounds) || []).flatMap(r =>
+    (r.matches || []).map(m => ({...m, phase_es:r.label_es, phase_en:r.label_en, is_knockout:true})));
+  const koFinals = ((D.knockout && D.knockout.final_matches) || [])
+    .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true}));
+  const knockoutMatches = koRounds.concat(koFinals).map(m => ({
+    ...m,
+    home:m.fixture_home,
+    away:m.fixture_away,
+    home_flag:m.fixture_home_flag,
+    away_flag:m.fixture_away_flag,
+  }));
+  return groupMatches.concat(knockoutMatches);
+}
+
+
 function buildHoy(){
   const s = section('hoy', L('⚽ Hoy','⚽ Today'),
     L('Los partidos de hoy','Today\'s matches'),
     L('Qué se juega hoy y qué ha puesto cada uno.','What\'s on today and what everyone predicted.'));
-  const allM = D.today.matches || [];
+  const allM = todayScheduleMatches();
   const todayStr = matchdayDateStr(new Date());
   const todayMatches = allM.filter(m => m.date === todayStr)
     .sort((a,b) => (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code));
@@ -1902,6 +2406,21 @@ function buildHoy(){
   const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', opts);
   s.appendChild(el('div','today-date reveal', dateStr.charAt(0).toUpperCase() + dateStr.slice(1)));
   todayMatches.forEach(m => {
+    if(m.is_knockout){
+      const winnerHtml = m.winner && m.winner.value
+        ? `<div class="tm-stat"><div class="val" style="font-size:1rem">${m.winner.flag || ''} ${esc(team(m.winner.value))}</div><div class="lab">${L('Consenso ganador','Winner consensus')} · ${pf(m.winner.agreement)} · ${m.winner.count}/${N}</div></div>`
+        : '';
+      s.appendChild(el('div','today-match reveal',
+        `<div class="tm-head">
+          <div class="tm-teams">${m.home_flag ? m.home_flag + ' ' : ''}${esc(team(m.home))} – ${esc(team(m.away))}${m.away_flag ? ' ' + m.away_flag : ''}</div>
+          <div class="tm-tags">${koTime(m)?`<span class="tm-time" title="${esc(koTz())}">⏱ ${esc(koTime(m))}${koNext(m)?` <span class="tm-next" title="${L('madrugada del día siguiente','after midnight, next day')}">+1</span>`:''}</span>`:''}<span class="tm-group">${L(m.phase_es || 'ELIMINATORIA', m.phase_en || 'KNOCKOUT')}</span></div>
+        </div>
+        <div class="tm-stats" style="grid-template-columns:${winnerHtml?'1fr 1fr':'1fr'}">
+          <div class="tm-stat"><div class="val" style="font-size:1rem">${esc(m.venue || '')}</div><div class="lab">${esc(m.city || '')}</div></div>
+          ${winnerHtml}
+        </div>`));
+      return;
+    }
     const o = m.outcome_dist, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
     const pct = k => tot ? Math.round((o[k]||0)/tot*100) : 0;
     const uniqueHtml = m.most_unique_pick
@@ -2122,9 +2641,99 @@ function buildFavoritos(){
   s.appendChild(two);
 }
 
+/* ---- ELIMINATORIAS ---- */
+function buildEliminatorias(){
+  const k = D.knockout || {};
+  const s = section('eliminatorias', L('05 · Eliminatorias','05 · Knockouts'),
+    L('El cuadro que viene 🧩','The bracket ahead 🧩'),
+    L('Calendario descargado de FIFA: cruces, fechas, horas y sedes de la fase eliminatoria. Encima aparecerá el consenso cuando se rellene el Excel.',
+      'Schedule pulled from FIFA: ties, dates, kick-off times and venues for the knockout stage. Consensus appears above once the Excel is filled.'));
+
+  function consensusName(c){ return c && c.value ? `${c.flag || ''} ${esc(team(c.value))}` : '–'; }
+  function agreement(c){ return c && c.count ? `${pf(c.agreement)} · ${c.count}/${N}` : L('sin datos','no data'); }
+  function miniDist(c){
+    if(!c || !c.dist || !c.dist.length) return '';
+    return c.dist.slice(0,3).map(x => `${x.flag || ''} ${esc(team(x.value))} <span class="n">${x.count}</span>`).join('');
+  }
+  function fixtureName(m, side){
+    const flag = m[`fixture_${side}_flag`] || '';
+    const name = m[`fixture_${side}`] || '–';
+    return `${flag ? flag + ' ' : ''}${esc(team(name))}`;
+  }
+  function fixtureTime(m){
+    const t = koTime(m);
+    if(!t) return '';
+    return `${t}${koNext(m) ? `<sup class="tm-next">+1</sup>` : ''} · ${koTz()}`;
+  }
+  function matchCard(m){
+    const winner = k.ready && m.winner ? `<div class="ko-mini">${L('Consenso ganador','Winner consensus')}: <b>${consensusName(m.winner)}</b> · ${agreement(m.winner)}</div>` : '';
+    const scoring = k.ready && m.score ? `<span class="ko-pill"><span class="ko-score">${m.score.value || '–'}</span> ${L('90 min','90 min')}</span>
+        <span class="ko-pill">${L('Penaltis','Pens')}: <b>${m.penalties.value || '–'}</b></span>` : '';
+    return `<div class="ko-match">
+      <div class="ko-code">${m.code} · ${m.date || '–'}</div>
+      <div class="ko-main">${fixtureName(m,'home')} <span class="muted">vs</span> ${fixtureName(m,'away')}</div>
+      <div class="ko-mini">${fixtureTime(m)}${m.venue ? ` · ${esc(m.venue)}` : ''}</div>
+      ${winner}
+      <div class="ko-pills">${scoring}</div>
+    </div>`;
+  }
+
+  if(!k.ready){
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">🧩</div><h3 style="margin:10px 0 6px">${L('Calendario de eliminatorias cargado','Knockout schedule loaded')}</h3>
+       <p class="muted">${L('Los cruces, fechas y horas salen de FIFA; el Excel solo aporta las predicciones y resultados. Cuando pegues las eliminatorias, aparecerá también el consenso.',
+        'Fixtures, dates and kick-off times come from FIFA; the Excel only supplies predictions and results. Paste knockout picks to show consensus too.')}</p>`));
+  } else {
+    const champ = k.outright.champion || {};
+    const runner = k.outright.runner_up || {};
+    const topScorer = k.awards.top_scorer || {};
+    const summary = el('div','ko-summary reveal');
+    summary.innerHTML = `
+      <div class="card ko-hero"><span class="k">${L('🏆 Campeón más apostado','🏆 Most-picked champion')}</span>
+        <div class="fav">${consensusName(champ)}</div><div class="muted">${agreement(champ)}</div>
+        <div class="ko-pills">${miniDist(champ)}</div></div>
+      <div class="card"><span class="k">${L('🥈 Subcampeón','🥈 Runner-up')}</span><h3>${consensusName(runner)}</h3><p class="muted">${agreement(runner)}</p></div>
+      <div class="card"><span class="k">${L('👟 Máximo goleador','👟 Top scorer')}</span><h3>${consensusName(topScorer)}</h3><p class="muted">${agreement(topScorer)}</p></div>`;
+    s.appendChild(summary);
+
+    const progress = el('div','card reveal');
+    progress.innerHTML = `<span class="k">${L('Progreso de carga','Pick coverage')}</span>
+      <div class="bar-row" style="grid-template-columns:minmax(84px,170px) 1fr 70px;padding-top:14px">
+        <div class="bar-name">${L('Eliminatorias','Knockouts')}</div>
+        <div class="bar-track"><div class="bar-fill gold" data-w="${k.pct}"></div></div>
+        <div class="bar-val">${fmt(k.filled)}/${fmt(k.total)}</div>
+      </div>`;
+    s.appendChild(progress);
+
+    if(k.scoring && k.scoring.table && k.scoring.table.length){
+      const ranking = el('div','card reveal'); ranking.style.marginTop = '22px';
+      const mx = k.scoring.table[0].pts || 1;
+      ranking.innerHTML = `<span class="k">${L('Marcador eliminatorio','Knockout scoring')}</span>`;
+      k.scoring.table.slice(0,12).forEach(r => ranking.appendChild(el('div','bar-row',
+        `<div class="bar-rank">${r.rank}</div><div class="bar-name">${r.rank===1?'👑 ':''}${esc(r.name)}
+          <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.advance} ${L('pases/premios','advances/awards')})</span></div>
+         <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
+         <div class="bar-val" data-count="${r.pts}">0</div>`)));
+      s.appendChild(ranking);
+    }
+  }
+
+  (k.rounds || []).forEach(r => {
+    const block = el('div','ko-round reveal');
+    block.innerHTML = `<h3>${L(r.label_es, r.label_en)} <span class="muted" style="font-size:.82rem">+${r.advance_points} ${L('puntos por pase','pts per advance')}</span></h3>
+      <div class="ko-grid">${r.matches.map(matchCard).join('')}</div>`;
+    s.appendChild(block);
+  });
+  if(k.final_matches && k.final_matches.length){
+    const finals = el('div','ko-round reveal');
+    finals.innerHTML = `<h3>${L('Finales','Final weekend')}</h3><div class="ko-grid">${k.final_matches.map(matchCard).join('')}</div>`;
+    s.appendChild(finals);
+  }
+}
+
 /* ---- PARTIDOS ---- */
 function buildPartidos(){
-  const s = section('partidos', L('05 · Partidos','05 · Matches'),
+  const s = section('partidos', L('06 · Partidos','06 · Matches'),
     L('Los partidos que nos parten en dos 🔪','The matches that split us 🔪'),
     L('Dónde hay guerra de pronósticos (poco acuerdo en el 1/X/2) y dónde casi todos ponemos lo mismo.',
       'Where there is a prediction war (little agreement on 1/X/2) and where we nearly all agree.'));
@@ -2150,7 +2759,7 @@ function buildPartidos(){
 
 /* ---- LOBO SOLITARIO ---- */
 function buildLobo(){
-  const s = section('lobo', L('06 · Atrevimiento','06 · Boldness'),
+  const s = section('lobo', L('07 · Atrevimiento','07 · Boldness'),
     L('Lobo solitario 🐺','Lone wolf 🐺'),
     L('Marcadores que solo apostó UNA persona en todo el grupo. El que más tiene, es el que más se aleja del rebaño.',
       'Scorelines only ONE person predicted in the whole pool. The more you have, the further from the flock you roam.'));
@@ -2170,7 +2779,7 @@ function buildLobo(){
 
 /* ---- FICHAS ---- */
 function buildFichas(){
-  const s = section('fichas', L('07 · Uno a uno','07 · One by one'),
+  const s = section('fichas', L('08 · Uno a uno','08 · One by one'),
     L('La ficha de cada uno 🪪',"Everyone's card 🪪"),
     L('Resumen por persona: su puesto en rebeldía, su estilo, su gemelo y su apuesta más loca. Busca tu nombre.',
       'A summary per person: their maverick rank, style, twin and wildest bet. Search your name.'));
@@ -2200,7 +2809,7 @@ function buildFichas(){
 
 /* ---- PREMIOS ---- */
 function buildPremios(){
-  const s = section('premios', L('08 · Palmarés','08 · Awards'),
+  const s = section('premios', L('09 · Palmarés','09 · Awards'),
     L('El palmarés de la porra 🏅',"The pool's hall of fame 🏅"),
     L('Los títulos honoríficos de esta edición.',"This edition's honorary titles."));
   const a = D.awards;
@@ -2278,7 +2887,7 @@ function rebuild(){
   wrap = el('div','wrap'); document.body.appendChild(wrap);
   renderRail();
   buildHoy(); buildAciertos(); buildUltimos(); buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo(); buildFavoritos();
-  buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildFooter();
+  buildEliminatorias(); buildPartidos(); buildLobo(); buildFichas(); buildPremios(); buildFooter();
   observeAll();
   renderPrototypeSwitcher();
 }

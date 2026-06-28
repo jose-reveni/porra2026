@@ -191,3 +191,72 @@ class TestLiveProgressionData:
                 "round_exact",
                 "round_sign",
             } <= set(row)
+
+
+class TestKnockoutData:
+    def test_knockout_predictions_are_parsed(self, workbook_data):
+        assert "knockouts" in workbook_data
+        rounds = workbook_data["knockouts"]["rounds"]
+        assert [r["key"] for r in rounds] == ["r32", "r16", "qf", "sf"]
+        assert [len(r["matches"]) for r in rounds] == [16, 8, 4, 2]
+
+    def test_knockout_schedule_is_attached(self, computed_data):
+        first = computed_data["knockout"]["rounds"][0]["matches"][0]
+        assert first["code"] == "R32-M1"
+        assert first["fixture_home"] == "Sudáfrica"
+        assert first["fixture_away"] == "Canadá"
+        assert first["date"] == "2026-06-28"
+        assert first["time_es"] == "21:00"
+        assert first["time_uk"] == "20:00"
+        assert first["venue"] == "Los Angeles Stadium"
+
+    def test_knockout_key_exists_in_computed_data(self, computed_data):
+        knockout = computed_data["knockout"]
+        assert {"ready", "filled", "total", "rounds", "outright", "awards", "scoring"} <= set(knockout)
+
+    def test_knockout_consensus_handles_empty_template(self, computed_data):
+        champion = computed_data["knockout"]["outright"]["champion"]
+        assert champion["value"] is None
+        assert champion["agreement"] == 0
+
+    def test_knockout_coverage_counts_divergent_filled_picks(self):
+        data = {
+            "names": ["A", "B"],
+            "n": 2,
+            "knockout_results": {"matches": {}, "outright": {}, "awards": {}},
+            "knockouts": {
+                "rounds": [{
+                    "key": "r32",
+                    "label_es": "Dieciseisavos",
+                    "label_en": "Round of 32",
+                    "advance_points": 1,
+                    "matches": [{
+                        "code": "R32-M1",
+                        "score_picks": [(1, 0), (0, 1)],
+                        "penalty_picks": ["México", "Sudáfrica"],
+                        "winner_picks": ["México", "Sudáfrica"],
+                    }],
+                }],
+                "final_matches": [],
+                "outright": {
+                    "champion": {
+                        "label_es": "Campeón",
+                        "label_en": "Champion",
+                        "points": 12,
+                        "picks": ["México", "Sudáfrica"],
+                    }
+                },
+                "awards": {},
+            },
+        }
+
+        knockout = gd.compute_knockout(data)
+
+        assert knockout["filled"] == 8
+        assert knockout["total"] == 8
+        assert knockout["pct"] == 100.0
+
+    def test_knockout_dashboard_section_is_registered(self):
+        assert "buildEliminatorias" in gd.JS
+        assert "todayScheduleMatches" in gd.JS
+        assert "eliminatorias" in gd.JS

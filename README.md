@@ -48,13 +48,19 @@ la interfaz *y* los nombres de selección al vuelo. Arranca en español.
 
 ## Reejecutable durante el torneo
 
-El dashboard se construye con las **apuestas** (72 marcadores de grupo + clasificados).
+El dashboard se construye con las **apuestas** (72 marcadores de grupo,
+clasificados, eliminatorias, campeón/subcampeón y premios).
 Cuando empiece a rodar el balón:
 
 1. Rellena los marcadores reales en la pestaña **`Real results`** del Excel.
 2. Vuelve a correr `python3 generate_dashboard.py`.
-3. La sección **"En directo"** mostrará el ranking de aciertos
-   (signo correcto = +2, marcador exacto = +4).
+3. La sección **"En directo"** mostrará el ranking de aciertos de grupos
+   (signo correcto = +2, marcador exacto = +4) y **"Eliminatorias"** mostrará
+   consenso del cuadro y marcador eliminatorio cuando haya datos de esa fase.
+
+El calendario de eliminatorias (cruces, fechas, horas y sedes) se toma de la
+página oficial de fixtures de FIFA y no del Excel. El Excel solo guarda
+predicciones y resultados.
 
 ## Qué hay dentro
 
@@ -63,6 +69,8 @@ Cuando empiece a rodar el balón:
 - **Afinidad** — matriz de quién coincide con quién (almas gemelas / polos opuestos).
 - **Estilo** — goleadores vs cerrojos, marcadores más repetidos, rey del empate.
 - **Favoritos** — consenso de clasificados por grupo, selecciones más respetadas.
+- **Eliminatorias** — calendario oficial FIFA, consenso de campeón, subcampeón,
+  ganadores por ronda, premios y ranking de aciertos de la fase eliminatoria.
 - **Partidos** — los que más nos dividen vs los de casi unanimidad.
 - **Lobo solitario** — marcadores que solo apostó una persona.
 - **Fichas** — resumen por participante (buscador incluido).
