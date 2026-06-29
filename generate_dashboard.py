@@ -3614,6 +3614,23 @@ footer .brand svg{height:20px;width:auto}
 .me-summary-link{border:0;background:transparent;color:var(--mint);font:700 .82rem 'Space Grotesk';cursor:pointer;padding:0}
 .race-me-pin{margin-bottom:8px}
 .race-me-pin-row{pointer-events:none}
+.me-bet-block{margin:12px 0;background:linear-gradient(160deg,rgba(122,252,208,.08),rgba(0,0,0,.15));
+  border:1px solid rgba(122,252,208,.25);border-left:3px solid var(--me-color,var(--mint));border-radius:12px;padding:12px 14px}
+.me-bet-head{font:800 .88rem 'Space Grotesk';color:var(--mint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+.me-bet-pick{font:800 1.25rem 'Space Grotesk';margin-bottom:6px}
+.me-bet-consensus{font-size:.82rem;margin-bottom:8px;line-height:1.4}
+.me-bet-consensus .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700;margin-left:6px}
+.me-bet-consensus .badge.agree{background:rgba(122,252,208,.15);color:var(--mint)}
+.me-bet-consensus .badge.disagree{background:rgba(255,180,80,.12);color:#ffb450}
+.me-bet-stake{font-size:.82rem;line-height:1.45}
+.me-bet-stake .swing{font:800 1.1rem 'Space Grotesk';color:var(--mint)}
+.race-me-step{margin-top:10px;padding:10px 12px;background:rgba(122,252,208,.08);border:1px solid rgba(122,252,208,.22);
+  border-radius:10px;font-size:.84rem;line-height:1.45}
+.race-me-step b{color:var(--mint)}
+.me-result-strip{margin:10px 0 4px;padding:8px 12px;background:rgba(122,252,208,.1);border:1px solid rgba(122,252,208,.28);
+  border-radius:8px;font:700 .84rem 'Space Grotesk';color:var(--mint)}
+.me-result-strip.miss{color:#ff8a8a;background:rgba(255,100,100,.08);border-color:rgba(255,100,100,.25)}
+.me-result-strip.sign{color:#c8d4ff;background:rgba(150,170,255,.08);border-color:rgba(150,170,255,.22)}
 .kp-scatter circle.is-me{stroke:#fff;stroke-width:2.5}
 """
 
@@ -3687,6 +3704,34 @@ function meCard(){
 function meLiveRow(){
   if(!ME || !D.live || !D.live.table) return null;
   return D.live.table.find(r => r.name === ME) || null;
+}
+function meStakePerson(stake){
+  if(!ME || !stake || !stake.people) return null;
+  return stake.people.find(p => p.name === ME) || null;
+}
+function mePickInMatch(m){
+  if(!ME || !m || !m.picks) return null;
+  return m.picks.find(p => p.name === ME) || null;
+}
+function meProgressionAt(idx){
+  const hist = liveHistory();
+  const snap = hist[idx];
+  if(!snap || !ME) return null;
+  return snap.table.find(r => r.name === ME) || null;
+}
+function meRecentOutcome(m){
+  if(!ME || !m) return null;
+  const lists = [
+    {key:'exact', kind:'exact'},
+    {key:'sign', kind:'sign'},
+    {key:'miss', kind:'miss'},
+    {key:'advance', kind:'advance'},
+  ];
+  for(const {key, kind} of lists){
+    const hit = (m[key] || []).find(p => p.name === ME);
+    if(hit) return {kind, pick: hit.pick};
+  }
+  return null;
 }
 function sortPeople(arr){
   return [...arr].sort((a,b) => {
@@ -4007,6 +4052,7 @@ function buildLiveRanking(s){
         <div class="race-match"></div>
         <div class="muted race-date"></div>
         <div class="race-now"></div>
+        <div class="race-me-step" hidden></div>
         <div class="race-legend">
           <span><i class="race-dot" style="background:var(--mint)"></i>${L('sube en ranking','rank up')}</span>
           <span><i class="race-dot" style="background:var(--red)"></i>${L('baja en ranking','rank down')}</span>
@@ -4025,6 +4071,7 @@ function buildLiveRanking(s){
   const date = card.querySelector('.race-date');
   const step = card.querySelector('.race-step');
   const now = card.querySelector('.race-now');
+  const meStep = card.querySelector('.race-me-step');
   const play = card.querySelector('.race-play');
   const prev = card.querySelector('.race-prev');
   const next = card.querySelector('.race-next');
@@ -4076,6 +4123,25 @@ function buildLiveRanking(s){
     mePin.hidden = false;
     mePin.innerHTML = racePinHtml(r);
   }
+  function updateMeStep(snap){
+    if(!meStep || !ME){ if(meStep) meStep.hidden = true; return; }
+    const r = snap.table.find(x => x.name === ME);
+    if(!r){ meStep.hidden = true; return; }
+    meStep.hidden = false;
+    const pts = r.round_pts || 0;
+    const delta = r.delta || 0;
+    let moveTxt = '';
+    if(delta > 0) moveTxt = L(', subiste ', ', you moved up ') + delta;
+    else if(delta < 0) moveTxt = L(', bajaste ', ', you moved down ') + Math.abs(delta);
+    else moveTxt = L(', sin cambio de puesto', ', no rank change');
+    if(pts > 0){
+      meStep.innerHTML = `${L('En este partido','This match')}: <b>+${pts} pts</b>${moveTxt}`;
+    } else if(delta !== 0){
+      meStep.innerHTML = `${L('En este partido','This match')}: <b>${L('sin puntos','no points')}</b>${moveTxt}`;
+    } else {
+      meStep.innerHTML = `${L('En este partido','This match')}: ${L('sin puntos este paso','no points this step')}`;
+    }
+  }
   function animateRowsFrom(previousRects){
     if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4116,6 +4182,7 @@ function buildLiveRanking(s){
       <span><b>+${pointsNow}</b>${L('pts repartidos','pts awarded')}</span>`;
     board.innerHTML = snap.table.map(rowHtml).join('');
     updateMePin(snap);
+    updateMeStep(snap);
     requestAnimationFrame(() => animateRowsFrom(previousRects));
   }
   input.addEventListener('input', () => { stopPlaying(); paint(); });
@@ -4209,7 +4276,31 @@ function stakeResultLbl(r){
 }
 
 function stakeSwingHtml(st){
+  const meSt = meStakePerson(st);
   const up = st.max_swing || 0, down = st.min_swing || 0;
+  const meUp = meSt ? (meSt.swing_up || 0) : 0;
+  const meDown = meSt ? (meSt.swing_down || 0) : 0;
+  if(ME && meSt && (meUp || meDown)){
+    const parts = [];
+    if(meUp) parts.push(`+${meUp}`);
+    if(meDown) parts.push(`−${meDown}`);
+    let hints = '';
+    if(meUp && meSt.best_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:4px;line-height:1.35">+${meUp} ${L('si sale','if')} <b>${stakeResultLbl(meSt.best_result)}</b></div>`;
+    }
+    if(meDown && meSt.worst_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:2px;line-height:1.35">−${meDown} ${L('si sale','if')} <b>${stakeResultLbl(meSt.worst_result)}</b></div>`;
+    }
+    let globalHint = '';
+    if(up && st.max_swing_who && st.max_swing_who !== ME){
+      globalHint += `<div class="muted" style="font-size:.72rem;margin-top:6px;line-height:1.35">${L('En la porra, quien más se juega es','In the pool, most at stake is')} <b>${esc(st.max_swing_who)}</b> (+${up})</div>`;
+    }
+    if(down && st.min_swing_who && st.min_swing_who !== ME && st.min_swing_who !== st.max_swing_who){
+      globalHint += `<div class="muted" style="font-size:.72rem;margin-top:2px;line-height:1.35">${L('Quien más puede bajar es','Most downside for')} <b>${esc(st.min_swing_who)}</b> (−${down})</div>`;
+    }
+    return `<div class="swing">${parts.join(' / ')}</div>
+      <div class="muted" style="font-size:.82rem">${L('tus puestos arriba / abajo','your places up / down')}</div>${hints}${globalHint}`;
+  }
   if(!up && !down) return `<div class="swing">0</div>
       <div class="muted" style="font-size:.82rem">${L('sin movimiento','no movement')}</div>`;
   const parts = [];
@@ -4239,6 +4330,110 @@ function stakeDeferredHtml(st){
   )}<br><span style="color:var(--mint)">${lbl}</span>${when}</div>`;
 }
 
+function pickScoreLbl(p, knockout){
+  if(p.home == null || p.away == null) return '–';
+  let s = `${p.home}-${p.away}`;
+  if(knockout && p.home === p.away && p.winner){
+    s += ` · ${p.winner_flag || ''} ${esc(team(p.winner))}`;
+  }
+  return s;
+}
+
+function meTodayOutcome(m){
+  if(!ME) return null;
+  const pick = mePickInMatch(m);
+  if(!pick || pick.home == null || !m.result) return null;
+  const rh = m.result.home, ra = m.result.away;
+  const ph = pick.home, pa = pick.away;
+  const pickStr = `${ph}-${pa}`;
+  if(ph === rh && pa === ra) return {kind:'exact', pick: pickStr};
+  const ps = ph > pa ? '1' : ph === pa ? 'X' : '2';
+  const rs = rh > ra ? '1' : rh === ra ? 'X' : '2';
+  if(ps === rs) return {kind:'sign', pick: pickStr};
+  return {kind:'miss', pick: pickStr};
+}
+
+function meResultStripText(outcome){
+  const pick = esc(outcome.pick || '');
+  switch(outcome.kind){
+    case 'exact': return `✓ ${L('Pleno','Exact score')} — ${L('apostaste','you picked')} ${pick}`;
+    case 'sign': return `~ ${L('Signo','Outcome')} — ${L('apostaste','you picked')} ${pick}`;
+    case 'miss': return `✗ ${L('Fallaste','Missed')} — ${L('tenías','you had')} ${pick}`;
+    case 'advance': return `✓ ${L('Acertaste el pase','Correct advance')}`;
+    default: return '';
+  }
+}
+
+function meResultStripHtml(m){
+  if(!ME) return '';
+  const outcome = meRecentOutcome(m);
+  if(!outcome) return '';
+  const cls = outcome.kind === 'miss' ? ' miss' : outcome.kind === 'sign' ? ' sign' : '';
+  return `<div class="me-result-strip${cls}">${meResultStripText(outcome)}</div>`;
+}
+
+function meBetBlockHtml(m){
+  if(!ME) return '';
+  const pick = mePickInMatch(m);
+  if(!pick) return '';
+  const knockout = !!m.is_knockout;
+  const pickLbl = pickScoreLbl(pick, knockout);
+  const pickScore = pick.home != null ? `${pick.home}-${pick.away}` : '';
+  const consensus = knockout
+    ? (m.score && m.score.value ? m.score.value : null)
+    : (m.modal_scoreline || null);
+  const consensusPct = knockout
+    ? (m.score ? Math.round(m.score.agreement || 0) : null)
+    : (m.modal_scoreline_share != null ? Math.round(m.modal_scoreline_share * 100) : null);
+  let consensusHtml = '';
+  if(consensus){
+    const agree = pickScore === consensus;
+    const badge = agree
+      ? `<span class="badge agree">${L('Vas con el pueblo','With the crowd')}</span>`
+      : `<span class="badge disagree">${L('Discrepas','You disagree')}</span>`;
+    consensusHtml = `<div class="me-bet-consensus">${L('Consenso','Consensus')}: <b>${esc(consensus)}</b>${consensusPct != null ? ` (${consensusPct}%)` : ''} ${badge}</div>`;
+  }
+  let stakeHtml = '';
+  const st = m.stake;
+  const meSt = st ? meStakePerson(st) : null;
+  if(st && st.deferred){
+    stakeHtml = `<div class="me-bet-stake muted">${L('Tu swing se calcula cuando caigan los resultados anteriores de hoy', 'Your swing is calculated once earlier today\'s results are in')}</div>`;
+  } else if(meSt && (meSt.swing_up || meSt.swing_down || meSt.max_pts)){
+    const parts = [];
+    if(meSt.swing_up) parts.push(`+${meSt.swing_up}`);
+    if(meSt.swing_down) parts.push(`−${meSt.swing_down}`);
+    let hints = '';
+    if(meSt.swing_up && meSt.best_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:4px">+${meSt.swing_up} ${L('si sale','if')} <b>${stakeResultLbl(meSt.best_result)}</b></div>`;
+    }
+    if(meSt.swing_down && meSt.worst_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:2px">−${meSt.swing_down} ${L('si sale','if')} <b>${stakeResultLbl(meSt.worst_result)}</b></div>`;
+    }
+    stakeHtml = `<div class="me-bet-stake">${L('En juego','At stake')}: ${L('hasta','up to')} +${meSt.max_pts} pts${parts.length ? ` · <span class="swing">${parts.join(' / ')}</span> ${L('puestos','places')}` : ''}${hints}</div>`;
+  } else if(!st && m.result){
+    const outcome = meTodayOutcome(m);
+    if(outcome) stakeHtml = `<div class="me-bet-stake">${meResultStripText(outcome)}</div>`;
+  }
+  return `<div class="me-bet-block" style="--me-color:${personColor(ME)}">
+    <div class="me-bet-head">${L('Tu apuesta','Your pick')}</div>
+    <div class="me-bet-pick">${esc(pickLbl)}</div>
+    ${consensusHtml}
+    ${stakeHtml}
+  </div>`;
+}
+
+function koStakeSwingers(st){
+  const all = (st.people || []).filter(p => p.swing_up > 0 || p.swing_down > 0)
+    .sort((a,b) => (b.swing_up - a.swing_up) || (b.swing_down - a.swing_down) || b.max_pts - a.max_pts);
+  if(!ME) return all.slice(0, 4);
+  const meEntry = all.find(p => p.name === ME);
+  const top = all.slice(0, 4);
+  if(meEntry && !top.some(p => p.name === ME)){
+    return all.slice(0, 3).concat([meEntry]);
+  }
+  return top;
+}
+
 function groupMatchStakeHtml(m){
   const st = m.stake;
   if(!st) return '';
@@ -4264,8 +4459,7 @@ function koMatchStakeHtml(m){
       <div style="text-align:right">${stakeDeferredHtml(st)}</div>
     </div>`;
   }
-  const swingers = (st.people || []).filter(p => p.swing_up > 0 || p.swing_down > 0)
-    .sort((a,b) => (b.swing_up - a.swing_up) || (b.swing_down - a.swing_down) || b.max_pts - a.max_pts).slice(0,4);
+  const swingers = koStakeSwingers(st);
   const swingHtml = swingers.length
     ? `<div class="muted" style="font-size:.82rem;margin-top:8px">${L('Más en juego','Most at stake')}: ${swingers.map(p => {
         const mv = [];
@@ -4389,6 +4583,7 @@ function buildHoy(){
           ${scoreHtml}
         </div>
         ${outcomeHtml}
+        ${meBetBlockHtml(m)}
         ${koMatchStakeHtml(m)}
         ${picksHtml}
         ${m.home_trivia && m.home_trivia.es ? `<div class="trivia-block">
@@ -4423,6 +4618,7 @@ function buildHoy(){
         <div class="tm-stat"><div class="val">${m.modal_scoreline}</div><div class="lab">${L('Marcador más repetido','Most common scoreline')} (${pf(Math.round(m.modal_scoreline_share*100))})</div></div>
         <div class="tm-stat"><div class="val" style="font-size:1rem">${uniqueHtml||'–'}</div><div class="lab">${L('Pick único más salvaje','Wildest unique pick')}</div></div>
       </div>
+      ${meBetBlockHtml(m)}
       ${groupMatchStakeHtml(m)}
       ${picksHtml}
       <div class="trivia-block">
@@ -4471,6 +4667,7 @@ function buildUltimos(){
         <span class="score-final">${m.result.home}-${m.result.away}</span>
       </div>
       <div class="recent-meta"><span>${dateStr}</span><span>${phase}</span><span>${L('Resultado final','Final score')}</span>${winner}</div>
+      ${meResultStripHtml(m)}
       <div class="result-groups">
         <div class="result-box">
           <div class="rb-title">${L('Pleno','Exact score')} <span class="rb-count">${m.exact.length}</span></div>

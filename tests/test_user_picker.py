@@ -42,3 +42,20 @@ class TestUserPickerSmoke:
     def test_payload_has_participant_names(self, generated_html):
         assert '"matrix"' in generated_html
         assert '"names"' in generated_html
+
+
+class TestPersonalMetricsSmoke:
+    def test_html_contains_me_helpers(self, generated_html):
+        assert "function meStakePerson(" in generated_html
+        assert "function mePickInMatch(" in generated_html
+        assert "function meProgressionAt(" in generated_html
+        assert "function meRecentOutcome(" in generated_html
+        assert "function meBetBlockHtml(" in generated_html
+        assert "function meResultStripHtml(" in generated_html
+
+    def test_html_contains_p0_ui_classes(self, generated_html):
+        assert "me-bet-block" in generated_html
+        assert "race-me-step" in generated_html
+        assert "me-result-strip" in generated_html
+        assert "function updateMeStep(" in generated_html
+        assert "function koStakeSwingers(" in generated_html
