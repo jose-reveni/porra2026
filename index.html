@@ -82,6 +82,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .race-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:.76rem;color:var(--muted)}
 .race-legend span{display:inline-flex;align-items:center;gap:6px}.race-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
 .race-board{display:grid;gap:8px;position:relative;z-index:0;overflow:visible}
+.race-board-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}
 .race-row{display:grid;grid-template-columns:34px minmax(82px,170px) 68px minmax(42px,1fr) 42px 42px;gap:9px;align-items:center;background:rgba(255,255,255,.04);
   border:1px solid rgba(122,252,208,.08);border-left:4px solid var(--runner);border-radius:10px;padding:7px 10px;min-width:0;
   position:relative;will-change:transform,box-shadow;transition:border-color .25s ease,background .25s ease}
@@ -414,6 +415,50 @@ footer .brand svg{height:20px;width:auto}
 @media(max-width:560px){.kp-duo{grid-template-columns:1fr}}
 
 @media(max-width:560px){.proto-shell-inner{padding:10px 14px}.proto-body{padding:0 14px}}
+/* user identity picker + personalization */
+.proto-user{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  color:var(--text);border-radius:999px;padding:6px 12px;font:700 .78rem 'Space Grotesk';cursor:pointer;max-width:160px}
+.proto-user .pu-dot{width:9px;height:9px;border-radius:50%;flex:none}
+.proto-user .pu-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:560px){.proto-user{max-width:44px;padding:6px 9px}.proto-user .pu-label{display:none}}
+.user-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,10,12,.72);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;padding:18px;opacity:0;pointer-events:none;transition:opacity .18s}
+.user-overlay.open{opacity:1;pointer-events:auto}
+.user-modal{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px;width:min(420px,100%);
+  box-shadow:0 24px 80px rgba(0,0,0,.55);max-height:min(88vh,560px);display:flex;flex-direction:column}
+.user-modal h3{font-size:1.15rem;margin-bottom:4px}
+.user-modal .sub{color:var(--muted);font-size:.88rem;margin-bottom:14px}
+.user-modal .search{max-width:none;margin-bottom:10px}
+.user-list{overflow-y:auto;display:flex;flex-direction:column;gap:4px;min-height:80px;max-height:240px;margin-bottom:14px}
+.user-option{border:1px solid transparent;background:rgba(255,255,255,.04);color:var(--text);border-radius:10px;
+  padding:10px 12px;font:600 .92rem 'Space Grotesk';cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px}
+.user-option:hover,.user-option.on{border-color:rgba(122,252,208,.35);background:rgba(122,252,208,.08)}
+.user-option .uo-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.user-actions{display:flex;flex-wrap:wrap;gap:8px}
+.user-actions button{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:10px;
+  padding:8px 12px;font:700 .78rem 'Space Grotesk';cursor:pointer}
+.user-actions button.primary{background:var(--mint);color:#001a1f;border-color:transparent}
+.is-me{box-shadow:0 0 0 1px rgba(122,252,208,.45)!important;background:rgba(122,252,208,.07)!important}
+.bar-row.is-me,.race-row.is-me{border-color:rgba(122,252,208,.55)!important}
+.race-row.is-me .bar-name{font-weight:800}
+.result-person.is-me{border-color:rgba(122,252,208,.55);background:rgba(122,252,208,.12)}
+.result-person.is-me b{color:var(--mint)}
+.ficha.is-me{border-color:rgba(122,252,208,.55);box-shadow:0 0 0 1px rgba(122,252,208,.25)}
+.mlabel.is-me{color:var(--mint);font-weight:700}
+.mcell.is-me{outline:2px solid var(--mint);outline-offset:-1px}
+.surv-name.is-me{color:var(--mint);font-weight:800}
+.me-summary{margin-bottom:22px}
+.me-summary-inner{background:linear-gradient(160deg,rgba(122,252,208,.1),rgba(0,0,0,.2));border:1px solid rgba(122,252,208,.28);
+  border-left:4px solid var(--me-color,var(--mint));border-radius:16px;padding:16px 18px}
+.me-summary-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.me-dot{width:11px;height:11px;border-radius:50%;background:var(--me-color,var(--mint));flex:none}
+.me-summary-stats{display:flex;flex-wrap:wrap;gap:14px 22px;margin-bottom:12px}
+.me-stat .lab{display:block;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.me-stat .val{font:800 1.1rem 'Space Grotesk';color:var(--mint)}
+.me-summary-link{border:0;background:transparent;color:var(--mint);font:700 .82rem 'Space Grotesk';cursor:pointer;padding:0}
+.race-me-pin{margin-bottom:8px}
+.race-me-pin-row{pointer-events:none}
+.kp-scatter circle.is-me{stroke:#fff;stroke-width:2.5}
 </style>
 </head>
 <body>
@@ -437,6 +482,211 @@ const logo = `<svg width="123" height="33" viewBox="0 0 123 33" fill="none" xmln
 `;
 let LANG = 'es';
 let wrap = null;
+
+/* ---- USER IDENTITY (localStorage + ?user=) ---- */
+const USER_KEY = 'porra2026.currentUser';
+const PICKER_DISMISS_KEY = 'porra2026.pickerDismissed';
+let ME = null;
+let _pickerEl = null;
+
+function participantNames(){
+  return ((D.matrix && D.matrix.names) || []).slice();
+}
+function isKnownParticipant(name){
+  return participantNames().includes(name);
+}
+function loadMe(){
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get('user');
+  if(fromUrl){
+    const decoded = decodeURIComponent(fromUrl);
+    if(isKnownParticipant(decoded)){
+      ME = decoded;
+      try { localStorage.setItem(USER_KEY, ME); } catch(e){}
+      params.delete('user');
+      const u = new URL(location.href);
+      u.search = params.toString();
+      history.replaceState(null, '', u.pathname + (u.search ? '?' + u.search : '') + u.hash);
+      return;
+    }
+  }
+  try {
+    const stored = localStorage.getItem(USER_KEY);
+    if(stored && isKnownParticipant(stored)) ME = stored;
+    else {
+      if(stored){
+        localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(PICKER_DISMISS_KEY);
+      }
+      ME = null;
+    }
+  } catch(e){ ME = null; }
+}
+function saveMe(name){
+  ME = name || null;
+  try {
+    if(ME) localStorage.setItem(USER_KEY, ME);
+    else localStorage.removeItem(USER_KEY);
+    localStorage.setItem(PICKER_DISMISS_KEY, '1');
+  } catch(e){}
+}
+function dismissPicker(){
+  try { localStorage.setItem(PICKER_DISMISS_KEY, '1'); } catch(e){}
+}
+function pickerDismissed(){
+  try { return localStorage.getItem(PICKER_DISMISS_KEY) === '1'; } catch(e){ return false; }
+}
+function isMe(name){ return !!(ME && name === ME); }
+function meClass(name){ return isMe(name) ? ' is-me' : ''; }
+function meCard(){
+  if(!ME) return null;
+  return (D.cards || []).find(c => c.name === ME) || null;
+}
+function meLiveRow(){
+  if(!ME || !D.live || !D.live.table) return null;
+  return D.live.table.find(r => r.name === ME) || null;
+}
+function sortPeople(arr){
+  return [...arr].sort((a,b) => {
+    if(isMe(a.name)) return -1;
+    if(isMe(b.name)) return 1;
+    return a.name.localeCompare(b.name, LANG === 'es' ? 'es' : 'en');
+  });
+}
+function userBarHtml(){
+  const dot = ME ? `<span class="pu-dot" style="background:${personColor(ME)}"></span>` : '';
+  const short = ME && ME.length > 14 ? ME.slice(0, 13) + '…' : ME;
+  const label = ME ? esc(short) : L('¿Quién eres?', 'Who are you?');
+  return `<button type="button" class="proto-user" data-action="open-user-picker">${dot}<span class="pu-label">${label}</span></button>`;
+}
+function ensureUserPicker(){
+  if(_pickerEl) return _pickerEl;
+  _pickerEl = el('div', 'user-overlay');
+  _pickerEl.id = 'user-picker';
+  _pickerEl.innerHTML = `<div class="user-modal" role="dialog" aria-modal="true">
+    <h3>${L('¿Quién eres en la porra?', 'Who are you in the pool?')}</h3>
+    <p class="sub">${L('Elige tu nombre para resaltar tu ranking, picks y ficha.', 'Pick your name to highlight your ranking, picks and card.')}</p>
+    <input type="search" class="search user-search" autocomplete="off" placeholder="${L('🔎 Busca tu nombre…', '🔎 Search your name…')}">
+    <div class="user-list"></div>
+    <div class="user-actions">
+      <button type="button" class="primary" data-pick-confirm disabled>${L('Confirmar', 'Confirm')}</button>
+      <button type="button" data-pick-spectator>${L('Solo miro', 'Just browsing')}</button>
+      <button type="button" data-pick-later>${L('Ahora no', 'Not now')}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(_pickerEl);
+  const modal = _pickerEl.querySelector('.user-modal');
+  const inp = _pickerEl.querySelector('.user-search');
+  const list = _pickerEl.querySelector('.user-list');
+  const confirmBtn = _pickerEl.querySelector('[data-pick-confirm]');
+  let selected = ME;
+  function renderList(){
+    const q = inp.value.toLowerCase().trim();
+    const names = participantNames().filter(n => !q || n.toLowerCase().includes(q));
+    list.innerHTML = names.length
+      ? names.map(n => `<button type="button" class="user-option${n === selected ? ' on' : ''}" data-name="${esc(n)}">
+          <span class="uo-dot" style="background:${personColor(n)}"></span>${esc(n)}</button>`).join('')
+      : `<span class="muted" style="padding:8px">${L('Sin coincidencias', 'No matches')}</span>`;
+    confirmBtn.disabled = !selected || !names.includes(selected);
+  }
+  function closePicker(){
+    _pickerEl.classList.remove('open');
+    selected = ME;
+  }
+  function openPicker(){
+    selected = ME;
+    inp.value = '';
+    renderList();
+    _pickerEl.classList.add('open');
+    inp.focus();
+  }
+  inp.addEventListener('input', () => {
+    const q = inp.value.toLowerCase().trim();
+    const first = participantNames().find(n => !q || n.toLowerCase().includes(q));
+    selected = first || null;
+    renderList();
+  });
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      const first = list.querySelector('.user-option');
+      if(first && first.dataset.name){ selected = first.dataset.name; confirmBtn.click(); }
+    }
+    if(e.key === 'Escape'){ dismissPicker(); closePicker(); }
+  });
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('.user-option');
+    if(!btn) return;
+    selected = btn.dataset.name;
+    renderList();
+  });
+  confirmBtn.addEventListener('click', () => {
+    if(!selected) return;
+    saveMe(selected);
+    closePicker();
+    rebuild();
+  });
+  _pickerEl.querySelector('[data-pick-spectator]').addEventListener('click', () => {
+    saveMe(null);
+    closePicker();
+    rebuild();
+  });
+  _pickerEl.querySelector('[data-pick-later]').addEventListener('click', () => {
+    dismissPicker();
+    closePicker();
+  });
+  _pickerEl.addEventListener('click', e => {
+    if(e.target === _pickerEl){ dismissPicker(); closePicker(); }
+  });
+  modal.addEventListener('click', e => e.stopPropagation());
+  _pickerEl.openPicker = openPicker;
+  return _pickerEl;
+}
+function showUserPicker(){ ensureUserPicker().openPicker(); }
+function maybeShowUserPicker(){
+  if(!ME && !pickerDismissed()) showUserPicker();
+}
+function buildMeSummary(parent){
+  if(!ME || !parent) return;
+  const row = meLiveRow();
+  const card = meCard();
+  const stats = [];
+  if(row){
+    stats.push(`<div class="me-stat"><span class="lab">${L('Puesto', 'Rank')}</span><span class="val">#${row.rank}</span></div>`);
+    stats.push(`<div class="me-stat"><span class="lab">${L('Puntos', 'Points')}</span><span class="val">${row.pts}</span></div>`);
+    if(row.delta) stats.push(`<div class="me-stat"><span class="lab">${L('Último mov.', 'Last move')}</span><span class="val">${row.delta > 0 ? '+' : ''}${row.delta}</span></div>`);
+  }
+  if(card){
+    stats.push(`<div class="me-stat"><span class="lab">${L('Gemelo', 'Twin')}</span><span class="val">${esc(card.twin)}</span></div>`);
+    stats.push(`<div class="me-stat"><span class="lab">${L('Rebeldía', 'Maverick')}</span><span class="val">#${card.rebel_rank}</span></div>`);
+  }
+  const statsHtml = stats.length
+    ? stats.join('')
+    : `<span class="muted">${L('Sin datos en directo todavía', 'No live data yet')}</span>`;
+  const banner = el('div', 'me-summary reveal',
+    `<div class="me-summary-inner" style="--me-color:${personColor(ME)}">
+      <div class="me-summary-head"><span class="me-dot"></span><b>${esc(ME)}</b><span class="muted">${L('Tu resumen', 'Your summary')}</span></div>
+      <div class="me-summary-stats">${statsHtml}</div>
+      <button type="button" class="me-summary-link" data-goto-ficha>${L('Ver tu ficha →', 'See your card →')}</button>
+    </div>`);
+  banner.querySelector('[data-goto-ficha]').addEventListener('click', () => {
+    const u = new URL(location.href);
+    u.searchParams.set('view', 'groups');
+    u.hash = 'fichas';
+    history.replaceState(null, '', u);
+    rebuild();
+  });
+  parent.appendChild(banner);
+}
+function afterRenderMeHooks(view){
+  if(view !== 'groups' || !ME) return;
+  if(location.hash !== '#fichas') return;
+  requestAnimationFrame(() => {
+    const ficha = document.querySelector('#fichas .ficha.is-me');
+    const inp = document.querySelector('#fichas .search');
+    if(inp && !inp.value) inp.value = ME;
+    if(ficha) setTimeout(() => ficha.scrollIntoView({behavior:'smooth', block:'center'}), 400);
+  });
+}
 
 function L(es, en){ return LANG === 'es' ? es : en; }
 function team(es){ return LANG === 'es' ? es : (ES2EN[es] || es); }
@@ -621,10 +871,14 @@ function buildLiveRanking(s){
           <span><i class="race-dot" style="background:var(--gold)"></i>${L('pts del partido','match pts')}</span>
         </div>
       </div>
-      <div class="race-board"></div>
+      <div class="race-board-wrap">
+        <div class="race-me-pin" hidden></div>
+        <div class="race-board"></div>
+      </div>
     </div>`);
   const input = card.querySelector('input');
   const board = card.querySelector('.race-board');
+  const mePin = card.querySelector('.race-me-pin');
   const match = card.querySelector('.race-match');
   const date = card.querySelector('.race-date');
   const step = card.querySelector('.race-step');
@@ -652,7 +906,8 @@ function buildLiveRanking(s){
     return rects;
   }
   function rowHtml(r,i){
-    return `<div class="race-row ${i===0?'leader':''} ${r.delta>0?'moved-up':(r.delta<0?'moved-down':'')}" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || personColor(r.name)}">
+    const me = isMe(r.name) ? ' is-me' : '';
+    return `<div class="race-row${me} ${i===0?'leader':''} ${r.delta>0?'moved-up':(r.delta<0?'moved-down':'')}" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || personColor(r.name)}">
       <div class="bar-rank">${r.rank}</div>
       <div class="bar-name">${esc(r.name)}</div>
       ${rankDeltaLong(r)}
@@ -661,6 +916,23 @@ function buildLiveRanking(s){
       <div class="race-round">+${r.round_pts || 0}</div>
       ${rankTip(r)}
     </div>`;
+  }
+  function racePinHtml(r){
+    return `<div class="race-row is-me race-me-pin-row" data-name="${esc(r.name)}" style="--runner:${colors[r.name] || personColor(r.name)}">
+      <div class="bar-rank">${r.rank}</div>
+      <div class="bar-name">${L('Tú', 'You')}: ${esc(r.name)}</div>
+      ${rankDeltaLong(r)}
+      <div class="bar-track"><div class="race-fill" style="width:${(r.pts/mx*100).toFixed(1)}%"></div></div>
+      <div class="bar-val">${r.pts}</div>
+      <div class="race-round">+${r.round_pts || 0}</div>
+    </div>`;
+  }
+  function updateMePin(snap){
+    if(!mePin || !ME){ if(mePin) mePin.hidden = true; return; }
+    const r = snap.table.find(x => x.name === ME);
+    if(!r){ mePin.hidden = true; return; }
+    mePin.hidden = false;
+    mePin.innerHTML = racePinHtml(r);
   }
   function animateRowsFrom(previousRects){
     if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
@@ -701,6 +973,7 @@ function buildLiveRanking(s){
       <span><b>${movers}</b>${L('movimientos','moves')}</span>
       <span><b>+${pointsNow}</b>${L('pts repartidos','pts awarded')}</span>`;
     board.innerHTML = snap.table.map(rowHtml).join('');
+    updateMePin(snap);
     requestAnimationFrame(() => animateRowsFrom(previousRects));
   }
   input.addEventListener('input', () => { stopPlaying(); paint(); });
@@ -878,14 +1151,14 @@ function todayPicksHtml(picks, match){
     }
     buckets[key].push(p);
   });
-  const sort = arr => [...arr].sort((a,b) => a.name.localeCompare(b.name, LANG==='es' ? 'es' : 'en'));
+  const sort = arr => sortPeople(arr);
   const pill = p => {
     const score = p.home != null ? `${p.home}-${p.away}` : '–';
     let extra = '';
     if(knockout && p.home != null && p.away != null && p.home === p.away && p.winner){
       extra = ` · ${p.winner_flag || ''} ${esc(team(p.winner))}`;
     }
-    return `<span class="result-person"><b>${esc(p.name)}</b><span>${score}${extra}</span></span>`;
+    return `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${score}${extra}</span></span>`;
   };
   const people = arr => arr.length
     ? arr.map(pill).join('')
@@ -1039,7 +1312,7 @@ function buildUltimos(){
   s.appendChild(el('div','muted reveal', `${recent.length} ${L('últimos de','latest of')} ${D.recent_results.total} ${L('partidos jugados','finished matches')}`));
   recent.forEach(m => {
     const people = arr => arr.length
-      ? arr.map(p => `<span class="result-person"><b>${esc(p.name)}</b><span>${esc(p.pick)}</span></span>`).join('')
+      ? arr.map(p => `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${esc(p.pick)}</span></span>`).join('')
       : `<span class="muted">${L('Nadie','Nobody')}</span>`;
     const dateObj = new Date(m.date + 'T12:00:00');
     const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', {day:'numeric', month:'short'});
@@ -1092,7 +1365,7 @@ function buildRebeldia(){
   R.forEach((r,i) => {
     const badge = i===0?'🐺 ':(i===R.length-1?'🐑 ':'');
     const cls = i===R.length-1?'gold':'';
-    list.appendChild(el('div','bar-row',
+    list.appendChild(el('div','bar-row'+meClass(r.name),
       `<div class="bar-rank">${i+1}</div><div class="bar-name">${badge}${esc(r.name)}</div>
        <div class="bar-track"><div class="bar-fill ${cls}" data-w="${(r.index/max*100).toFixed(1)}"></div></div>
        <div class="bar-val" data-count="${r.index}" data-decimals="1">0</div>`));
@@ -1117,18 +1390,19 @@ function buildAfinidad(){
       <div class="muted">${L('los que más se contradicen (distancia media '+wp.dist+' goles por partido)','the most contradictory pair (avg distance '+wp.dist+' goals per match)')}</div></div>`;
   s.appendChild(duo);
   const names = D.matrix.names, sim = D.matrix.sim;
+  const meIdx = ME ? names.indexOf(ME) : -1;
   let mx = 0; for(let i=0;i<N;i++) for(let j=0;j<N;j++) if(i!==j) mx = Math.max(mx, sim[i][j]);
   const wrapm = el('div','matrix-wrap reveal');
   const grid = el('div','matrix');
   grid.style.gridTemplateColumns = `120px repeat(${N},19px)`;
   grid.appendChild(el('div','mlabel'));
-  names.forEach(n => grid.appendChild(el('div','mlabel col', esc(n))));
+  names.forEach((n,j) => grid.appendChild(el('div','mlabel col'+meClass(n), esc(n))));
   for(let i=0;i<N;i++){
-    grid.appendChild(el('div','mlabel row', esc(names[i])));
+    grid.appendChild(el('div','mlabel row'+meClass(names[i]), esc(names[i])));
     for(let j=0;j<N;j++){
       if(i===j){ grid.appendChild(el('div','mcell mdiag')); continue; }
       const v = sim[i][j], a = mx ? Math.max(.05, v/mx) : 0;
-      const c = el('div','mcell');
+      const c = el('div','mcell'+(i===meIdx||j===meIdx?' is-me':''));
       c.style.background = `rgba(122,252,208,${a.toFixed(3)})`;
       c.dataset.t = `${esc(names[i])} ↔ ${esc(names[j])} · ${v}% ${L('idénticos','identical')}`;
       grid.appendChild(c);
@@ -1163,7 +1437,7 @@ function buildEstilo(){
   const list = el('div','reveal'); list.style.marginTop = '22px';
   const mxg = st[0].avg_goals;
   list.appendChild(el('div','k', L('Media de goles por quiniela','Average goals per prediction')));
-  st.forEach((r,i) => list.appendChild(el('div','bar-row',
+  st.forEach((r,i) => list.appendChild(el('div','bar-row'+meClass(r.name),
     `<div class="bar-rank">${i+1}</div><div class="bar-name">${esc(r.name)}</div>
      <div class="bar-track"><div class="bar-fill" data-w="${(r.avg_goals/mxg*100).toFixed(1)}"></div></div>
      <div class="bar-val" data-count="${r.avg_goals}" data-decimals="2">0</div>`)));
@@ -1291,7 +1565,7 @@ function koScoringBlock(k){
   const ranking = el('div','card reveal');
   const mx = k.scoring.table[0].pts || 1;
   ranking.innerHTML = `<span class="k">${L('Marcador eliminatorio','Knockout scoring')}</span>`;
-  k.scoring.table.slice(0,12).forEach(r => ranking.appendChild(el('div','bar-row',
+  k.scoring.table.slice(0,12).forEach(r => ranking.appendChild(el('div','bar-row'+meClass(r.name),
     `<div class="bar-rank">${r.rank}</div><div class="bar-name">${r.rank===1?'👑 ':''}${esc(r.name)}
       <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.advance} ${L('pases/premios','advances/awards')})</span></div>
      <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
@@ -1353,7 +1627,7 @@ function buildLobo(){
       'Scorelines only ONE person predicted in the whole pool. The more you have, the further from the flock you roam.'));
   const mx = D.lobo[0].count;
   const list = el('div','reveal');
-  D.lobo.forEach((r,i) => list.appendChild(el('div','bar-row',
+  D.lobo.forEach((r,i) => list.appendChild(el('div','bar-row'+meClass(r.name),
     `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'🐺 ':''}${esc(r.name)}</div>
      <div class="bar-track"><div class="bar-fill" data-w="${(r.count/mx*100).toFixed(1)}"></div></div>
      <div class="bar-val" data-count="${r.count}">0</div>`)));
@@ -1372,11 +1646,12 @@ function buildFichas(){
     L('Resumen por persona: su puesto en rebeldía, su estilo, su gemelo y su apuesta más loca. Busca tu nombre.',
       'A summary per person: their maverick rank, style, twin and wildest bet. Search your name.'));
   const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  if(ME) inp.value = ME;
   s.appendChild(inp);
   const grid = el('div','grid g3 reveal');
   D.cards.slice().sort((a,b) => a.rebel_rank-b.rebel_rank).forEach(c => {
     const big = c.biggest ? `${c.biggest.flags} ${esc(team(c.biggest.home))} ${c.biggest.score} ${esc(team(c.biggest.away))}` : '–';
-    const card = el('div','ficha'); card.dataset.name = c.name.toLowerCase();
+    const card = el('div','ficha'+meClass(c.name)); card.dataset.name = c.name.toLowerCase();
     card.innerHTML = `
       <div class="fh"><div><div class="fn">${esc(c.name)}</div><div class="lab">${labelOf(c.label)}</div></div>
         <div class="rk">#${c.rebel_rank}<br>${L('rebeldía','maverick')}</div></div>
@@ -1492,9 +1767,12 @@ function buildTopBar(activeView){
     `<div class="proto-shell-inner">
        <a class="brand" href="#" data-view="live">${logo}</a>
        <div class="proto-tabs">${tabs}</div>
+       ${userBarHtml()}
        ${langBar()}
      </div>`);
   bar.addEventListener('click', e => {
+    const ub = e.target.closest('[data-action="open-user-picker"]');
+    if(ub){ showUserPicker(); return; }
     const lb = e.target.closest('button[data-l]');
     if(lb){ if(lb.dataset.l !== LANG){ LANG = lb.dataset.l; rebuild(); } return; }
     const t = e.target.closest('[data-view]');
@@ -1508,7 +1786,14 @@ function renderView(view){
     buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
     buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
   }
-  else { buildHoy(); buildAciertos(); buildUltimos(); }
+  else {
+    if(ME){
+      const meSec = el('section','sec'); meSec.id = 'me-resumen';
+      buildMeSummary(meSec);
+      wrap.appendChild(meSec);
+    }
+    buildHoy(); buildAciertos(); buildUltimos();
+  }
 }
 
 /* ---- BRACKET VISUALIZATION ----
@@ -1809,7 +2094,7 @@ function koBracketPrecisionCard(){
   const head = `<div class="surv-head"></div>` + rounds.map(r => `<div class="surv-head">${r}</div>`).join('');
   const body = rows.map(p => {
     const cells = (p.bracket || []).map((cell, i) => koBracketCellHtml(cell, rounds[i])).join('');
-    return `<div class="surv-name">${esc(p.name)}</div>${cells}`;
+    return `<div class="surv-name${meClass(p.name)}">${esc(p.name)}</div>${cells}`;
   }).join('');
   const legend = `<div class="surv-legend">
     <span><i class="lg-grad"></i>${L('Proporcional a la fase (1 fallo en 16 ≠ todo rojo)','Scaled to the round (1 miss in 16 ≠ all red)')}</span>
@@ -1909,7 +2194,7 @@ function koScatter(people){
   const dots = people.map(p => {
     const expLbl = p.expApprox ? L('pts esp. (aprox.)','exp pts (approx.)') : L('pts KO','KO pts');
     const info = `${p.exp} ${expLbl} · ${L('riesgo','risk')} ${p.variance}/100 · ${p.boldPct}% ${L('fuera del consenso','off consensus')}`;
-    return `<circle data-name="${esc(p.name)}" data-info="${esc(info)}" data-color="${personColor(p.name)}" cx="${X(p.exp).toFixed(1)}" cy="${Y(p.variance).toFixed(1)}" r="6" fill="${personColor(p.name)}" opacity=".85"></circle>`;
+    return `<circle class="${isMe(p.name)?'is-me':''}" data-name="${esc(p.name)}" data-info="${esc(info)}" data-color="${personColor(p.name)}" cx="${X(p.exp).toFixed(1)}" cy="${Y(p.variance).toFixed(1)}" r="${isMe(p.name)?7:6}" fill="${personColor(p.name)}" opacity=".85"></circle>`;
   }).join('');
   const xLbl = approx ? L('puntos esperados (aprox.) →','expected pts (approx.) →') : L('puntos KO →','KO points →');
   return `<svg class="kp-scatter" viewBox="0 0 ${W} ${H}">
@@ -1965,7 +2250,7 @@ function koChampBarsHtml(dz){
 function koBoldBarsHtml(dz){
   if(!dz.boldRank || !dz.boldRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
   const mx = dz.boldRank[0].boldPct || 1;
-  return dz.boldRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+  return dz.boldRank.slice(0,8).map((p,i) => `<div class="bar-row${meClass(p.name)}"><div class="bar-rank">${i+1}</div>
       <div class="bar-name" style="color:${personColor(p.name)}">${esc(p.name)}</div>
       <div class="bar-track"><div class="bar-fill" data-w="${mx ? (p.boldPct/mx*100).toFixed(0) : 0}"></div></div>
       <div class="bar-val">${p.boldPct}%</div></div>`).join('');
@@ -1993,12 +2278,13 @@ function koFichasBody(dz){
   (dz.twins || []).forEach(t => { if(!twinOf[t.a]) twinOf[t.a] = {name:t.b, sim:t.sim}; if(!twinOf[t.b]) twinOf[t.b] = {name:t.a, sim:t.sim}; });
   const box = el('div','kp-fichas-wrap');
   const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  if(ME) inp.value = ME;
   const grid = el('div','grid g3');
   dz.people.slice().sort((a,b) => a.name.localeCompare(b.name,'es')).forEach(p => {
     const survives = p.fell >= dz.rounds.length;
     const fellTxt = survives ? L('aguanta hasta el final','lasts to the end') : koRoundLabel(dz.rounds[p.fell]);
     const tw = twinOf[p.name];
-    const card = el('div','ficha'); card.dataset.name = p.name.toLowerCase();
+    const card = el('div','ficha'+meClass(p.name)); card.dataset.name = p.name.toLowerCase();
     card.innerHTML = `
       <div class="fh"><div><div class="fn">${esc(p.name)}</div><div class="lab">🏆 ${esc(team(p.champ[0]))}</div></div>
         <div class="rk">${p.exp}<br>${p.expApprox ? L('pts esp.','exp pts') : L('pts KO','KO pts')}</div></div>
@@ -2186,6 +2472,7 @@ function buildKoStoryBody(){
 /* ---- BUILD / REBUILD ---- */
 function rebuild(){
   clearRaceTimer();
+  loadMe();
   if(wrap) wrap.remove();
   wrap = el('div','wrap'); document.body.appendChild(wrap);
   const view = currentView();
@@ -2196,7 +2483,11 @@ function rebuild(){
   wrap = prevWrap;
   buildFooter();
   observeAll();
+  maybeShowUserPicker();
+  afterRenderMeHooks(view);
 }
+ensureUserPicker();
+loadMe();
 rebuild();
 </script>
 </body>
