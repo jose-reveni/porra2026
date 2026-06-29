@@ -4343,7 +4343,9 @@ function meTodayOutcome(m){
   if(!ME) return null;
   const pick = mePickInMatch(m);
   if(!pick || pick.home == null || !m.result) return null;
-  const rh = m.result.home, ra = m.result.away;
+  const resultScore = m.result.score || m.result;
+  const rh = resultScore.home, ra = resultScore.away;
+  if(rh == null || ra == null) return null;
   const ph = pick.home, pa = pick.away;
   const pickStr = `${ph}-${pa}`;
   if(ph === rh && pa === ra) return {kind:'exact', pick: pickStr};
