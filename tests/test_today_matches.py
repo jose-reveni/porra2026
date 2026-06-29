@@ -548,3 +548,102 @@ class TestKnockoutData:
         assert stake["max_one"] == 6
         assert stake["picks"] == 2
         assert stake["people"][0]["max_pts"] == 6
+
+    def test_knockout_phase3_metrics(self, computed_data):
+        metrics = computed_data["knockout"]["metrics"]
+        assert "honors" in metrics
+        assert "championPath" in metrics
+        assert "vsPuebloRank" in metrics
+        assert metrics["expApprox"] is False
+        person = metrics["people"][0]
+        assert {"variance", "vsPueblo", "vsPuebloTotal", "boldPct", "reventador", "expApprox"} <= set(person)
+        assert 0 <= person["variance"] <= 100
+        assert metrics["honors"]["profeta"]["name"]
+        assert metrics["honors"]["agorero"]["name"]
+        assert metrics["honors"]["manual"]["name"]
+
+    def test_ko_risk_reward_uses_consensus_share(self):
+        data = {
+            "names": ["Ana", "Bob", "Cara"],
+            "n": 3,
+            "qualifiers": {},
+            "knockout_results": {"matches": {}, "outright": {}, "awards": {}},
+            "knockouts": {
+                "rounds": [{
+                    "key": "r32",
+                    "label_es": "Dieciseisavos",
+                    "label_en": "Round of 32",
+                    "advance_points": 1,
+                    "matches": [{
+                        "code": "R32-M1",
+                        "fixture_home": "Mexico",
+                        "fixture_away": "South Africa",
+                        "score_picks": [(1, 0), (1, 0), (0, 1)],
+                        "winner_picks": ["Mexico", "Mexico", "South Africa"],
+                    }],
+                }],
+                "final_matches": [],
+                "outright": {
+                    "champion": {
+                        "label_es": "Campeón",
+                        "label_en": "Champion",
+                        "points": 12,
+                        "picks": ["Mexico", "Mexico", "South Africa"],
+                    }
+                },
+                "awards": {},
+            },
+        }
+        metrics = gd.compute_knockout_metrics(data)
+        ana = next(p for p in metrics["people"] if p["name"] == "Ana")
+        cara = next(p for p in metrics["people"] if p["name"] == "Cara")
+        assert ana["variance"] < cara["variance"]
+        assert ana["exp"] > cara["exp"]
+        assert metrics["expApprox"] is True
+        assert metrics["honors"]["agorero"]["name"] == "Cara"
+        assert metrics["honors"]["manual"]["name"] in ("Ana", "Bob")
+
+    def test_ko_champion_path_follows_consensus(self):
+        data = {
+            "names": ["A", "B"],
+            "n": 2,
+            "qualifiers": {},
+            "knockout_results": {"matches": {}, "outright": {}, "awards": {}},
+            "knockouts": {
+                "rounds": [{
+                    "key": "r32",
+                    "label_es": "Dieciseisavos",
+                    "label_en": "Round of 32",
+                    "advance_points": 1,
+                    "matches": [{
+                        "code": "R32-M1",
+                        "fixture_home": "Spain",
+                        "fixture_away": "France",
+                        "score_picks": [(1, 0), (1, 0)],
+                        "winner_picks": ["Spain", "Spain"],
+                    }],
+                }],
+                "final_matches": [],
+                "outright": {
+                    "champion": {
+                        "label_es": "Campeón",
+                        "label_en": "Champion",
+                        "points": 12,
+                        "picks": ["Spain", "Spain"],
+                    }
+                },
+                "awards": {},
+            },
+        }
+        metrics = gd.compute_knockout_metrics(data)
+        assert metrics["championTeam"] == "España"
+        assert len(metrics["championPath"]) == 1
+        assert metrics["championPath"][0]["opponent"] == "Francia"
+
+    def test_knockout_dashboard_has_phase3_ui(self):
+        assert "koChampionPathHtml" in gd.JS
+        assert "koHonorsHtml" in gd.JS
+        assert "koVsPuebloHtml" in gd.JS
+        assert "attachBracketHovers" in gd.JS
+        assert "koBoldBarsHtml" in gd.JS
+        assert "Acto 10" in gd.JS

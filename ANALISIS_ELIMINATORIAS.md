@@ -60,6 +60,9 @@ En `generate_dashboard.py`:
 | **`compute_ko_progression`** | Ranking KO partido a partido (`D.knockout.progression`) | ✅ **Fase 2** |
 | **`_ko_champion_fell_round`** | Supervivencia del campeón predicho | ✅ **Fase 2** |
 | **`_ko_person_bracket_rounds`** | Precisión del cuadro por fase + desvío en rama | ✅ **Fase 2** |
+| **`_ko_person_risk_reward`** | Riesgo/recompensa con prob. implícita del consenso | ✅ **Fase 3** |
+| **`_ko_champion_path`** | Camino del campeón consensual | ✅ **Fase 3** |
+| **`_compute_ko_honors`** | Premios honoríficos KO (`metrics.honors`) | ✅ **Fase 3** |
 
 ### Vista producción (`?view=ko`)
 
@@ -127,15 +130,40 @@ conviven con la progression KO dedicada en el relato.
 
 ---
 
-## 5. Qué sigue aproximado / pendiente (Fase 3)
+## 5. Fase 3 — Implementada
 
-| Pieza | Motivo |
+### 5.1 Riesgo/recompensa con probabilidad implícita
+
+- **`variance`**: índice 0–100 derivado de `(1 − share)` por pick vs consenso (marcador + ganador + premios).
+- **`exp`**: pts reales del ranking KO si hay resultados; si no, suma ponderada por alineación con el consenso.
+- **`expApprox`**: flag global y por persona cuando los pts son estimación.
+
+### 5.2 Pueblo vs individuos
+
+- **`people[].vsPueblo`**: cruces donde el ganador predicho ≠ consenso.
+- **`vsPuebloRank`**: ranking de distancia al cuadro del pueblo.
+- UI: Acto 3b del relato.
+
+### 5.3 Camino del campeón
+
+- **`championPath`**: ruta del campeón consensual a través del cuadro del pueblo.
+- UI: debajo del bracket en Acto 1.
+
+### 5.4 Premios honoríficos KO (`metrics.honors`)
+
+| Premio | Criterio |
 |---|---|
-| **Riesgo/recompensa** (scatter) | `variance` = picks contra consenso, no probabilidad implícita |
-| **`exp` sin resultados KO** | Aproximación; con resultados = puntos reales |
-| Progression KO multi-jornada rica | Crece sola; con 1 partido hay un solo paso |
-| Bracket pueblo vs individuos, reventador, camino del campeón | Extras Fase 3 |
-| Premios honoríficos KO | El agorero, el manual, etc. |
+| El Profeta | Líder pts KO (o mayor `exp` si no hay resultados) |
+| El Agorero | Mayor riesgo / más contrario al consenso |
+| El de manual | Menor riesgo / más alineado con el pueblo |
+| El Reventador | Sorpresas acertadas (underdog ganó y lo predijiste) |
+| Contra el pueblo | Más cruces distintos al consenso |
+
+UI: Acto 10 del relato.
+
+### 5.5 Progression multi-jornada
+
+- Con varios partidos KO jugados, timeline compacto encima del bloque subidón/batacazo.
 
 ---
 

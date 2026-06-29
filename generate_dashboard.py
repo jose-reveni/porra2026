@@ -1997,6 +1997,188 @@ def _ko_depth_row(team_name, raw, n):
     }
 
 
+def _ko_consensus_w_map(raw, n):
+    """Cuadro del pueblo: ganador modal por cruce → mapa W## → team key."""
+    w_map = {}
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            consensus = _text_consensus(match["winner_picks"], n).get("value")
+            if w and consensus:
+                w_map[w] = _cmp_team(consensus)
+    return w_map
+
+
+def _ko_pick_share(picks, pick, n):
+    """Probabilidad implícita del consenso para un pick (0–1)."""
+    filled = [p for p in picks if p]
+    if not pick or not filled:
+        return 0.0
+    key = _cmp_text(team_es(pick))
+    counter = Counter(_cmp_text(team_es(p)) for p in filled)
+    return counter.get(key, 0) / len(filled)
+
+
+def _ko_scoreline_share(picks, h, a):
+    filled = [(x, y) for x, y in picks if x is not None and y is not None]
+    if h is None or a is None or not filled:
+        return 0.0
+    counter = Counter(f"{x}-{y}" for x, y in filled)
+    return counter.get(f"{h}-{a}", 0) / len(filled)
+
+
+def _ko_person_risk_reward(i, raw, n, outright, awards_meta, score_row, has_scoring):
+    """Riesgo (contrarianismo vs consenso) y pts esperados por alineación implícita."""
+    raw_risk = 0.0
+    risk_n = 0.0
+    exp = 0.0
+
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            pick = match["winner_picks"][i] if match.get("winner_picks") else None
+            if pick:
+                share = _ko_pick_share(match["winner_picks"], pick, n)
+                raw_risk += 1.0 - share
+                risk_n += 1.0
+                exp += rnd["advance_points"] * share
+            h, a = match["score_picks"][i]
+            if h is not None:
+                share = _ko_scoreline_share(match["score_picks"], h, a)
+                raw_risk += (1.0 - share) * 0.5
+                risk_n += 0.5
+                exp += 5.0 * share
+
+    for meta in outright.values():
+        pick = meta["picks"][i]
+        if pick:
+            share = _ko_pick_share(meta["picks"], pick, n)
+            raw_risk += 1.0 - share
+            risk_n += 1.0
+            exp += meta["points"] * share
+
+    for meta in awards_meta.values():
+        pick = meta["picks"][i]
+        if pick:
+            share = _ko_pick_share(meta["picks"], pick, n)
+            raw_risk += 1.0 - share
+            risk_n += 1.0
+            exp += meta["points"] * share
+
+    avg_risk = raw_risk / risk_n if risk_n else 0.0
+    if has_scoring:
+        exp = score_row.get("pts", 0)
+    return avg_risk, round(exp, 1)
+
+
+def _ko_person_vs_pueblo(i, raw, n):
+    diffs = total = 0
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            consensus = _text_consensus(match["winner_picks"], n).get("value")
+            pick = match["winner_picks"][i] if match.get("winner_picks") else None
+            if not consensus or not pick:
+                continue
+            total += 1
+            if _cmp_team(pick) != _cmp_team(consensus):
+                diffs += 1
+    return diffs, total
+
+
+def _ko_reventador_counts(data, prestige):
+    counts = [0] * data["n"]
+    results = data["knockout_results"]["matches"]
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            result = results.get(match["code"])
+            if not result or not result.get("winner"):
+                continue
+            home_es, away_es = _ko_team_pair(match)
+            if not home_es:
+                continue
+            underdog = _ko_underdog_key(home_es, away_es, prestige)
+            if _cmp_team(result["winner"]) != underdog:
+                continue
+            for i, pick in enumerate(match["winner_picks"]):
+                if pick and _cmp_text(pick) == underdog:
+                    counts[i] += 1
+    return counts
+
+
+def _ko_champion_path(champ_team, raw, n):
+    """Camino del campeón consensual a través del cuadro del pueblo."""
+    if not champ_team:
+        return []
+    champ_key = _cmp_team(champ_team)
+    w_map = _ko_consensus_w_map(raw, n)
+    path = []
+
+    for rnd in raw["rounds"]:
+        for match in rnd["matches"]:
+            pair = _ko_fixture_pair(match, w_map)
+            if not pair or champ_key not in pair:
+                continue
+            opp_key = pair[0] if pair[1] == champ_key else pair[1]
+            opp_name = opp_flag = None
+            for side in ("home", "away"):
+                val = match.get(f"fixture_{side}", "")
+                if val and not str(val).startswith("W") and _cmp_team(val) == opp_key:
+                    opp_name = team_es(val)
+                    opp_flag = team_flag(val)
+                    break
+            if not opp_name:
+                for side in ("home", "away"):
+                    val = match.get(f"fixture_{side}", "")
+                    wm = re.match(r"^W(\d+)$", str(val))
+                    if wm:
+                        resolved = w_map.get(int(wm.group(1)))
+                        if resolved == opp_key:
+                            opp_name = team_es(resolved)
+                            opp_flag = team_flag(resolved)
+                            break
+            w = ko_w_number(match["code"])
+            winner = w_map.get(w)
+            path.append({
+                "code": match["code"],
+                "round_es": rnd["label_es"],
+                "round_en": rnd["label_en"],
+                "opponent": opp_name or opp_key,
+                "opponent_flag": opp_flag or "🏳️",
+                "agreement": round(_ko_pick_share(match["winner_picks"], champ_team, n) * 100, 1),
+            })
+            if winner != champ_key:
+                break
+    return path
+
+
+def _compute_ko_honors(names, people, reventador, scoring_table):
+    risk_rank = sorted(people, key=lambda p: (-p["variance"], p["name"].lower()))
+    manual = risk_rank[-1] if risk_rank else None
+    agorero = risk_rank[0] if risk_rank else None
+    vs_rank = sorted(people, key=lambda p: (-p["boldPct"], p["name"].lower()))
+    reventador_rank = sorted(
+        [{"name": names[i], "count": c} for i, c in enumerate(reventador) if c],
+        key=lambda x: (-x["count"], x["name"].lower()),
+    )
+    rev = reventador_rank[0] if reventador_rank else {"name": "–", "count": 0}
+    if scoring_table:
+        prophet = {"name": scoring_table[0]["name"], "pts": scoring_table[0]["pts"], "approx": False}
+    else:
+        exp_rank = sorted(people, key=lambda p: (-p["exp"], p["name"].lower()))
+        top = exp_rank[0] if exp_rank else None
+        prophet = {"name": top["name"], "pts": top["exp"], "approx": True} if top else {"name": "–", "pts": 0, "approx": True}
+    return {
+        "manual": {"name": manual["name"], "risk": manual["variance"]} if manual else {"name": "–", "risk": 0},
+        "agorero": {"name": agorero["name"], "risk": agorero["variance"]} if agorero else {"name": "–", "risk": 0},
+        "reventador": rev,
+        "profeta": prophet,
+        "vsPueblo": {
+            "name": vs_rank[0]["name"],
+            "diff": vs_rank[0]["vsPueblo"],
+            "pct": vs_rank[0]["boldPct"],
+        } if vs_rank else {"name": "–", "diff": 0, "pct": 0},
+    }
+
+
 def compute_knockout_metrics(data):
     """Métricas del relato KO (variantes B/C) derivadas de las porras reales."""
     names = data["names"]
@@ -2007,10 +2189,14 @@ def compute_knockout_metrics(data):
     prestige = _team_prestige(data)
     alive = _ko_alive_teams(data)
     scoring_by_name = {}
+    scoring_table = None
+    has_scoring = False
     if data.get("knockout_results"):
         scoring = compute_knockout_scoring(data)
         if scoring:
-            scoring_by_name = {row["name"]: row for row in scoring["table"]}
+            has_scoring = True
+            scoring_table = scoring["table"]
+            scoring_by_name = {row["name"]: row for row in scoring_table}
 
     champ_consensus = _text_consensus(outright["champion"]["picks"], n)
     champ_rank = [
@@ -2021,24 +2207,24 @@ def compute_knockout_metrics(data):
     ts_counter = Counter(p for p in awards.get("top_scorer", {}).get("picks", []) if p)
     ts_rank = [{"name": t, "count": c} for t, c in ts_counter.most_common(8)]
 
-    chaos_counts = [0] * n
-    variance_counts = [0] * n
-    for rnd in raw["rounds"]:
-        for match in rnd["matches"]:
-            home_es, away_es = _ko_team_pair(match)
-            if not home_es:
-                continue
-            underdog = _ko_underdog_key(home_es, away_es, prestige)
-            consensus = _text_consensus(match["winner_picks"], n).get("value")
-            consensus_key = _cmp_text(consensus) if consensus else None
-            for i, pick in enumerate(match["winner_picks"]):
-                if not pick:
-                    continue
-                pick_key = _cmp_text(pick)
-                if pick_key == underdog:
-                    chaos_counts[i] += 1
-                if consensus_key and pick_key != consensus_key:
-                    variance_counts[i] += 1
+    reventador = _ko_reventador_counts(data, prestige)
+    champ_team = champ_consensus.get("value")
+    champion_path = _ko_champion_path(champ_team, raw, n)
+    raw_risks = []
+    exp_vals = []
+    vs_pueblo = []
+    vs_pueblo_total = []
+    for i in range(n):
+        score_row = scoring_by_name.get(names[i], {})
+        risk, exp = _ko_person_risk_reward(
+            i, raw, n, outright, awards, score_row, has_scoring,
+        )
+        raw_risks.append(risk)
+        exp_vals.append(exp)
+        diffs, total = _ko_person_vs_pueblo(i, raw, n)
+        vs_pueblo.append(diffs)
+        vs_pueblo_total.append(total)
+    risk_index = [round(v, 1) for v in minmax_scale(raw_risks)]
 
     twin_pairs = []
     for i in range(n):
@@ -2087,27 +2273,31 @@ def compute_knockout_metrics(data):
         champ_pick = outright["champion"]["picks"][i]
         runner_pick = outright.get("runner_up", {}).get("picks", [None] * n)[i]
         ts_pick = awards.get("top_scorer", {}).get("picks", [None] * n)[i]
-        score_row = scoring_by_name.get(name, {})
-        exp = score_row.get("pts", 0)
-        if not exp and champ_pick:
-            exp = max(1, 8 - variance_counts[i] // 3)
-        champ_arr = [team_es(champ_pick), team_flag(champ_pick)] if champ_pick else ["–", "🏳️"]
-        runner_arr = [team_es(runner_pick), team_flag(runner_pick)] if runner_pick else ["–", "🏳️"]
         fell = _ko_champion_fell_round(i, data)
         bracket = _ko_person_bracket_rounds(i, data)
+        champ_arr = [team_es(champ_pick), team_flag(champ_pick)] if champ_pick else ["–", "🏳️"]
+        runner_arr = [team_es(runner_pick), team_flag(runner_pick)] if runner_pick else ["–", "🏳️"]
+        total = vs_pueblo_total[i]
+        diffs = vs_pueblo[i]
         people.append({
             "name": name,
             "champ": champ_arr,
             "runner": runner_arr,
             "ts": ts_pick or "–",
-            "chaos": chaos_counts[i],
+            "boldPct": round(100 * diffs / total) if total else 0,
             "fell": fell,
             "bracket": bracket,
-            "exp": exp,
-            "variance": variance_counts[i],
+            "exp": exp_vals[i],
+            "expApprox": not has_scoring,
+            "variance": risk_index[i],
+            "vsPueblo": diffs,
+            "vsPuebloTotal": total,
+            "reventador": reventador[i],
         })
 
-    chaos_rank = sorted(people, key=lambda p: (-p["chaos"], p["name"].lower()))
+    bold_rank = sorted(people, key=lambda p: (-p["boldPct"], p["name"].lower()))
+    vs_pueblo_rank = sorted(people, key=lambda p: (-p["boldPct"], p["name"].lower()))
+    honors = _compute_ko_honors(names, people, reventador, scoring_table)
 
     return {
         "people": people,
@@ -2118,7 +2308,13 @@ def compute_knockout_metrics(data):
         "depth": depth,
         "twins": twin_pairs,
         "grave": grave,
-        "chaosRank": chaos_rank,
+        "boldRank": bold_rank,
+        "vsPuebloRank": vs_pueblo_rank,
+        "championPath": champion_path,
+        "championTeam": champ_team,
+        "championFlag": champ_consensus.get("flag", "🏳️"),
+        "honors": honors,
+        "expApprox": not has_scoring,
         "pool": [[row["team"], row["flag"], row["champ"]] for row in depth[:12]],
     }
 
@@ -3022,6 +3218,16 @@ footer .brand svg{height:20px;width:auto}
 .bk-cbar .away{background:var(--gold)}
 .bk-tip{color:var(--muted);font-size:.68rem;margin-top:4px}
 .bk-tip.bk-real{color:var(--gold);font-weight:600}
+.bk-match.bk-has-tip,.ko-match.bk-has-tip{cursor:help}
+.bk-match:not(.played).bk-has-tip:hover{border-color:rgba(122,252,208,.45)}
+#bktip{position:fixed;pointer-events:none;z-index:95;background:#001a1f;border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px;font-size:.78rem;opacity:0;transition:opacity .12s;
+  box-shadow:0 8px 30px rgba(0,0,0,.5);max-width:300px;line-height:1.45}
+.bk-ht-title{font:800 .72rem 'Space Grotesk';color:var(--mint);margin-bottom:8px;letter-spacing:.04em}
+.bk-ht-slot{margin-bottom:8px}.bk-ht-slot:last-child{margin-bottom:0}
+.bk-ht-lbl{font:700 .68rem;color:var(--muted);margin-bottom:4px}
+.bk-ht-row{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.bk-ht-row span:last-child{color:var(--mint);font-weight:700;font-size:.72rem}
 /* --- mobile: round chips + full-width match list --- */
 .bk-mobile{display:none}
 .bk-chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:12px;margin-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -3103,6 +3309,19 @@ footer .brand svg{height:20px;width:auto}
 .kp-scatter circle{cursor:pointer;transition:stroke-width .08s}
 .kp-scatter circle:hover{stroke:#fff;stroke-width:2}
 .kp-fichas-wrap .search{margin-bottom:18px}
+.kp-path{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center}
+.kp-path-step{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+.kp-path-step .lab{font:800 .72rem 'Space Grotesk';color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.kp-path-step .opp{font:800 .95rem 'Space Grotesk';margin-top:4px}
+.kp-path-arrow{color:var(--mint);font:800 1.2rem 'Space Grotesk'}
+.kp-honors{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:18px}
+.kp-honor{background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center}
+.kp-honor .em{font-size:1.8rem}
+.kp-honor .ti{font:800 .82rem 'Space Grotesk';color:var(--mint);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.kp-honor .wn{font:800 1.1rem 'Space Grotesk'}
+.kp-honor .dt{font-size:.82rem;color:var(--muted);margin-top:4px}
+.kp-prog-timeline{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.kp-prog-step{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.15);font-size:.86rem}
 @media(max-width:720px){.kp-act-grid,.kp-prog-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.kp-duo{grid-template-columns:1fr}}
 
@@ -4097,7 +4316,7 @@ function koMatchCardHtml(m, k){
     ? `<span class="ko-pill"><span class="ko-score">${m.score.value}</span> ${L('90 min','90 min')}</span>` : '';
   const result = m.result && m.result.score
     ? `<span class="ko-pill"><span class="ko-score">${m.result.score.home}-${m.result.score.away}</span> ${L('real','FT')}</span>` : '';
-  return `<div class="ko-match">
+  return `<div class="ko-match" data-code="${m.code || ''}">
     <div class="ko-code">${m.code} · ${m.date || '–'}</div>
     <div class="ko-main">${koFixtureName(m,'home')} <span class="muted">vs</span> ${koFixtureName(m,'away')}</div>
     <div class="ko-mini">${koFixtureTime(m)}${m.venue ? ` · ${esc(m.venue)}` : ''}</div>
@@ -4159,6 +4378,7 @@ function buildEliminatoriasSchedule(parent){
     s.appendChild(finals);
   }
   if(!parent) return;
+  attachBracketHovers(s);
 }
 
 /* ---- PARTIDOS ---- */
@@ -4376,6 +4596,83 @@ function koWOf(code){
   const m = /^(R32|R16|QF|SF)-M(\d+)$/.exec(code || '');
   return m ? KO_WBASE[m[1]] + (+m[2]) : null;
 }
+let _koWMap;
+function koWToMatchMap(){
+  if(_koWMap) return _koWMap;
+  _koWMap = {};
+  const k = D.knockout || {};
+  (k.rounds || []).forEach(r => (r.matches || []).forEach(m => {
+    const w = koWOf(m.code); if(w) _koWMap[w] = m;
+  }));
+  (k.final_matches || []).forEach(m => {
+    const w = koWOf(m.code); if(w) _koWMap[w] = m;
+  });
+  return _koWMap;
+}
+function koMatchByCode(code){
+  const k = D.knockout || {};
+  for(const r of (k.rounds || [])){
+    const m = (r.matches || []).find(x => x.code === code);
+    if(m) return m;
+  }
+  return (k.final_matches || []).find(x => x.code === code) || null;
+}
+function bkSlotTipHtml(m){
+  const played = !!(m.result && m.result.winner);
+  if(played) return '';
+  const k = D.knockout || {};
+  if(!k.ready) return '';
+  const wmap = koWToMatchMap();
+  const slots = [];
+  ['home','away'].forEach(side => {
+    const fix = m['fixture_'+side] || '';
+    const wm = /^W(\d+)$/.exec(fix);
+    if(!wm) return;
+    const feeder = wmap[+wm[1]];
+    if(!feeder || !feeder.winner || !feeder.winner.dist || !feeder.winner.dist.length) return;
+    const rows = feeder.winner.dist.map(d =>
+      `<div class="bk-ht-row"><span>${d.flag || ''} ${esc(team(d.value))}</span><span>${d.count}/${N}</span></div>`
+    ).join('');
+    slots.push(`<div class="bk-ht-slot"><div class="bk-ht-lbl">${fix} · ${L('¿quién llega?','who advances?')}</div>${rows}</div>`);
+  });
+  if(!slots.length) return '';
+  return `<div class="bk-ht-title">${esc(m.code || '')}</div>${slots.join('')}`;
+}
+let bktip;
+function ensureBkTip(){
+  if(bktip) return bktip;
+  bktip = el('div'); bktip.id = 'bktip'; document.body.appendChild(bktip);
+  return bktip;
+}
+function moveBkTip(e){
+  if(!bktip) return;
+  const pad = 14;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  const r = bktip.getBoundingClientRect();
+  if(x + r.width > window.innerWidth - 8) x = e.clientX - r.width - pad;
+  if(y + r.height > window.innerHeight - 8) y = e.clientY - r.height - pad;
+  bktip.style.left = x + 'px';
+  bktip.style.top = y + 'px';
+}
+function attachBracketHovers(root){
+  const tip = ensureBkTip();
+  root.querySelectorAll('.bk-match, .ko-match').forEach(card => {
+    const code = card.dataset.code;
+    if(!code) return;
+    const m = koMatchByCode(code);
+    if(!m) return;
+    const html = bkSlotTipHtml(m);
+    if(!html) return;
+    card.classList.add('bk-has-tip');
+    card.addEventListener('mouseenter', e => {
+      tip.innerHTML = html;
+      tip.style.opacity = '1';
+      moveBkTip(e);
+    });
+    card.addEventListener('mousemove', moveBkTip);
+    card.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+  });
+}
 function bkMatchNode(m, opts){
   opts = opts || {};
   const k = D.knockout || {};
@@ -4538,6 +4835,7 @@ function koBracketBox(){
     document.fonts.ready.then(() => { if(tree.isConnected) drawBracketLines(tree); });
   }
   ensureBracketResize();
+  attachBracketHovers(box);
   return box;
 }
 function koResultsStarted(){
@@ -4599,7 +4897,8 @@ function koBracketPrecisionCard(){
 function koProgressionCard(k){
   const prog = k.progression;
   if(!prog || !prog.progression || !prog.progression.length) return null;
-  const last = prog.progression[prog.progression.length - 1];
+  const steps = prog.progression;
+  const last = steps[steps.length - 1];
   const matchTitle = `${last.home_flag || ''} ${team(last.home)} – ${team(last.away)} ${last.away_flag || ''}`;
   const gainers = last.table.filter(r => r.delta > 0).sort((a,b) => b.delta - a.delta || a.rank - b.rank).slice(0,5);
   const losers = last.table.filter(r => r.delta < 0).sort((a,b) => a.delta - b.delta || b.rank - a.rank).slice(0,5);
@@ -4614,9 +4913,21 @@ function koProgressionCard(k){
   const scoreHtml = scorers.length
     ? scorers.map(r => row(r, `<b>+${r.round_pts}</b> (${r.round_exact ? r.round_exact + ' pleno' : ''}${r.round_exact && r.round_outcomes ? ' · ' : ''}${r.round_outcomes ? r.round_outcomes + ' signo' : ''}${r.round_advance ? ' · ' + r.round_advance + ' pase' : ''})`)).join('')
     : `<p class="muted">${L('Nadie sumó en este cruce.','Nobody scored in this tie.')}</p>`;
+  let timelineHtml = '';
+  if(steps.length > 1){
+    timelineHtml = `<div class="kp-prog-timeline">${steps.map(s => {
+      const t = `${s.home_flag || ''} ${team(s.home)} ${s.result.home}-${s.result.away} ${team(s.away)} ${s.away_flag || ''}`;
+      const top = s.table.filter(r => r.round_pts > 0).sort((a,b) => b.round_pts - a.round_pts)[0];
+      const topTxt = top ? `${esc(top.name)} +${top.round_pts}` : L('nadie sumó','nobody scored');
+      return `<div class="kp-prog-step"><b>${L(s.phase_es, s.phase_en)}</b> · ${esc(t)} · ${topTxt}</div>`;
+    }).join('')}</div>`;
+  }
   return el('div','kp-prog reveal',
-    `<h3>${L('Subidón y batacazo del último cruce','Ups and downs from the latest tie')}</h3>
+    `<h3>${steps.length > 1
+      ? L('Subidón y batacazo (último cruce)','Ups and downs (latest tie)')
+      : L('Subidón y batacazo del último cruce','Ups and downs from the latest tie')}</h3>
      <p class="muted" style="margin-bottom:14px"><b>${esc(matchTitle)}</b> · ${last.result.home}-${last.result.away} · ${L(last.phase_es, last.phase_en)}</p>
+     ${timelineHtml}
      <div class="kp-prog-grid">
        <div class="kp-act-viz"><span class="k">${L('🚀 Subidón','🚀 Climbers')}</span>${gainHtml}</div>
        <div class="kp-act-viz"><span class="k">${L('📉 Batacazo','📉 Slides')}</span>${loseHtml}</div>
@@ -4667,16 +4978,53 @@ function koScatter(people){
   const xmin = Math.min(...xs) - 3, xmax = Math.max(...xs) + 3, ymin = Math.min(...ys) - 3, ymax = Math.max(...ys) + 3;
   const X = v => pad + (v - xmin) / (xmax - xmin) * (W - pad - 12);
   const Y = v => H - pad - (v - ymin) / (ymax - ymin) * (H - pad - 24);
+  const approx = people.some(p => p.expApprox);
   const dots = people.map(p => {
-    const info = `${p.exp} ${L('pts esperados','exp pts')} · ${L('riesgo','risk')} ${p.variance} · ${p.chaos} ${L('sorpresas','upsets')}`;
+    const expLbl = p.expApprox ? L('pts esp. (aprox.)','exp pts (approx.)') : L('pts KO','KO pts');
+    const info = `${p.exp} ${expLbl} · ${L('riesgo','risk')} ${p.variance}/100 · ${p.boldPct}% ${L('fuera del consenso','off consensus')}`;
     return `<circle data-name="${esc(p.name)}" data-info="${esc(info)}" data-color="${personColor(p.name)}" cx="${X(p.exp).toFixed(1)}" cy="${Y(p.variance).toFixed(1)}" r="6" fill="${personColor(p.name)}" opacity=".85"></circle>`;
   }).join('');
+  const xLbl = approx ? L('puntos esperados (aprox.) →','expected pts (approx.) →') : L('puntos KO →','KO points →');
   return `<svg class="kp-scatter" viewBox="0 0 ${W} ${H}">
     <line class="axis" x1="${pad}" y1="${H-pad}" x2="${W-6}" y2="${H-pad}"></line>
     <line class="axis" x1="${pad}" y1="14" x2="${pad}" y2="${H-pad}"></line>
-    <text x="${W-6}" y="${H-pad+24}" text-anchor="end">${L('puntos esperados →','expected points →')}</text>
-    <text x="${pad}" y="12" text-anchor="middle">${L('↑ riesgo','↑ risk')}</text>
+    <text x="${W-6}" y="${H-pad+24}" text-anchor="end">${xLbl}</text>
+    <text x="${pad}" y="12" text-anchor="middle">${L('↑ riesgo (0–100)','↑ risk (0–100)')}</text>
     ${dots}</svg>`;
+}
+function koChampionPathHtml(dz){
+  if(!dz.championPath || !dz.championPath.length) return '';
+  const steps = dz.championPath.map((s, i) => {
+    const arrow = i < dz.championPath.length - 1 ? `<span class="kp-path-arrow">→</span>` : '';
+    return `<div class="kp-path-step"><div class="lab">${L(s.round_es, s.round_en)}</div>
+      <div class="opp">${s.opponent_flag} ${esc(team(s.opponent))}</div>
+      <div class="muted" style="font-size:.76rem;margin-top:3px">${s.agreement}% ${L('consenso','consensus')}</div></div>${arrow}`;
+  }).join('');
+  return `<div class="kp-path">${steps}</div>`;
+}
+function koVsPuebloHtml(dz){
+  if(!dz.vsPuebloRank || !dz.vsPuebloRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
+  const mx = dz.vsPuebloRank[0].boldPct || 1;
+  return dz.vsPuebloRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+      <div class="bar-name" style="color:${personColor(p.name)}">${esc(p.name)}</div>
+      <div class="bar-track"><div class="bar-fill" data-w="${mx ? (p.boldPct/mx*100).toFixed(0) : 0}"></div></div>
+      <div class="bar-val">${p.boldPct}%</div></div>`).join('');
+}
+function koHonorsHtml(h){
+  if(!h) return '';
+  const items = [
+    ['🔮', L('El Profeta','The Prophet'), h.profeta.name,
+      h.profeta.approx ? L(h.profeta.pts + ' pts esp.',''+h.profeta.pts+' exp pts') : h.profeta.pts + ' ' + L('pts KO','KO pts')],
+    ['📢', L('El Agorero','The Doomsayer'), h.agorero.name, L('riesgo '+h.agorero.risk+'/100','risk '+h.agorero.risk+'/100')],
+    ['📋', L('El de manual','Mr. Chalk'), h.manual.name, L('riesgo '+h.manual.risk+'/100','risk '+h.manual.risk+'/100')],
+    ['💥', L('El Reventador','The Upset Caller'), h.reventador.name,
+      h.reventador.count ? L(h.reventador.count + ' sorpresa(s) acertada(s)', h.reventador.count + ' upset(s) called') : L('ninguna aún','none yet')],
+    ['🏘️', L('Contra el pueblo','Against the crowd'), h.vsPueblo.name,
+      L(h.vsPueblo.pct + '% fuera del consenso (' + h.vsPueblo.diff + ' cruces)',
+        h.vsPueblo.pct + '% off consensus (' + h.vsPueblo.diff + ' ties)')],
+  ];
+  return items.map(([em,ti,wn,dt]) => `<div class="kp-honor"><div class="em">${em}</div><div class="ti">${ti}</div>
+    <div class="wn">${esc(wn)}</div><div class="dt">${dt}</div></div>`).join('');
 }
 /* ---- métricas KO (fragmentos reutilizables del relato) ---- */
 function koChampBarsHtml(dz){
@@ -4687,13 +5035,13 @@ function koChampBarsHtml(dz){
       <div class="bar-track"><div class="bar-fill gold" data-w="${(c.count/mx*100).toFixed(0)}"></div></div>
       <div class="bar-val" data-count="${c.count}">0</div></div>`).join('');
 }
-function koChaosBarsHtml(dz){
-  if(!dz.chaosRank || !dz.chaosRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
-  const mx = dz.chaosRank[0].chaos || 1;
-  return dz.chaosRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
+function koBoldBarsHtml(dz){
+  if(!dz.boldRank || !dz.boldRank.length) return `<p class="muted">${L('Sin datos aún','No data yet')}</p>`;
+  const mx = dz.boldRank[0].boldPct || 1;
+  return dz.boldRank.slice(0,8).map((p,i) => `<div class="bar-row"><div class="bar-rank">${i+1}</div>
       <div class="bar-name" style="color:${personColor(p.name)}">${esc(p.name)}</div>
-      <div class="bar-track"><div class="bar-fill" data-w="${(p.chaos/mx*100).toFixed(0)}"></div></div>
-      <div class="bar-val" data-count="${p.chaos}">0</div></div>`).join('');
+      <div class="bar-track"><div class="bar-fill" data-w="${mx ? (p.boldPct/mx*100).toFixed(0) : 0}"></div></div>
+      <div class="bar-val">${p.boldPct}%</div></div>`).join('');
 }
 function koTwinsHtml(dz){
   if(!dz.twins || !dz.twins.length) return `<p class="muted">${L('Ningún par supera el 45 % de similitud.','No pair clears 45% similarity.')}</p>`;
@@ -4726,14 +5074,15 @@ function koFichasBody(dz){
     const card = el('div','ficha'); card.dataset.name = p.name.toLowerCase();
     card.innerHTML = `
       <div class="fh"><div><div class="fn">${esc(p.name)}</div><div class="lab">🏆 ${esc(team(p.champ[0]))}</div></div>
-        <div class="rk">${p.exp}<br>${L('pts esp.','exp pts')}</div></div>
+        <div class="rk">${p.exp}<br>${p.expApprox ? L('pts esp.','exp pts') : L('pts KO','KO pts')}</div></div>
       <div class="fstats">
         <div>${L('Campeón','Champion')}<br><span class="v">${p.champ[1]} ${esc(team(p.champ[0]))}</span></div>
         <div>${L('Subcampeón','Runner-up')}<br><span class="v">${p.runner[1]} ${esc(team(p.runner[0]))}</span></div>
         <div>${L('Pichichi','Top scorer')}<br><span class="v">${esc(p.ts)}</span></div>
-        <div>${L('Índice de caos','Chaos index')}<br><span class="v">${p.chaos}</span></div>
+        <div>${L('Riesgo','Risk')}<br><span class="v">${p.variance}/100</span></div>
       </div>
       <div class="fline">${L('📉 Tu campeón cae en:','📉 Your champion falls at:')} <b>${fellTxt}</b></div>
+      ${p.vsPuebloTotal ? `<div class="fline">${L('🏘️ vs pueblo:','🏘️ vs crowd:')} <b>${p.boldPct}%</b> (${p.vsPueblo}/${p.vsPuebloTotal} ${L('cruces','ties')})</div>` : ''}
       ${tw ? `<div class="fline">${L('👯 Gemelo:','👯 Twin:')} <b>${esc(tw.name)}</b> (${tw.sim}%)</div>` : ''}`;
     grid.appendChild(card);
   });
@@ -4754,26 +5103,36 @@ function buildKoStoryBody(){
   if(!dz) return;
   const top = dz.champRank[0] || {count:0, team:'–', flag:'🏳️'};
   const second = dz.champRank[1] || {count:0, team:'–', flag:'🏳️'};
-  const bold = dz.chaosRank[0] || {name:'–', chaos:0};
-  const safe = dz.chaosRank[dz.chaosRank.length - 1] || bold;
+  const bold = dz.boldRank[0] || {name:'–', boldPct:0, vsPueblo:0, vsPuebloTotal:0};
+  const safe = dz.boldRank[dz.boldRank.length - 1] || bold;
   const prophetRow = k.scoring && k.scoring.table && k.scoring.table[0];
   const prophet = prophetRow
     ? {name: prophetRow.name, exp: prophetRow.pts, demo: false}
     : {name: (dz.people.slice().sort((a,b) => b.exp - a.exp)[0] || {name:'–', exp:0}).name,
-       exp: (dz.people.slice().sort((a,b) => b.exp - a.exp)[0] || {exp:0}).exp, demo: true};
+       exp: (dz.people.slice().sort((a,b) => b.exp - a.exp)[0] || {exp:0}).exp,
+       demo: dz.expApprox !== false};
   const sec = koSection();
 
   const bracketBox = koBracketBox();
   if(bracketBox){
+    const act1Body = el('div');
+    act1Body.appendChild(bracketBox);
+    if(dz.championPath && dz.championPath.length){
+      const pathViz = el('div','kp-act-viz');
+      pathViz.innerHTML = `<span class="k">${L('🛤️ Camino del campeón del pueblo','🛤️ The crowd\'s champion path')}</span>
+        <p class="muted" style="margin:8px 0 4px">${dz.championFlag} ${esc(team(dz.championTeam))} · ${L('cuadro consensual ronda a ronda','consensus bracket round by round')}</p>
+        ${koChampionPathHtml(dz)}`;
+      act1Body.appendChild(pathViz);
+    }
     sec.appendChild(koAct(
       L('Acto 1 · El cuadro','Act 1 · The bracket'),
       L('El camino hacia la final','The road to the final'),
       `<p class="kp-act-lead">${k.ready
-        ? L('El cuadro oficial de FIFA. Cada cruce muestra el % de consenso del ganador y el marcador más probable.',
-            'The official FIFA bracket. Each tie shows the winner consensus % and the most likely scoreline.')
+        ? L('El cuadro oficial de FIFA. Cada cruce muestra el % de consenso del ganador y el marcador más probable. Pasa el cursor sobre cruces con W## para ver quién puede llegar a ese hueco.',
+            'The official FIFA bracket. Each tie shows the winner consensus % and the most likely scoreline. Hover ties with W## slots to see who might fill them.')
         : L('El cuadro oficial de FIFA. Cuando suban las apuestas, cada cruce mostrará el % de consenso del ganador y el marcador más probable.',
             'The official FIFA bracket. Once picks are uploaded, each tie shows the winner consensus % and the most likely scoreline.')}</p>`,
-      bracketBox));
+      act1Body));
   }
 
   if(top.count){
@@ -4790,12 +5149,16 @@ function buildKoStoryBody(){
     L('Acto 3 · Carácter','Act 3 · Character'),
     L('Valientes contra los de manual','The bold vs the by-the-book'),
     `<div class="kp-duo">
-       <div class="b"><div class="muted">${L('🐺 El más loco','🐺 Wildest')}</div><div class="big" style="color:${personColor(bold.name)}">${esc(bold.name)}</div><div class="muted">${bold.chaos} ${L('sorpresas en su cuadro','upsets in their bracket')}</div></div>
-       <div class="b"><div class="muted">${L('🐑 El más de manual','🐑 Most chalk')}</div><div class="big" style="color:${personColor(safe.name)}">${esc(safe.name)}</div><div class="muted">${safe.chaos} ${L('sorpresas','upsets')}</div></div>
+       <div class="b"><div class="muted">${L('🐺 El más atrevido','🐺 Boldest')}</div><div class="big" style="color:${personColor(bold.name)}">${esc(bold.name)}</div><div class="muted">${bold.boldPct}% ${L('fuera del consenso','off consensus')} (${bold.vsPueblo}/${bold.vsPuebloTotal})</div></div>
+       <div class="b"><div class="muted">${L('🐑 El más de manual','🐑 Most chalk')}</div><div class="big" style="color:${personColor(safe.name)}">${esc(safe.name)}</div><div class="muted">${safe.boldPct}% ${L('fuera del consenso','off consensus')} (${safe.vsPueblo}/${safe.vsPuebloTotal})</div></div>
      </div>`,
     el('div','kp-act-grid',
-      `<div class="kp-act-viz"><span class="k">${L('🎲 Índice de caos','🎲 Chaos index')}</span>${koChaosBarsHtml(dz)}</div>`
-      + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}</div>`)));
+      `<div class="kp-act-viz"><span class="k">${L('🎯 Atrevimiento','🎯 Boldness')}</span>
+        <p class="muted" style="font-size:.82rem;margin:0 0 10px">${L('% de cruces KO donde tu ganador ≠ el favorito del pueblo.',
+          '% of KO ties where your winner pick ≠ the crowd favourite.')}</p>${koBoldBarsHtml(dz)}</div>`
+      + `<div class="kp-act-viz"><span class="k">${L('⚖️ Riesgo vs recompensa','⚖️ Risk vs reward')}</span>${koScatter(dz.people)}<p class="muted" style="margin-top:10px;font-size:.82rem">${dz.expApprox
+        ? L('Eje X: pts esperados por alineación con el consenso. Eje Y: riesgo 0–100 (prob. implícita contraria).','X: expected pts from consensus alignment. Y: risk 0–100 (contrarian vs crowd).')
+        : L('Eje X: pts KO reales. Eje Y: riesgo 0–100 (prob. implícita contraria).','X: actual KO pts. Y: risk 0–100 (contrarian vs crowd).')}</p></div>`)));
 
   if(koResultsStarted()){
     const bracketAct = koAct(
@@ -4880,6 +5243,17 @@ function buildKoStoryBody(){
     koFichasBody(dz));
   aCards.style.borderBottom = '0';
   sec.appendChild(aCards);
+
+  if(dz.honors){
+    const honorsAct = koAct(
+      L('Acto 10 · Palmarés KO','Act 10 · KO honours'),
+      L('Los títulos de la fase final','Knockout stage titles'),
+      `<p class="kp-act-lead">${L('Premios honoríficos de eliminatorias: profeta, agorero, manual, reventador y más.',
+                                'Knockout honorary titles: prophet, doomsayer, chalk, upset caller and more.')}</p>`,
+      el('div','kp-honors reveal', koHonorsHtml(dz.honors)));
+    honorsAct.style.borderBottom = '0';
+    sec.appendChild(honorsAct);
+  }
 }
 
 /* ---- BUILD / REBUILD ---- */
