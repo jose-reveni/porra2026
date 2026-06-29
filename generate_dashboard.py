@@ -1219,9 +1219,9 @@ def compute(data):
     today = compute_today(data, matches)
     if live:
         for m in today["matches"]:
-            m["stake"] = compute_match_stake(m, data["results"], live["table"])
+            m["stake"] = stake_for_group_match(m, data, matches, live["table"])
     recent_results = compute_recent_results(data, matches)
-    knockout = compute_knockout(data)
+    knockout = compute_knockout(data, live["table"] if live else None, matches)
 
     return {
         "es2en": ES2EN,
@@ -1311,15 +1311,13 @@ def resolve_knockout_fixture(pub_match, winner_by_w):
             pub_match[f"resolved_{side}_flag"] = team["flag"]
 
 
-def compute_knockout(data):
+def compute_knockout(data, live_table=None, matches=None):
     names = data["names"]
     n = data["n"]
     raw = data["knockouts"]
+    matches = matches or data.get("matches") or []
     winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
     scoring = compute_knockout_scoring(data)
-    ko_table = scoring["table"] if scoring else [
-        {"name": names[i], "pts": 0, "rank": i + 1} for i in range(n)
-    ]
 
     total_rows = 0
     filled_rows = 0
@@ -1349,7 +1347,7 @@ def compute_knockout(data):
                 pub["home_trivia"] = match_trivia(pub.get("fixture_home_en"), trivia_idx)
                 pub["away_trivia"] = match_trivia(pub.get("fixture_away_en"), trivia_idx)
             if not result or "score" not in result:
-                pub["stake"] = compute_ko_match_stake(m, rnd, names, ko_table)
+                pub["stake"] = stake_for_ko_match(m, rnd, names, data, matches, live_table)
             match_rows.append(pub)
         rounds.append({
             "key": rnd["key"],
@@ -1377,7 +1375,7 @@ def compute_knockout(data):
         }
         resolve_knockout_fixture(pub, winner_by_w)
         if not result or "score" not in result:
-            pub["stake"] = compute_ko_match_stake(m, None, names, ko_table)
+            pub["stake"] = stake_for_ko_match(m, None, names, data, matches, live_table)
         final_matches.append(pub)
 
     outright = {}
@@ -1540,57 +1538,335 @@ def _ko_public_pick_fields(match, names, n):
     }
 
 
-def compute_ko_match_stake(match, rnd, names, ko_table):
-    """Cuánto puede mover el ranking KO un cruce aún sin jugar."""
-    advance_pts = rnd["advance_points"] if rnd else 0
-    has_winner = bool(match.get("winner_picks"))
-    max_one = (3 + 2 + advance_pts) if has_winner else 5
-    if not ko_table:
-        ko_table = [{"name": name, "pts": 0} for name in names]
-    sorted_table = sorted(ko_table, key=lambda r: (-r["pts"], r["name"].lower()))
+def _match_sort_key(match):
+    return (match.get("date", ""), match.get("dt", ""), match.get("code", ""))
+
+
+def _iter_scheduled_matches(data, matches):
+    for m in matches:
+        yield {**m, "kind": "group"}
+    for rnd in data["knockouts"]["rounds"]:
+        for m in rnd["matches"]:
+            yield {**m, "kind": "ko", "advance_points": rnd["advance_points"]}
+    for m in data["knockouts"]["final_matches"]:
+        yield {**m, "kind": "ko", "advance_points": 0}
+
+
+def _has_match_result(match, data):
+    code = match["code"]
+    if match.get("kind") == "group":
+        return code in data["results"]
+    result = data["knockout_results"]["matches"].get(code)
+    return bool(result and "score" in result)
+
+
+def _pending_earlier_same_day(data, matches, match):
+    match_date = match.get("date")
+    if not match_date:
+        return []
+    tkey = _match_sort_key(match)
+    pending = []
+    for m in _iter_scheduled_matches(data, matches):
+        if m.get("date") != match_date:
+            continue
+        if _match_sort_key(m) >= tkey:
+            continue
+        if _has_match_result(m, data):
+            continue
+        pending.append({
+            "code": m["code"],
+            "home": m.get("fixture_home") or m.get("home", ""),
+            "away": m.get("fixture_away") or m.get("away", ""),
+            "home_flag": m.get("fixture_home_flag") or m.get("home_flag", ""),
+            "away_flag": m.get("fixture_away_flag") or m.get("away_flag", ""),
+            "time_es": m.get("time_es", ""),
+        })
+    return pending
+
+
+def _earlier_unplayed_same_day(data, matches, match):
+    return bool(_pending_earlier_same_day(data, matches, match))
+
+
+def _filtered_data_before(data, matches, target):
+    tkey = _match_sort_key(target)
+    results = {
+        m["code"]: data["results"][m["code"]]
+        for m in matches
+        if m["code"] in data["results"] and _match_sort_key(m) < tkey
+    }
+    ko_matches = {}
+    for m in _iter_scheduled_matches(data, matches):
+        if m.get("kind") == "group":
+            continue
+        code = m["code"]
+        result = data["knockout_results"]["matches"].get(code)
+        if result and "score" in result and _match_sort_key(m) < tkey:
+            ko_matches[code] = result
+    kr = data["knockout_results"]
+    return {
+        **data,
+        "results": results,
+        "knockout_results": {
+            "matches": ko_matches,
+            "outright": kr.get("outright", {}),
+            "awards": kr.get("awards", {}),
+        },
+    }
+
+
+def live_table_before_match(data, matches, target):
+    """Ranking tras todos los resultados anteriores a este partido (fecha/hora)."""
+    partial = _filtered_data_before(data, matches, target)
+    if (
+        not partial["results"]
+        and not partial["knockout_results"]["matches"]
+        and not partial["knockout_results"]["outright"]
+        and not partial["knockout_results"]["awards"]
+    ):
+        return None
+    live = compute_live(partial, matches)
+    return live["table"] if live else None
+
+
+def _deferred_stake(match, data, matches):
+    return {
+        "deferred": True,
+        "pending_after": _pending_earlier_same_day(data, matches, match),
+    }
+
+
+def stake_for_ko_match(match, rnd, names, data, matches, live_table):
+    if _earlier_unplayed_same_day(data, matches, match):
+        return _deferred_stake(match, data, matches)
+    table = live_table_before_match(data, matches, match) or live_table
+    return compute_ko_match_stake(match, rnd, names, table)
+
+
+def stake_for_group_match(match, data, matches, live_table):
+    if match["code"] in data["results"]:
+        return None
+    if _earlier_unplayed_same_day(data, matches, match):
+        return _deferred_stake(match, data, matches)
+    table = live_table_before_match(data, matches, match) or live_table
+    return compute_match_stake(match, data["results"], table)
+
+
+def _stake_live_context(live_table):
+    sorted_table = sorted(live_table, key=lambda r: (-r["pts"], r["name"].lower()))
     rank_rows = {}
     for rank, row in enumerate(sorted_table, 1):
         rank_rows[row["name"]] = {**row, "rank": row.get("rank", rank)}
+    return sorted_table, rank_rows
+
+
+def _ranks_after_scenario(sorted_table, deltas_by_name):
+    """Ranking tras un resultado: todos suman a la vez."""
+    new_rows = [
+        {"name": row["name"], "pts": row["pts"] + deltas_by_name.get(row["name"], 0)}
+        for row in sorted_table
+    ]
+    new_rows.sort(key=lambda row: (-row["pts"], row["name"].lower()))
+    return {row["name"]: rank for rank, row in enumerate(new_rows, 1)}
+
+
+def _format_group_scenario(scenario):
+    rh, ra = scenario
+    score = f"{rh}-{ra}"
+    return {"score": score, "score_es": score, "score_en": score}
+
+
+def _format_ko_scenario(scenario, _match=None):
+    rh, ra, res_winner = scenario
+    result = {"score": f"{rh}-{ra}", "score_es": f"{rh}-{ra}", "score_en": f"{rh}-{ra}"}
+    if rh == ra and res_winner:
+        result["winner"] = team_es(res_winner)
+        result["winner_en"] = res_winner
+        result["winner_flag"] = team_flag(res_winner)
+    return result
+
+
+def _compute_scenario_stake(
+    names, live_table, scenarios, points_for_name, format_scenario=None, extra=None,
+):
+    """Swing realista: simula cada apuesta única como resultado posible."""
+    if not scenarios or not live_table:
+        return None
+    sorted_table, rank_rows = _stake_live_context(live_table)
+
+    pickers = [name for name in names if points_for_name(name, scenarios[0]) is not None]
+    if not pickers:
+        return None
+
+    personal_max = {
+        name: max(points_for_name(name, scenario) for scenario in scenarios)
+        for name in pickers
+    }
+
+    records = {name: [] for name in pickers}
+    for scenario in scenarios:
+        deltas = {}
+        for name in names:
+            pts = points_for_name(name, scenario)
+            deltas[name] = pts if pts is not None else 0
+        new_ranks = _ranks_after_scenario(sorted_table, deltas)
+        for name in pickers:
+            old_rank = rank_rows[name]["rank"]
+            swing = old_rank - new_ranks[name]
+            records[name].append({
+                "swing": swing,
+                "scenario": scenario,
+                "at_max": deltas[name] == personal_max[name],
+            })
 
     people = []
-    picks = 0
-    max_swing = 0
     total_pts = 0
-    for i, name in enumerate(names):
+    for name in pickers:
+        recs = records[name]
+        at_max_recs = [rec for rec in recs if rec["at_max"]]
+        best_rec = max(at_max_recs, key=lambda rec: rec["swing"], default=None)
+        swing_up = best_rec["swing"] if best_rec and best_rec["swing"] > 0 else 0
+        best_result = (
+            format_scenario(best_rec["scenario"])
+            if format_scenario and best_rec and best_rec["swing"] > 0
+            else None
+        )
+
+        worst_rec = min(recs, key=lambda rec: rec["swing"])
+        swing_down = -worst_rec["swing"] if worst_rec["swing"] < 0 else 0
+        worst_result = (
+            format_scenario(worst_rec["scenario"])
+            if format_scenario and worst_rec["swing"] < 0
+            else None
+        )
+
+        people.append({
+            "name": name,
+            "max_pts": personal_max[name],
+            "swing_up": swing_up,
+            "swing_down": swing_down,
+            "swing": swing_up,
+            "best_result": best_result,
+            "worst_result": worst_result,
+        })
+        total_pts += personal_max[name]
+
+    result = {
+        "max_swing": max((p["swing_up"] for p in people), default=0),
+        "min_swing": max((p["swing_down"] for p in people), default=0),
+        "max_points": total_pts,
+        "picks": len(people),
+        "people": people,
+    }
+    if people:
+        top_up = max(people, key=lambda p: p["swing_up"])
+        top_down = max(people, key=lambda p: p["swing_down"])
+        if top_up["swing_up"] > 0:
+            result["max_swing_result"] = top_up.get("best_result")
+            result["max_swing_who"] = top_up["name"]
+        if top_down["swing_down"] > 0:
+            result["min_swing_result"] = top_down.get("worst_result")
+            result["min_swing_who"] = top_down["name"]
+    if extra:
+        result.update(extra)
+    return result
+
+
+def _group_match_scenarios(match):
+    scenarios = set()
+    for pick in match["picks"]:
+        if pick["home"] is not None:
+            scenarios.add((pick["home"], pick["away"]))
+    return list(scenarios)
+
+
+def _group_points_for_pick(h, a, rh, ra):
+    if h is None or a is None:
+        return None
+    if h == rh and a == ra:
+        return 4
+    if outcome(h, a) == outcome(rh, ra):
+        return 2
+    return 0
+
+
+def _ko_match_scenarios(match):
+    """Resultados plausibles: cada apuesta única (marcador + ganador en empate)."""
+    scenarios = {}
+    has_winner = bool(match.get("winner_picks"))
+    home = match.get("fixture_home") or match.get("fixture_home_en", "")
+    away = match.get("fixture_away") or match.get("fixture_away_en", "")
+    for i, (h, a) in enumerate(match["score_picks"]):
+        if h is None or a is None:
+            continue
+        if h == a:
+            if not has_winner:
+                continue
+            res_winner = match["winner_picks"][i]
+            if not res_winner:
+                continue
+        elif h > a:
+            res_winner = home
+        else:
+            res_winner = away
+        scenarios[(h, a, _cmp_text(res_winner))] = (h, a, res_winner)
+    return list(scenarios.values())
+
+
+def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts):
+    if h is None or a is None:
+        return None
+    pts = 0
+    if outcome(h, a) == outcome(rh, ra):
+        pts += 3
+        if h == rh and a == ra:
+            pts += 2
+    if advance_pts and res_winner and winner_pick:
+        if _cmp_text(winner_pick) == _cmp_text(res_winner):
+            pts += advance_pts
+    return pts
+
+
+def compute_ko_match_stake(match, rnd, names, live_table):
+    """Cuánto puede mover el ranking general un cruce KO (escenarios realistas)."""
+    advance_pts = rnd["advance_points"] if rnd else 0
+    has_winner = bool(match.get("winner_picks"))
+    max_one = (3 + 2 + advance_pts) if has_winner else 5
+    if not live_table:
+        live_table = [{"name": name, "pts": 0} for name in names]
+    name_index = {name: i for i, name in enumerate(names)}
+    scenarios = _ko_match_scenarios(match)
+    if not scenarios:
+        return None
+
+    def points_for_name(name, scenario):
+        i = name_index[name]
         h, a = match["score_picks"][i]
         winner = match["winner_picks"][i] if has_winner else None
         if h is None and not winner:
-            continue
-        picks += 1
-        person_max = max_one if winner else (5 if h is not None else 0)
-        total_pts += person_max
-        row = rank_rows.get(name, {"pts": 0, "rank": len(names)})
-        new_pts = row["pts"] + person_max
-        new_rank = 1 + sum(
-            1 for other in sorted_table
-            if other["pts"] > new_pts
-            or (other["pts"] == new_pts and other["name"].lower() < name.lower())
-        )
-        swing = row["rank"] - new_rank
-        max_swing = max(max_swing, swing)
-        people.append({
-            "name": name,
-            "max_pts": person_max,
-            "swing": swing,
-            "score": f"{h}-{a}" if h is not None else None,
-            "winner": team_es(winner) if winner else None,
-            "winner_flag": team_flag(winner) if winner else "",
-        })
-    if not picks:
+            return None
+        rh, ra, res_winner = scenario
+        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts)
+
+    extra = {"max_one": max_one, "advance_points": advance_pts}
+    stake = _compute_scenario_stake(
+        names,
+        live_table,
+        scenarios,
+        points_for_name,
+        lambda scenario: _format_ko_scenario(scenario, match),
+        extra,
+    )
+    if not stake:
         return None
-    return {
-        "max_one": max_one,
-        "advance_points": advance_pts,
-        "max_points": total_pts,
-        "picks": picks,
-        "max_swing": max_swing,
-        "people": people,
-    }
+    for person in stake["people"]:
+        i = name_index[person["name"]]
+        h, a = match["score_picks"][i]
+        winner = match["winner_picks"][i] if has_winner else None
+        person["score"] = f"{h}-{a}" if h is not None else None
+        person["winner"] = team_es(winner) if winner else None
+        person["winner_flag"] = team_flag(winner) if winner else ""
+    return stake
 
 
 def _ko_match_side_keys(match, pub, winner_by_w):
@@ -2180,7 +2456,7 @@ def _compute_ko_honors(names, people, reventador, scoring_table):
 
 
 def compute_knockout_metrics(data):
-    """Métricas del relato KO (variantes B/C) derivadas de las porras reales."""
+    """Métricas del relato KO derivadas de las porras reales."""
     names = data["names"]
     n = data["n"]
     raw = data["knockouts"]
@@ -2578,6 +2854,9 @@ def compute_live(data, matches):
             row["standings_pts"] = standings_pts[i]
             row["thirds_pts"] = thirds_pts[i]
             row["ko_pts"] = ko_row.get("pts", 0)
+            row["ko_exact"] = ko_row.get("exact", 0)
+            row["ko_outcomes"] = ko_row.get("outcomes", 0)
+            row["ko_advance"] = ko_row.get("advance", 0)
             row["round_ko_pts"] = ko_row.get("pts", 0)
             row["round_exact"] = ko_row.get("exact", 0)
             row["round_sign"] = ko_row.get("outcomes", 0)
@@ -2606,6 +2885,7 @@ def compute_live(data, matches):
     for i in range(n):
         nm = names[i]
         kp = ko_pts_by_name.get(nm, 0)
+        ko_row = ko_rows_by_name.get(nm, {})
         grand_rows.append({
             "name": nm,
             "pts": pts[i],
@@ -2613,6 +2893,9 @@ def compute_live(data, matches):
             "standings_pts": standings_pts[i],
             "thirds_pts": thirds_pts[i],
             "ko_pts": kp,
+            "ko_exact": ko_row.get("exact", 0),
+            "ko_outcomes": ko_row.get("outcomes", 0),
+            "ko_advance": ko_row.get("advance", 0),
             "exact": exact[i],
             "sign": sign[i],
             "_order": i,
@@ -2852,34 +3135,29 @@ def compute_today(data, matches):
 
 
 def compute_match_stake(match, results, live_table):
-    """Cuánto puede mover el ranking un partido de grupos aún sin jugar."""
+    """Cuánto puede mover el ranking un partido de grupos (escenarios realistas)."""
     if match["code"] in results or not live_table:
         return None
-    max_swing = 0
-    picks = 0
-    rank_rows = {r["name"]: r for r in live_table}
-    for pick in match["picks"]:
-        h, a = pick["home"], pick["away"]
-        if h is None:
-            continue
-        picks += 1
-        row = rank_rows.get(pick["name"])
-        if not row:
-            continue
-        new_pts = row["pts"] + 4
-        new_rank = 1 + sum(
-            1 for r in live_table
-            if r["pts"] > new_pts
-            or (r["pts"] == new_pts and r["name"].lower() < pick["name"].lower())
-        )
-        max_swing = max(max_swing, row["rank"] - new_rank)
-    if not picks:
+    picks_by_name = {p["name"]: p for p in match["picks"]}
+    scenarios = _group_match_scenarios(match)
+    if not scenarios:
         return None
-    return {
-        "max_swing": max_swing,
-        "max_points": picks * 4,
-        "picks": picks,
-    }
+    names = [row["name"] for row in live_table]
+
+    def points_for_name(name, scenario):
+        pick = picks_by_name.get(name)
+        if not pick or pick["home"] is None:
+            return None
+        rh, ra = scenario
+        return _group_points_for_pick(pick["home"], pick["away"], rh, ra)
+
+    return _compute_scenario_stake(
+        names,
+        live_table,
+        scenarios,
+        points_for_name,
+        _format_group_scenario,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -2938,33 +3216,14 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .bar-fill.cool{background:linear-gradient(90deg,#2b6f7f,#4a9aa8)}
 .bar-fill.gold{background:linear-gradient(90deg,#caa24a,var(--gold))}
 .bar-val{font-family:'Space Grotesk';font-weight:700;text-align:right;font-size:.95rem}
-/* ranking evolution */
-.rank-proto-card{background:rgba(0,26,31,.34);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;overflow:hidden}
+/* live ranking (?view=live → #aciertos): match-by-match race only */
+.rank-proto-card{background:rgba(0,26,31,.34);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:18px;overflow:visible}
 .rank-proto-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
 .rank-proto-top h3{font-size:1.08rem;margin-bottom:4px}
-.rank-proto-meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.rank-state-pill{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:6px 9px;
-  color:var(--muted);font-size:.78rem;white-space:nowrap}
-.rank-state-pill b{color:var(--text);font-family:'Space Grotesk'}
-.bump-scroll,.rank-matrix-scroll{overflow-x:auto;padding:6px 2px 12px}
-.bump-svg{display:block;min-width:880px}
-.bump-grid{stroke:rgba(226,246,239,.13);stroke-dasharray:2 5}
-.bump-axis-label{fill:var(--muted);font:700 11px 'Space Grotesk',sans-serif}
-.bump-rank-label{fill:rgba(226,246,239,.6);font:700 11px 'Space Grotesk',sans-serif}
-.bump-name{font:700 12px 'Inter',sans-serif}
-.bump-score{fill:var(--muted);font:600 11px 'Space Grotesk',sans-serif}
-.bump-line{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.bump-line-muted{opacity:.22}
-.bump-point{stroke:#001a1f;stroke-width:2}
-.rank-table-compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:14px}
-.rank-table-compact .rank-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;background:rgba(255,255,255,.045);
-  border:1px solid rgba(122,252,208,.1);border-radius:10px;padding:8px 10px;font-size:.83rem}
-.rank-row .rr-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank-row .rr-points{font-family:'Space Grotesk';font-weight:700;color:var(--gold)}
 .rr-breakdown{display:block;font-size:.7rem;font-weight:500;color:var(--muted);letter-spacing:.01em;margin-top:1px}
 .rank-delta{font-family:'Space Grotesk';font-size:.72rem;color:var(--muted);white-space:nowrap}
 .rank-delta.up{color:var(--mint)}.rank-delta.down{color:var(--red)}
-.race-layout{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:16px;align-items:start}
+.race-layout{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:16px;align-items:start;overflow:visible}
 .race-control{background:linear-gradient(160deg,rgba(122,252,208,.08),rgba(255,210,122,.055));border:1px solid var(--line);border-radius:14px;padding:14px}
 .race-control input{width:100%;accent-color:var(--mint);margin:12px 0}
 .race-actions{display:grid;grid-template-columns:36px 36px 1fr 36px;gap:8px;align-items:center;margin:12px 0}
@@ -2978,19 +3237,7 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .race-now b{display:block;color:var(--text);font-family:'Space Grotesk';font-size:1rem}
 .race-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:.76rem;color:var(--muted)}
 .race-legend span{display:inline-flex;align-items:center;gap:6px}.race-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
-.race-feed{display:grid;gap:9px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(122,252,208,.12)}
-.race-feed-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font:800 .68rem 'Space Grotesk';letter-spacing:.08em;
-  text-transform:uppercase;color:var(--muted)}
-.race-feed-title span{color:var(--gold);letter-spacing:0;text-transform:none}
-.race-feed-list{display:grid;gap:6px}
-.race-feed-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:rgba(0,0,0,.16);
-  border:1px solid rgba(255,255,255,.06);border-left:3px solid var(--runner,var(--mint));border-radius:9px;padding:7px 8px;min-width:0}
-.race-feed-row b{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.race-feed-row small{font-family:'Space Grotesk';font-weight:800;color:var(--gold);white-space:nowrap}
-.race-feed-row small.sign-pts{color:var(--mint)}
-.race-feed-row .rank-delta{justify-self:end;background:rgba(0,0,0,.18);border-radius:999px;padding:2px 6px;font-size:.68rem}
-.race-feed-empty{border:1px dashed rgba(226,246,239,.13);border-radius:9px;padding:8px;color:var(--muted);font-size:.78rem}
-.race-board{display:grid;gap:8px;isolation:isolate}
+.race-board{display:grid;gap:8px;position:relative;z-index:0;overflow:visible}
 .race-row{display:grid;grid-template-columns:34px minmax(82px,170px) 68px minmax(42px,1fr) 42px 42px;gap:9px;align-items:center;background:rgba(255,255,255,.04);
   border:1px solid rgba(122,252,208,.08);border-left:4px solid var(--runner);border-radius:10px;padding:7px 10px;min-width:0;
   position:relative;will-change:transform,box-shadow;transition:border-color .25s ease,background .25s ease}
@@ -3006,28 +3253,26 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 @keyframes rankGlowDown{0%,100%{box-shadow:0 0 0 rgba(255,122,122,0)}45%{box-shadow:0 0 0 1px rgba(255,122,122,.24),0 0 24px rgba(255,122,122,.13)}}
 .race-round{font-family:'Space Grotesk';font-weight:800;color:var(--runner);text-align:right;font-size:.88rem}
 .race-row .race-tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%) translateY(5px);
-  background:#02181c;border:1px solid rgba(122,252,208,.28);border-radius:11px;padding:9px 14px;display:flex;gap:16px;
-  white-space:nowrap;box-shadow:0 14px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;
+  background:#02181c;border:1px solid rgba(122,252,208,.28);border-radius:11px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;
+  min-width:200px;box-shadow:0 14px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;
   transition:opacity .16s ease,transform .16s ease;z-index:20}
 .race-row .race-tip::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);
   border:6px solid transparent;border-top-color:#02181c}
-.race-row .race-tip .rt-item{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.62rem;
-  color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
-.race-row .race-tip .rt-item b{font-family:'Space Grotesk';font-size:1.12rem;line-height:1;color:var(--text)}
-.race-row .race-tip .rt-pleno b{color:var(--gold)}
-.race-row .race-tip .rt-sign b{color:var(--mint)}
-.race-row .race-tip .rt-step b,.race-row .race-tip .rt-bonus b{color:#75e0ff}
+.race-tip .rt-block{display:flex;flex-direction:column;gap:5px}
+.race-tip .rt-block+.rt-block{padding-top:8px;border-top:1px solid rgba(122,252,208,.14)}
+.race-tip .rt-head{font:800 .62rem 'Space Grotesk';letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.race-tip .rt-items{display:flex;flex-wrap:wrap;gap:6px 10px}
+.race-tip .rt-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font-size:.62rem;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.race-tip .rt-item b{font-family:'Space Grotesk';font-size:1rem;line-height:1.1;color:var(--text)}
+.race-tip .rt-item .rt-pts{font-size:.92rem;margin-top:1px}
+.race-tip .rt-sum{font:700 .72rem 'Space Grotesk';color:var(--gold);letter-spacing:.02em;text-transform:none}
+.race-tip .rt-pleno b,.race-tip .rt-pleno .rt-pts{color:var(--gold)}
+.race-tip .rt-sign b,.race-tip .rt-sign .rt-pts{color:var(--mint)}
+.race-tip .rt-bonus b,.race-tip .rt-bonus .rt-pts{color:#75e0ff}
+.race-tip .rt-ko b,.race-tip .rt-ko .rt-pts{color:#c9a8ff}
 .race-row:hover{z-index:30;cursor:default}
 .race-row:hover .race-tip{opacity:1;transform:translateX(-50%) translateY(0)}
-.rank-matrix{display:grid;gap:3px;align-items:center;width:max-content;min-width:100%}
-.rank-matrix-name{width:118px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:.78rem}
-.rank-matrix-cell{width:31px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-  font:700 .72rem 'Space Grotesk',sans-serif;color:#001a1f}
-.rank-matrix-head{height:24px;color:var(--muted);font:700 .65rem 'Space Grotesk',sans-serif;text-align:center}
-.proto-switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:120;display:flex;align-items:center;gap:10px;
-  background:#e2f6ef;color:#001a1f;border:1px solid rgba(255,255,255,.65);border-radius:999px;padding:8px 10px;box-shadow:0 16px 50px rgba(0,0,0,.35)}
-.proto-switcher button{border:0;background:#001a1f;color:var(--mint);width:32px;height:32px;border-radius:50%;font:800 1rem 'Space Grotesk';cursor:pointer}
-.proto-switcher span{font:800 .78rem 'Space Grotesk';letter-spacing:.04em;white-space:nowrap}
 /* PODIUM */
 .podium{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:end;margin-bottom:30px}
 .pod{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;text-align:center;position:relative}
@@ -3118,7 +3363,6 @@ footer .brand svg{height:20px;width:auto}
   .g3,.g4{grid-template-columns:repeat(2,1fr)}.duo,.podium,.ko-summary{grid-template-columns:1fr}
   .chips{grid-template-columns:repeat(2,1fr)}
   .race-layout{grid-template-columns:1fr}
-  .proto-switcher{bottom:62px}
 }
 @media(max-width:560px){
   .g2,.g3,.g4{grid-template-columns:1fr}
@@ -3370,12 +3614,8 @@ const LABELS = {
 };
 function labelOf(k){ const x = LABELS[k] || LABELS.equilibrado; return L(x[0], x[1]); }
 
-// Live ranking variants, switchable via ?variant=A/B/C. Variant B is the default in #aciertos.
-const RANKING_VARIANTS = {
-  A: ['Bump chart', 'Bump chart'],
-  B: ['Carrera por partido', 'Match-by-match race'],
-  C: ['Matriz de posiciones', 'Rank matrix'],
-};
+/* ---- LIVE RANKING (?view=live → #aciertos) ----
+   Single UI: match-by-match race (slider + bar board). No ?variant= switcher. */
 /* Colour por persona, determinista: cada participante conserva SIEMPRE el mismo
    color en todas las secciones, independientemente de su puesto actual en el
    ranking. El tono sale de un índice alfabético estable repartido por el ángulo
@@ -3398,20 +3638,7 @@ function personColor(name){
   for(let i=0;i<name.length;i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return `hsl(${h % 360} 72% 64%)`;
 }
-let prototypeKeyListenerReady = false;
 let racePlayTimer = null;
-
-function currentRankingVariant(){
-  const raw = new URLSearchParams(location.search).get('variant');
-  const key = raw ? raw.toUpperCase() : '';
-  return RANKING_VARIANTS[key] ? key : 'B';
-}
-function explicitRankingVariant(){
-  const raw = new URLSearchParams(location.search).get('variant');
-  const key = raw ? raw.toUpperCase() : '';
-  return RANKING_VARIANTS[key] ? key : null;
-}
-function variantLabel(key){ const x = RANKING_VARIANTS[key] || RANKING_VARIANTS.A; return key + ' · ' + L(x[0], x[1]); }
 function liveHistory(){ return (D.live && D.live.progression) || []; }
 function latestSnapshot(){ const h = liveHistory(); return h[h.length - 1] || null; }
 function matchTitle(m){
@@ -3453,110 +3680,56 @@ function clearRaceTimer(){
     racePlayTimer = null;
   }
 }
-function rowMap(rows){
-  const map = {};
-  rows.forEach(r => { map[r.name] = r; });
-  return map;
-}
-function smoothPath(points){
-  if(!points.length) return '';
-  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for(let i=1;i<points.length;i++){
-    const a = points[i-1], b = points[i], mid = (a.x + b.x) / 2;
-    d += ` C ${mid.toFixed(1)} ${a.y.toFixed(1)} ${mid.toFixed(1)} ${b.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
-  }
-  return d;
-}
-function tipItem(value, label, cls){
-  return `<span class="rt-item ${cls || ''}"><b>${value}</b>${label}</span>`;
+function tipMetric(count, pts, label, cls){
+  if(!pts && !count) return '';
+  const countLine = count != null ? `<b>${count}</b>${label}` : `<span>${label}</span>`;
+  return `<span class="rt-item ${cls || ''}">${countLine}<b class="rt-pts">+${pts}</b></span>`;
 }
 function rankTip(r){
-  const items = [
-    tipItem(r.exact || 0, L('plenos','exact'), 'rt-pleno'),
-    tipItem(r.sign || 0, L('signos','outcomes'), 'rt-sign'),
-    tipItem(r.pts, 'pts')
-  ];
-  if(r.round_pts) items.push(tipItem('+'+r.round_pts, L('este paso','this step'), 'rt-step'));
-  if(r.round_standings_pts) items.push(tipItem('+'+r.round_standings_pts, L('clasif.','standings'), 'rt-bonus'));
-  if(r.round_thirds_pts) items.push(tipItem('+'+r.round_thirds_pts, L('3.ºs','thirds'), 'rt-bonus'));
-  if(r.round_ko_pts){
-    items.push(tipItem('+'+r.round_ko_pts, 'KO', 'rt-bonus'));
-    if(r.round_exact) items.push(tipItem(r.round_exact, L('pleno KO','KO exact'), 'rt-pleno'));
-    if(r.round_sign) items.push(tipItem(r.round_sign, L('signo KO','KO outcome'), 'rt-sign'));
-    if(r.round_advance) items.push(tipItem(r.round_advance, L('pase','advance'), 'rt-bonus'));
-  }
-  return `<div class="race-tip">${items.join('')}</div>`;
+  const gExact = r.exact || 0;
+  const gSign = r.sign || 0;
+  const gPlenoPts = gExact * 4;
+  const gSignPts = gSign * 2;
+  const gStand = r.standings_pts || 0;
+  const gThird = r.thirds_pts || 0;
+  const gTotal = gPlenoPts + gSignPts + gStand + gThird;
+  const groupItems = [
+    tipMetric(gExact, gPlenoPts, L('plenos','exact'), 'rt-pleno'),
+    tipMetric(gSign, gSignPts, L('signos','outcomes'), 'rt-sign'),
+    gStand ? tipMetric(null, gStand, L('clasificados','standings'), 'rt-bonus') : '',
+    gThird ? tipMetric(null, gThird, L('terceros','thirds'), 'rt-bonus') : '',
+  ].filter(Boolean).join('');
+  if(!groupItems && !gTotal) return '';
+  const groupBlock = `<div class="rt-block">
+    <div class="rt-head">${L('Fase de grupos','Group stage')}</div>
+    <div class="rt-items">${groupItems}</div>
+    <div class="rt-sum">= ${gTotal} pts</div>
+  </div>`;
+
+  const koPts = r.ko_pts || 0;
+  if(!koPts) return `<div class="race-tip">${groupBlock}</div>`;
+
+  const koExact = r.ko_exact || 0;
+  const koOut = r.ko_outcomes || 0;
+  const koSignOnly = Math.max(0, koOut - koExact);
+  const koExactPts = koExact * 5;
+  const koSignPts = koSignOnly * 3;
+  const koAdv = r.ko_advance || 0;
+  const koAdvPts = Math.max(0, koPts - koExactPts - koSignPts);
+  const koItems = [
+    koExact ? tipMetric(koExact, koExactPts, L('plenos','exact'), 'rt-ko') : '',
+    koSignOnly ? tipMetric(koSignOnly, koSignPts, L('signos','outcomes'), 'rt-ko') : '',
+    koAdv ? tipMetric(koAdv, koAdvPts, L('pases','advances'), 'rt-ko') : '',
+    !koExact && !koSignOnly && !koAdv ? tipMetric(null, koPts, L('puntos','points'), 'rt-ko') : '',
+  ].filter(Boolean).join('');
+  const koBlock = `<div class="rt-block">
+    <div class="rt-head">${L('Eliminatorias','Knockouts')}</div>
+    <div class="rt-items">${koItems}</div>
+    <div class="rt-sum">= ${koPts} pts</div>
+  </div>`;
+  return `<div class="race-tip">${groupBlock}${koBlock}</div>`;
 }
-function rankSummaryText(r){
-  return `${r.exact || 0} ${L('plenos','exact')} · ${r.sign || 0} ${L('aciertos','outcomes')} · ${r.pts} pts`;
-}
-function rankBreakdown(r){
-  if(!(r.standings_pts || r.thirds_pts || r.ko_pts)) return '';
-  const parts = [`${L('grupos','groups')} ${r.group_pts || 0}`];
-  if(r.standings_pts) parts.push(`${L('clasif.','standings')} +${r.standings_pts}`);
-  if(r.thirds_pts) parts.push(`${L('3.ºs','thirds')} +${r.thirds_pts}`);
-  if(r.ko_pts) parts.push(`KO +${r.ko_pts}`);
-  return `<span class="rr-breakdown">${parts.join(' · ')}</span>`;
-}
-function renderRankingState(rows, limit){
-  return `<div class="rank-table-compact">${rows.slice(0, limit || rows.length).map(r =>
-    `<div class="rank-row" title="${esc(r.name)} — ${rankSummaryText(r)}">
-      <div class="bar-rank">${r.rank}</div>
-      <div class="rr-name">${esc(r.name)} ${rankDelta(r)}${rankBreakdown(r)}</div>
-      <div class="rr-points">${r.pts}</div>
-    </div>`).join('')}</div>`;
-}
-function rankHeat(rank, total){
-  const t = total <= 1 ? 0 : (rank - 1) / (total - 1);
-  if(t < .12) return '#ffd27a';
-  if(t < .38) return '#7afcd0';
-  if(t < .7) return '#75e0ff';
-  return '#ff8e7d';
-}
-function setRankingVariant(next){
-  clearRaceTimer();
-  const url = new URL(location.href);
-  url.searchParams.set('variant', next);
-  if(!url.hash) url.hash = '#aciertos';
-  history.replaceState(null, '', url);
-  rebuild();
-  const target = document.getElementById('aciertos');
-  if(target) target.scrollIntoView({block:'start'});
-}
-function cycleRankingVariant(dir){
-  const keys = Object.keys(RANKING_VARIANTS);
-  const current = currentRankingVariant();
-  const idx = keys.indexOf(current);
-  setRankingVariant(keys[(idx + dir + keys.length) % keys.length]);
-}
-function ensurePrototypeKeys(){
-  if(prototypeKeyListenerReady) return;
-  document.addEventListener('keydown', e => {
-    if(!currentRankingVariant()) return;
-    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
-    if(tag === 'input' || tag === 'textarea' || (document.activeElement && document.activeElement.isContentEditable)) return;
-    if(e.key === 'ArrowLeft'){ e.preventDefault(); cycleRankingVariant(-1); }
-    if(e.key === 'ArrowRight'){ e.preventDefault(); cycleRankingVariant(1); }
-  });
-  prototypeKeyListenerReady = true;
-}
-function renderPrototypeSwitcher(){
-  const old = document.querySelector('.proto-switcher');
-  if(old) old.remove();
-  const key = explicitRankingVariant();
-  if(!key) return;
-  ensurePrototypeKeys();
-  const bar = el('div','proto-switcher',
-    `<button type="button" data-dir="-1" aria-label="${L('Variante anterior','Previous variant')}">‹</button>
-     <span>${variantLabel(key)}</span>
-     <button type="button" data-dir="1" aria-label="${L('Variante siguiente','Next variant')}">›</button>`);
-  bar.addEventListener('click', e => {
-    const b = e.target.closest('button[data-dir]');
-    if(b) cycleRankingVariant(Number(b.dataset.dir));
-  });
-  document.body.appendChild(bar);
-}
-function buildRankingPrototype(s, variant){
+function buildLiveRanking(s){
   const snap = latestSnapshot();
   if(!snap){
     s.appendChild(el('div','card teaser reveal',
@@ -3564,58 +3737,6 @@ function buildRankingPrototype(s, variant){
        <p class="muted">${L('El ranking necesita al menos un resultado real cargado.','The ranking needs at least one real score loaded.')}</p>`));
     return;
   }
-  if(variant === 'B') return buildRankingRaceVariant(s);
-  if(variant === 'C') return buildRankingMatrixVariant(s);
-  return buildRankingBumpVariant(s);
-}
-function buildRankingBumpVariant(s){
-  const hist = liveHistory(), finalRows = D.live.table, total = finalRows.length;
-  const names = finalRows.map(r => r.name);
-  const left = 112, right = 166, top = 42, rowH = 31, bottom = 46;
-  const plotW = Math.max(740, (hist.length - 1) * 76);
-  const width = left + plotW + right, height = top + rowH * Math.max(1, total - 1) + bottom;
-  const maps = hist.map(h => rowMap(h.table));
-  const xAt = i => left + (hist.length <= 1 ? 0 : (i / (hist.length - 1)) * plotW);
-  const yAt = rank => top + (rank - 1) * rowH;
-  const grid = hist.map((h,i) => {
-    const x = xAt(i);
-    const label = i === 0 || i === hist.length - 1 || i % 3 === 0 ? `<text class="bump-axis-label" x="${x}" y="${height-14}" text-anchor="middle">P${h.idx}</text>` : '';
-    return `<line class="bump-grid" x1="${x}" y1="${top-18}" x2="${x}" y2="${height-bottom+12}"></line>${label}`;
-  }).join('');
-  const rankLabels = [1,2,3,5,10,15,20,total].filter((v,i,a) => v <= total && a.indexOf(v) === i).map(r =>
-    `<text class="bump-rank-label" x="${left-58}" y="${yAt(r)+4}">#${r}</text>
-     <line class="bump-grid" x1="${left-24}" y1="${yAt(r)}" x2="${width-right+24}" y2="${yAt(r)}"></line>`).join('');
-  const lines = names.map((name, idx) => {
-    const points = maps.map((m,i) => ({x:xAt(i), y:yAt(m[name].rank), row:m[name], snap:hist[i]}));
-    const color = personColor(name);
-    const prominent = idx < 8;
-    const first = points[0], last = points[points.length - 1];
-    const nodes = prominent ? points.map(p => `<circle class="bump-point" cx="${p.x}" cy="${p.y}" r="4" fill="${color}"><title>${esc(name)} · #${p.row.rank} · ${p.row.pts} pts · ${p.snap.code}</title></circle>`).join('') : '';
-    return `<path class="bump-line ${prominent?'':'bump-line-muted'}" d="${smoothPath(points)}" stroke="${color}" stroke-width="${prominent?4:2}"><title>${esc(name)}</title></path>
-      ${nodes}
-      <text class="bump-name" x="${left-12}" y="${first.y+4}" text-anchor="end" fill="${color}">${esc(name)}</text>
-      <text class="bump-name" x="${width-right+12}" y="${last.y+4}" fill="${color}">${esc(name)}</text>
-      <text class="bump-score" x="${width-right+112}" y="${last.y+4}" text-anchor="end">${last.row.pts} pts</text>`;
-  }).join('');
-  const card = el('div','rank-proto-card reveal',
-    `<div class="rank-proto-top">
-      <div><h3>${L('Evolución puesto a puesto','Position-by-position evolution')}</h3>
-      <p class="muted">${L('Cada línea sigue el ranking tras cada partido y los hitos de clasificados/eliminatorias.','Each line follows the ranking after every match and standings/knockout milestones.')}</p></div>
-      <div class="rank-proto-meta">
-        <span class="rank-state-pill"><b>${D.live.played}</b> ${L('partidos','matches')}</span>
-        <span class="rank-state-pill"><b>${esc(finalRows[0].name)}</b> ${L('líder','leader')}</span>
-        <span class="rank-state-pill"><b>${finalRows[0].pts}</b> pts</span>
-      </div>
-    </div>
-    <div class="bump-scroll">
-      <svg class="bump-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${L('Evolución del ranking partido a partido','Ranking evolution match by match')}">
-        ${grid}${rankLabels}${lines}
-      </svg>
-    </div>
-    ${renderRankingState(finalRows, 12)}`);
-  s.appendChild(card);
-}
-function buildRankingRaceVariant(s){
   clearRaceTimer();
   const hist = liveHistory(), finalRows = D.live.table, mx = finalRows[0].pts || 1, colors = rankingColorMap();
   const card = el('div','rank-proto-card reveal',
@@ -3641,7 +3762,6 @@ function buildRankingRaceVariant(s){
           <span><i class="race-dot" style="background:var(--red)"></i>${L('baja en ranking','rank down')}</span>
           <span><i class="race-dot" style="background:var(--gold)"></i>${L('pts del partido','match pts')}</span>
         </div>
-        <div class="race-feed"></div>
       </div>
       <div class="race-board"></div>
     </div>`);
@@ -3651,7 +3771,6 @@ function buildRankingRaceVariant(s){
   const date = card.querySelector('.race-date');
   const step = card.querySelector('.race-step');
   const now = card.querySelector('.race-now');
-  const feed = card.querySelector('.race-feed');
   const play = card.querySelector('.race-play');
   const prev = card.querySelector('.race-prev');
   const next = card.querySelector('.race-next');
@@ -3684,71 +3803,6 @@ function buildRankingRaceVariant(s){
       <div class="race-round">+${r.round_pts || 0}</div>
       ${rankTip(r)}
     </div>`;
-  }
-  function feedRow(row, valueHtml){
-    return `<div class="race-feed-row" style="--runner:${colors[row.name] || personColor(row.name)}">
-      <b>${esc(row.name)}</b>
-      ${valueHtml}
-    </div>`;
-  }
-  function raceFeedHtml(snap){
-    if(snap.virtual){
-      const isKo = snap.kind === 'ko';
-      const bonus = snap.table
-        .filter(r => (r.round_pts || 0) > 0)
-        .sort((a,b) => b.round_pts - a.round_pts || a.rank - b.rank)
-        .slice(0, 8);
-      const movers = snap.table
-        .filter(r => r.delta !== 0)
-        .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
-        .slice(0, 4);
-      const movementRows = movers.length
-        ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
-        : `<div class="race-feed-empty">${L('Sin cambios de puesto.','No rank changes.')}</div>`;
-      const bonusRows = bonus.length
-        ? bonus.map(r => {
-            const parts = [];
-            if(isKo){
-              if(r.round_exact) parts.push(L('pleno','exact'));
-              else if(r.round_sign) parts.push(L('signo','outcome'));
-              if(r.round_advance) parts.push(`${L('pase','advance')} x${r.round_advance}`);
-              return feedRow(r, `<small>KO +${r.round_pts}${parts.length ? ' · '+parts.join(' · ') : ''}</small>`);
-            }
-            if(r.round_standings_pts) parts.push(`${L('clasif.','standings')} +${r.round_standings_pts}`);
-            if(r.round_thirds_pts) parts.push(`${L('3.ºs','thirds')} +${r.round_thirds_pts}`);
-            return feedRow(r, `<small>🏁 +${r.round_pts}${parts.length ? ' · '+parts.join(' · ') : ''}</small>`);
-          }).join('')
-        : `<div class="race-feed-empty">${isKo ? L('Nadie suma en eliminatorias.','No knockout points awarded.') : L('Nadie suma en clasificados.','No standings points awarded.')}</div>`;
-      return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
-        <div class="race-feed-list">${movementRows}</div>
-        <div class="race-feed-title">${isKo ? L('Puntos KO','KO points') : L('Puntos de clasificados','Standings points')}<span>${bonus.length}</span></div>
-        <div class="race-feed-list">${bonusRows}</div>`;
-    }
-    const movers = snap.table
-      .filter(r => r.delta !== 0)
-      .sort((a,b) => Math.abs(b.delta) - Math.abs(a.delta) || b.round_pts - a.round_pts || a.rank - b.rank)
-      .slice(0, 4);
-    const plenos = snap.table
-      .filter(r => (r.round_exact || 0) > 0)
-      .sort((a,b) => a.rank - b.rank);
-    const signos = snap.table
-      .filter(r => (r.round_sign || 0) > 0)
-      .sort((a,b) => a.rank - b.rank);
-    const movementRows = movers.length
-      ? movers.map(r => feedRow(r, rankDeltaLong(r))).join('')
-      : `<div class="race-feed-empty">${L('Sin cambios de puesto en este partido.','No rank changes in this match.')}</div>`;
-    const plenoRows = plenos.length
-      ? plenos.map(r => feedRow(r, `<small>🎯 +${r.round_pts}</small>`)).join('')
-      : `<div class="race-feed-empty">${L('Sin plenos en este partido.','No exact scores this match.')}</div>`;
-    const signoRows = signos.length
-      ? signos.map(r => feedRow(r, `<small class="sign-pts">✓ +2</small>`)).join('')
-      : `<div class="race-feed-empty">${L('Sin aciertos de signo en este partido.','No correct outcomes this match.')}</div>`;
-    return `<div class="race-feed-title">${L('Movimientos','Movements')}<span>${movers.length}</span></div>
-      <div class="race-feed-list">${movementRows}</div>
-      <div class="race-feed-title">${L('Plenos del partido','Exact scores')}<span>${plenos.length}</span></div>
-      <div class="race-feed-list">${plenoRows}</div>
-      <div class="race-feed-title">${L('Aciertos de signo','Correct outcomes')}<span>${signos.length}</span></div>
-      <div class="race-feed-list">${signoRows}</div>`;
   }
   function animateRowsFrom(previousRects){
     if(!previousRects || !previousRects.size || !board.isConnected || typeof Element === 'undefined') return;
@@ -3788,7 +3842,6 @@ function buildRankingRaceVariant(s){
       <span><b>${esc(leader.name)}</b>${L('líder','leader')} · ${leader.pts} pts</span>
       <span><b>${movers}</b>${L('movimientos','moves')}</span>
       <span><b>+${pointsNow}</b>${L('pts repartidos','pts awarded')}</span>`;
-    feed.innerHTML = raceFeedHtml(snap);
     board.innerHTML = snap.table.map(rowHtml).join('');
     requestAnimationFrame(() => animateRowsFrom(previousRects));
   }
@@ -3808,36 +3861,8 @@ function buildRankingRaceVariant(s){
   paint({animate:false});
   s.appendChild(card);
 }
-function buildRankingMatrixVariant(s){
-  const hist = liveHistory(), finalRows = D.live.table, total = finalRows.length;
-  const cols = `118px repeat(${hist.length},31px)`;
-  const header = `<div></div>` + hist.map(h =>
-    `<div class="rank-matrix-head">${h.virtual ? '★' : 'P'+h.idx}</div>`).join('');
-  const maps = hist.map(h => rowMap(h.table));
-  const rows = finalRows.map(person => {
-    const cells = hist.map((h,i) => {
-      const r = maps[i][person.name];
-      return `<div class="rank-matrix-cell" style="background:${rankHeat(r.rank,total)}" title="${esc(person.name)} · ${h.code} · #${r.rank} · ${r.pts} pts">${r.rank}</div>`;
-    }).join('');
-    return `<div class="rank-matrix-name">${esc(person.name)}</div>${cells}`;
-  }).join('');
-  const card = el('div','rank-proto-card reveal',
-    `<div class="rank-proto-top">
-      <div><h3>${L('Todas las posiciones, sin cruces','Every rank without crossing lines')}</h3>
-      <p class="muted">${L('Cada celda es el puesto de una persona tras ese partido; dorado arriba, rojo abajo.','Each cell is a person’s rank after that match; gold is top, red is bottom.')}</p></div>
-      <div class="rank-proto-meta">
-        <span class="rank-state-pill"><b>${total}</b> ${L('personas','people')}</span>
-        <span class="rank-state-pill"><b>${hist.length}</b> ${L('pasos','steps')}</span>
-      </div>
-    </div>
-    <div class="rank-matrix-scroll">
-      <div class="rank-matrix" style="grid-template-columns:${cols}">${header}${rows}</div>
-    </div>
-    ${renderRankingState(finalRows, total)}`);
-  s.appendChild(card);
-}
 
-/* shared tooltip for the matrix */
+/* shared tooltip for affinity matrix */
 const tip = el('div'); tip.id = 'mtip'; document.body.appendChild(tip);
 
 function section(id, kicker, title, sub){
@@ -3900,31 +3925,86 @@ function todayScheduleMatches(){
   return groupMatches.concat(knockoutMatches);
 }
 
+function stakeResultLbl(r){
+  if(!r) return '';
+  let s = r.score;
+  if(r.winner){
+    const w = LANG === 'es' ? r.winner : (r.winner_en || r.winner);
+    s += ` · ${r.winner_flag || ''} ${esc(team(w))}`;
+  }
+  return s;
+}
+
+function stakeSwingHtml(st){
+  const up = st.max_swing || 0, down = st.min_swing || 0;
+  if(!up && !down) return `<div class="swing">0</div>
+      <div class="muted" style="font-size:.82rem">${L('sin movimiento','no movement')}</div>`;
+  const parts = [];
+  if(up) parts.push(`+${up}`);
+  if(down) parts.push(`−${down}`);
+  let hints = '';
+  if(up && st.max_swing_result){
+    const who = st.max_swing_who ? ` <span class="muted">(${esc(st.max_swing_who)})</span>` : '';
+    hints += `<div class="muted" style="font-size:.75rem;margin-top:4px;line-height:1.35">+${up} ${L('si sale','if')} <b>${stakeResultLbl(st.max_swing_result)}</b>${who}</div>`;
+  }
+  if(down && st.min_swing_result){
+    const who = st.min_swing_who ? ` <span class="muted">(${esc(st.min_swing_who)})</span>` : '';
+    hints += `<div class="muted" style="font-size:.75rem;margin-top:2px;line-height:1.35">−${down} ${L('si sale','if')} <b>${stakeResultLbl(st.min_swing_result)}</b>${who}</div>`;
+  }
+  return `<div class="swing">${parts.join(' / ')}</div>
+      <div class="muted" style="font-size:.82rem">${L('puestos arriba / abajo','places up / down')}</div>${hints}`;
+}
+
+function stakeDeferredHtml(st){
+  const wait = (st.pending_after || [])[0];
+  if(!wait) return '';
+  const lbl = `${wait.home_flag} ${esc(team(wait.home))} – ${esc(team(wait.away))} ${wait.away_flag}`;
+  const when = wait.time_es ? ` · ${esc(wait.time_es)}` : '';
+  return `<div class="muted" style="font-size:.82rem;margin-top:6px;line-height:1.45;max-width:280px;text-align:right;margin-left:auto">${L(
+    'El ranking en juego se calcula cuando entren los resultados anteriores de hoy',
+    'Stakes are calculated once earlier today\'s results are in'
+  )}<br><span style="color:var(--mint)">${lbl}</span>${when}</div>`;
+}
+
 function groupMatchStakeHtml(m){
   const st = m.stake;
   if(!st) return '';
+  if(st.deferred){
+    return `<div class="kp-stake tm-stake">
+      <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego en el ranking','At stake in the standings')}</div></div>
+      <div style="text-align:right">${stakeDeferredHtml(st)}</div>
+    </div>`;
+  }
   return `<div class="kp-stake tm-stake">
     <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego en el ranking','At stake in the standings')}</div>
       <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} ${st.max_points} ${L('pts repartibles','pts on the table')} · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div></div>
-    <div style="text-align:right"><div class="swing">±${st.max_swing}</div>
-      <div class="muted" style="font-size:.82rem">${L('puestos que puedes ganar','places you could gain')}</div></div>
+    <div style="text-align:right">${stakeSwingHtml(st)}</div>
   </div>`;
 }
 
 function koMatchStakeHtml(m){
   const st = m.stake;
   if(!st) return '';
-  const swingers = (st.people || []).filter(p => p.swing > 0)
-    .sort((a,b) => b.swing - a.swing || b.max_pts - a.max_pts).slice(0,4);
+  if(st.deferred){
+    return `<div class="kp-stake tm-stake">
+      <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego (eliminatorias)','At stake (knockouts)')}</div></div>
+      <div style="text-align:right">${stakeDeferredHtml(st)}</div>
+    </div>`;
+  }
+  const swingers = (st.people || []).filter(p => p.swing_up > 0 || p.swing_down > 0)
+    .sort((a,b) => (b.swing_up - a.swing_up) || (b.swing_down - a.swing_down) || b.max_pts - a.max_pts).slice(0,4);
   const swingHtml = swingers.length
-    ? `<div class="muted" style="font-size:.82rem;margin-top:8px">${L('Más en juego','Most at stake')}: ${swingers.map(p =>
-        `<b>${esc(p.name)}</b> +${p.max_pts}${p.swing ? ` (±${p.swing})` : ''}`).join(' · ')}</div>`
+    ? `<div class="muted" style="font-size:.82rem;margin-top:8px">${L('Más en juego','Most at stake')}: ${swingers.map(p => {
+        const mv = [];
+        if(p.swing_up) mv.push(`+${p.swing_up}${p.best_result ? ` (${stakeResultLbl(p.best_result)})` : ''}`);
+        if(p.swing_down) mv.push(`−${p.swing_down}${p.worst_result ? ` (${stakeResultLbl(p.worst_result)})` : ''}`);
+        return `<b>${esc(p.name)}</b> ${mv.join(' · ')}`;
+      }).join(' · ')}</div>`
     : '';
   return `<div class="kp-stake tm-stake">
     <div><div style="font:800 1.05rem 'Space Grotesk'">${L('En juego (eliminatorias)','At stake (knockouts)')}</div>
       <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${st.max_one} ${L('pts/persona','pts/person')} (+${st.advance_points} ${L('por pase','per advance')}) · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div></div>
-    <div style="text-align:right"><div class="swing">±${st.max_swing}</div>
-      <div class="muted" style="font-size:.82rem">${L('puestos en ranking KO','KO rank places')}</div></div>
+    <div style="text-align:right">${stakeSwingHtml(st)}</div>
     ${swingHtml}
   </div>`;
 }
@@ -4491,18 +4571,7 @@ function buildAciertos(){
        <p class="muted">${L('Rellena los marcadores reales en la pestaña <b>Real results</b> del Excel y vuelve a generar el dashboard: aparecerá aquí el ranking de aciertos (signo +2, marcador exacto +4).','Fill in the real scores in the <b>Real results</b> tab of the Excel and regenerate the dashboard: the scoring ranking shows up here (correct outcome +2, exact score +4).')}</p>`));
     return;
   }
-  const t = D.live.table, mx = t[0].pts || 1;
-  const variant = currentRankingVariant();
-  if(variant){
-    buildRankingPrototype(s, variant);
-    return;
-  }
-  const list = el('div','reveal');
-  t.forEach((r,i) => list.appendChild(el('div','bar-row',
-    `<div class="bar-rank">${i+1}</div><div class="bar-name">${i===0?'👑 ':''}${esc(r.name)} <span class="muted" style="font-size:.78rem">(${r.exact} ${L('plenos','exact')} · ${r.sign} ${L('signos','outcomes')})</span>${rankBreakdown(r)}</div>
-     <div class="bar-track"><div class="bar-fill gold" data-w="${(r.pts/mx*100).toFixed(1)}"></div></div>
-     <div class="bar-val" data-count="${r.pts}">0</div>`)));
-  s.appendChild(list);
+  buildLiveRanking(s);
 }
 
 /* ---- FOOTER ---- */
@@ -5269,7 +5338,6 @@ function rebuild(){
   wrap = prevWrap;
   buildFooter();
   observeAll();
-  renderPrototypeSwitcher();
 }
 rebuild();
 """

@@ -165,11 +165,52 @@ class TestTodayStake:
             {"name": "B", "pts": 12, "rank": 1},
         ]
         stake = gd.compute_match_stake(match, {}, live_table)
-        assert stake == {"max_swing": 1, "max_points": 8, "picks": 2}
+        assert stake["max_swing"] == 1
+        assert stake["min_swing"] == 1
+        assert stake["max_points"] == 8
+        assert stake["picks"] == 2
+
+    def test_scenario_stake_unanimous_pick_no_movement(self):
+        names = ["A", "B", "C"]
+        live_table = [{"name": n, "pts": 100, "rank": i + 1} for i, n in enumerate(names)]
+        match = {
+            "code": "G1",
+            "picks": [{"name": n, "home": 2, "away": 0} for n in names],
+        }
+        stake = gd.compute_match_stake(match, {}, live_table)
+        assert stake["max_swing"] == 0
+        assert stake["min_swing"] == 0
+        assert all(p["swing_up"] == 0 and p["swing_down"] == 0 for p in stake["people"])
+
+    def test_scenario_stake_sign_only_beats_you(self):
+        """Si aciertas signo pero otro hace pleno, puedes bajar."""
+        live_table = [
+            {"name": "A", "pts": 100, "rank": 1},
+            {"name": "B", "pts": 99, "rank": 2},
+        ]
+        match = {
+            "code": "G1",
+            "picks": [
+                {"name": "A", "home": 2, "away": 0},
+                {"name": "B", "home": 1, "away": 0},
+            ],
+        }
+        stake = gd.compute_match_stake(match, {}, live_table)
+        a, b = {p["name"]: p for p in stake["people"]}["A"], {p["name"]: p for p in stake["people"]}["B"]
+        assert a["swing_up"] == 0
+        assert a["swing_down"] == 1
+        assert a["worst_result"]["score"] == "1-0"
+        assert b["swing_up"] == 1
+        assert b["swing_down"] == 0
+        assert b["best_result"]["score"] == "1-0"
+        assert stake["max_swing_result"]["score"] == "1-0"
+        assert stake["min_swing_result"]["score"] == "1-0"
 
     def test_stake_section_removed_from_js(self):
         assert "buildStakeToday" not in gd.JS
         assert "koStakeHtml" not in gd.JS
+        assert "stakeSwingHtml" in gd.JS
+        assert "stakeResultLbl" in gd.JS
 
 
 class TestRecentResultsData:
@@ -260,11 +301,15 @@ class TestLiveProgressionData:
         assert ko_step["table"][0]["pts"] == live["table"][0]["pts"]
 
     def test_race_hover_shows_standings_and_knockout_sources(self):
-        assert "round_standings_pts" in gd.JS
-        assert "round_thirds_pts" in gd.JS
-        assert "round_ko_pts" in gd.JS
-        assert "round_advance" in gd.JS
-        assert "pleno KO" in gd.JS
+        assert "function buildLiveRanking" in gd.JS
+        assert "function rankTip" in gd.JS
+        assert "Fase de grupos" in gd.JS
+        assert "Eliminatorias" in gd.JS
+        assert "ko_exact" in gd.JS
+        assert "ko_outcomes" in gd.JS
+        assert "ko_advance" in gd.JS
+        assert "RANKING_VARIANTS" not in gd.JS
+        assert "race-feed" not in gd.JS
 
     def test_live_progression_rows_have_rank_and_delta(self, computed_data, workbook_data):
         live = computed_data["live"]
@@ -382,6 +427,8 @@ class TestKnockoutData:
                     "advance_points": 1,
                     "matches": [{
                         "code": "R32-M1",
+                        "date": "2026-06-29",
+                        "dt": "2026-06-29T20:00:00",
                         "score_picks": [(1, 0), (0, 1)],
                         "penalty_picks": ["México", "Sudáfrica"],
                         "winner_picks": ["México", "Sudáfrica"],
@@ -422,14 +469,29 @@ class TestKnockoutData:
         assert "D.today.matches.length" not in gd.JS
 
     def test_knockout_matches_expose_picks_and_stake(self, computed_data):
-        unplayed = computed_data["knockout"]["rounds"][0]["matches"][0]
-        assert unplayed["code"] == "R32-M1"
+        unplayed = next(
+            m for rnd in computed_data["knockout"]["rounds"] for m in rnd["matches"]
+            if m["code"] == "R32-M9"
+        )
         assert "picks" in unplayed
         assert len(unplayed["picks"]) == computed_data["hero"]["participants"]
         assert "outcome_dist" in unplayed
         assert "stake" in unplayed
         assert unplayed["stake"]["max_one"] == 6
         assert unplayed["stake"]["picks"] > 0
+        assert unplayed["stake"]["max_swing"] <= 10
+
+    def test_ko_match_stake_uses_live_ranking(self, computed_data):
+        unplayed = next(
+            m for rnd in computed_data["knockout"]["rounds"] for m in rnd["matches"]
+            if m["code"] == "R32-M9"
+        )
+        nadia_stake = next(
+            p for p in unplayed["stake"]["people"] if p["name"] == "Nadia"
+        )
+        assert nadia_stake["swing_up"] < 10
+        assert "swing_down" in nadia_stake
+        assert unplayed["stake"]["min_swing"] >= 0
 
     def test_knockout_progression_after_r32_m3(self, computed_data):
         prog = computed_data["knockout"]["progression"]
@@ -538,16 +600,43 @@ class TestKnockoutData:
         match = {
             "score_picks": [(1, 0), (0, 1)],
             "winner_picks": ["México", "Sudáfrica"],
+            "fixture_home": "México",
+            "fixture_away": "Sudáfrica",
         }
         rnd = {"advance_points": 1}
-        ko_table = [
-            {"name": "A", "pts": 4, "rank": 2},
-            {"name": "B", "pts": 8, "rank": 1},
+        live_table = [
+            {"name": "A", "pts": 10, "rank": 2},
+            {"name": "B", "pts": 12, "rank": 1},
         ]
-        stake = gd.compute_ko_match_stake(match, rnd, ["A", "B"], ko_table)
+        stake = gd.compute_ko_match_stake(match, rnd, ["A", "B"], live_table)
         assert stake["max_one"] == 6
         assert stake["picks"] == 2
+        assert stake["max_swing"] == 1
+        assert stake["min_swing"] == 1
         assert stake["people"][0]["max_pts"] == 6
+
+    def test_same_day_later_match_defers_stake_until_earlier_played(self, workbook_data):
+        data = workbook_data
+        c = gd.compute(data)
+        brasil = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
+        germany = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
+        assert brasil["stake"] and not brasil["stake"].get("deferred")
+        assert germany["stake"]["deferred"] is True
+        assert germany["stake"]["pending_after"][0]["code"] == "R32-M9"
+
+    def test_same_day_later_stake_updates_after_earlier_result(self, workbook_data):
+        import copy
+        data = copy.deepcopy(workbook_data)
+        data["knockout_results"]["matches"]["R32-M9"] = {
+            "score": (2, 1),
+            "winner": "Brasil",
+        }
+        c = gd.compute(data)
+        brasil = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
+        germany = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
+        assert brasil.get("stake") is None
+        assert germany["stake"] and not germany["stake"].get("deferred")
+        assert germany["stake"]["max_swing"] > 0
 
     def test_knockout_phase3_metrics(self, computed_data):
         metrics = computed_data["knockout"]["metrics"]

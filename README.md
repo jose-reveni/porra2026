@@ -47,7 +47,8 @@ internet usa fuentes del sistema.)
 (partido del día, ranking en vivo y últimos resultados), **Eliminatorias**
 (cuadro de brackets, supervivencia de pronósticos y marcador KO) y **Fase de
 grupos** (todo el análisis: rebeldía, afinidad, estilo, fichas, palmarés). El
-estado vive en `?view=live|ko|groups`.
+estado vive en `?view=live|ko|groups`. El ranking en directo es una sola
+carrera partido a partido (slider + barras); no hay variantes URL ni panel lateral.
 
 **Bilingüe:** arriba a la derecha hay un selector **ES / EN** que traduce toda
 la interfaz *y* los nombres de selección al vuelo. Arranca en español.
