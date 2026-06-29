@@ -287,7 +287,10 @@ class TestLiveProgressionData:
         assert "progression" in live
         assert live["steps"] == len(live["progression"])
         virtual_steps = (1 if live.get("standings_ready") else 0)
-        if computed_data["knockout"].get("scoring"):
+        ko_progression = computed_data["knockout"].get("progression")
+        if ko_progression:
+            virtual_steps += ko_progression["steps"]
+        elif computed_data["knockout"].get("scoring"):
             virtual_steps += 1
         assert len(live["progression"]) == live["played"] + virtual_steps
         last = live["progression"][-1]
@@ -321,6 +324,33 @@ class TestLiveProgressionData:
             ko_step["table"][0]
         )
         assert ko_step["table"][0]["pts"] == live["table"][0]["pts"]
+
+    def test_live_progression_keeps_knockout_matches_separate(self, computed_data):
+        live = computed_data["live"]
+        ko_progression = computed_data["knockout"]["progression"]
+        if not live or not ko_progression or ko_progression["steps"] < 2:
+            pytest.skip("Workbook needs at least two knockout results loaded")
+
+        ko_steps = ko_progression["progression"]
+        ko_codes = [step["code"] for step in ko_steps]
+        assert ko_codes[:2] == ["R32-M3", "R32-M9"]
+        live_ko_steps = [
+            step for step in live["progression"]
+            if step.get("kind") == "ko" and step["code"] in ko_codes
+        ]
+        assert [step["code"] for step in live_ko_steps] == ko_codes
+
+        latest_ko = ko_steps[-1]
+        carryover = next(
+            row for row in latest_ko["table"]
+            if row["pts"] != row["round_pts"]
+        )
+        live_row = next(
+            row for row in live_ko_steps[-1]["table"]
+            if row["name"] == carryover["name"]
+        )
+        assert live_row["ko_pts"] == carryover["pts"]
+        assert live_row["round_ko_pts"] == carryover["round_pts"]
 
     def test_race_hover_shows_standings_and_knockout_sources(self):
         assert "function buildLiveRanking" in gd.JS

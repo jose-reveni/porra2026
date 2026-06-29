@@ -2841,15 +2841,16 @@ def compute_live(data, matches):
     ko = compute_knockout_scoring(data)
     ko_rows_by_name = {row["name"]: row for row in ko["table"]} if ko else {}
     ko_pts_by_name = {name: row["pts"] for name, row in ko_rows_by_name.items()}
-    if ko_pts_by_name:
-        latest_ko_match = _latest_knockout_result_match(data)
+    ko_progression = compute_ko_progression(data)
+
+    def append_ko_step(meta, step_rows_by_name):
         before_pts = pts[:]
         for i, name in enumerate(names):
-            pts[i] += ko_pts_by_name.get(name, 0)
+            pts[i] += step_rows_by_name.get(name, {}).get("round_pts", 0)
         rows = snapshot_rows(before_pts, show_standings=True)
         for row in rows:
             i = name_index[row["name"]]
-            ko_row = ko_rows_by_name.get(row["name"], {})
+            ko_row = step_rows_by_name.get(row["name"], {})
             row["group_pts"] = group_pts_by_name.get(row["name"], 0)
             row["standings_pts"] = standings_pts[i]
             row["thirds_pts"] = thirds_pts[i]
@@ -2857,24 +2858,77 @@ def compute_live(data, matches):
             row["ko_exact"] = ko_row.get("exact", 0)
             row["ko_outcomes"] = ko_row.get("outcomes", 0)
             row["ko_advance"] = ko_row.get("advance", 0)
-            row["round_ko_pts"] = ko_row.get("pts", 0)
-            row["round_exact"] = ko_row.get("exact", 0)
-            row["round_sign"] = ko_row.get("outcomes", 0)
-            row["round_advance"] = ko_row.get("advance", 0)
+            row["round_ko_pts"] = ko_row.get("round_pts", 0)
+            row["round_exact"] = ko_row.get("round_exact", 0)
+            row["round_sign"] = ko_row.get("round_outcomes", 0)
+            row["round_advance"] = ko_row.get("round_advance", 0)
         step = {
             "idx": len(progression) + 1,
-            "code": "KO",
+            "code": meta["code"],
             "virtual": True,
             "kind": "ko",
             "label_es": "Eliminatorias",
             "label_en": "Knockouts",
-            "date": latest_ko_match["date"] if latest_ko_match else "",
+            "date": meta.get("date", ""),
+            "dt": meta.get("dt", ""),
             "group": "",
+            "phase_es": meta.get("phase_es", "Eliminatorias"),
+            "phase_en": meta.get("phase_en", "Knockouts"),
             "table": rows,
         }
-        if latest_ko_match:
-            step.update(latest_ko_match)
+        for key in ("home", "away", "home_flag", "away_flag", "result"):
+            if key in meta:
+                step[key] = meta[key]
         progression.append(step)
+
+    if ko_progression and ko_progression.get("progression"):
+        for ko_step in ko_progression["progression"]:
+            append_ko_step(
+                ko_step,
+                {row["name"]: row for row in ko_step["table"]},
+            )
+        latest_ko_rows_by_name = {
+            row["name"]: row for row in ko_progression["progression"][-1]["table"]
+        }
+        bonus_rows_by_name = {}
+        for name, total_row in ko_rows_by_name.items():
+            current = latest_ko_rows_by_name.get(name, {})
+            bonus_rows_by_name[name] = {
+                **total_row,
+                "round_pts": total_row.get("pts", 0) - current.get("pts", 0),
+                "round_exact": total_row.get("exact", 0) - current.get("exact", 0),
+                "round_outcomes": total_row.get("outcomes", 0) - current.get("outcomes", 0),
+                "round_advance": total_row.get("advance", 0) - current.get("advance", 0),
+            }
+        if any(row["round_pts"] for row in bonus_rows_by_name.values()):
+            append_ko_step(
+                {
+                    "code": "KO-BONUS",
+                    "date": progression[-1].get("date", last_date),
+                    "phase_es": "Premios KO",
+                    "phase_en": "KO awards",
+                },
+                bonus_rows_by_name,
+            )
+    elif ko_pts_by_name:
+        append_ko_step(
+            {
+                "code": "KO",
+                "date": last_date,
+                "phase_es": "Eliminatorias",
+                "phase_en": "Knockouts",
+            },
+            {
+                name: {
+                    **row,
+                    "round_pts": row.get("pts", 0),
+                    "round_exact": row.get("exact", 0),
+                    "round_outcomes": row.get("outcomes", 0),
+                    "round_advance": row.get("advance", 0),
+                }
+                for name, row in ko_rows_by_name.items()
+            },
+        )
 
     final_delta_by_name = {
         row["name"]: row.get("delta", 0)
