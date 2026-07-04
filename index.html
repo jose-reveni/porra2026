@@ -1115,10 +1115,10 @@ function todayScheduleMatches(){
     .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true, advance_points:0}));
   const knockoutMatches = koRounds.concat(koFinals).map(m => ({
     ...m,
-    home:m.fixture_home,
-    away:m.fixture_away,
-    home_flag:m.fixture_home_flag,
-    away_flag:m.fixture_away_flag,
+    home:m.resolved_home || m.fixture_home,
+    away:m.resolved_away || m.fixture_away,
+    home_flag:m.resolved_home_flag || m.fixture_home_flag,
+    away_flag:m.resolved_away_flag || m.fixture_away_flag,
   }));
   return groupMatches.concat(knockoutMatches);
 }
