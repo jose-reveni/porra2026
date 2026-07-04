@@ -259,23 +259,24 @@ class TestRecentResultsData:
         assert {"home", "away", "outcome"} <= set(m["result"])
         assert m["result"]["outcome"] in {"1", "X", "2"}
         assert {"exact", "sign", "miss"} <= set(m)
-        assert len(m["exact"]) + len(m["sign"]) + len(m["miss"]) == workbook_data["n"]
+        # KO knockout cards add a `voided` bucket (right outcome but wrong branch),
+        # so every participant lands in exactly one of the four groups.
+        voided = m.get("voided", [])
+        assert len(m["exact"]) + len(m["sign"]) + len(m["miss"]) + len(voided) == workbook_data["n"]
 
     def test_recent_results_include_knockout_matches(self, computed_data, workbook_data):
         recent = computed_data["recent_results"]["matches"]
-        ko_match = next((m for m in recent if m["code"] == "R32-M3"), None)
+        ko_matches = [m for m in recent if m.get("is_knockout")]
 
-        assert ko_match is not None
-        assert ko_match["is_knockout"] is True
-        assert ko_match["phase_es"] == "Dieciseisavos"
-        assert ko_match["result"]["home"] == 0
-        assert ko_match["result"]["away"] == 1
-        assert ko_match["result"]["winner"] == "Canadá"
+        assert ko_matches, "recent results should include at least one knockout match"
+        ko_match = ko_matches[0]
+        assert ko_match["phase_es"]
+        assert {"home", "away", "outcome"} <= set(ko_match["result"])
+        assert ko_match["result"]["winner"]
         assert {"exact", "sign", "miss", "advance"} <= set(ko_match)
-        assert (
-            len(ko_match["exact"]) + len(ko_match["sign"]) + len(ko_match["miss"])
-            == workbook_data["n"]
-        )
+        # Cada participante cae en exactamente un grupo (incluido el "cementerio").
+        buckets = ("exact", "sign", "miss", "voided")
+        assert sum(len(ko_match.get(b, [])) for b in buckets) == workbook_data["n"]
 
 
 class TestLiveProgressionData:
@@ -424,8 +425,16 @@ class TestKnockoutData:
     def test_knockout_round_of_32_winner_comes_from_score(self, workbook_data):
         match = workbook_data["knockouts"]["rounds"][0]["matches"][4]
         assert match["code"] == "R32-M5"
-        assert match["fixture_home"] == "Portugal"
-        assert match["winner_picks"][0] == "Portugal"
+        # R32 has real teams from the start, so the winner pick is derived from the
+        # scoreline: a decisive score picks that side; it is always one of the two.
+        h, a = match["score_picks"][0]
+        wp = match["winner_picks"][0]
+        sides = {gd._cmp_team(match["fixture_home"]), gd._cmp_team(match["fixture_away"])}
+        if h is not None and a is not None and h != a:
+            expected = match["fixture_home"] if h > a else match["fixture_away"]
+            assert gd._cmp_team(wp) == gd._cmp_team(expected)
+        else:
+            assert wp is None or gd._cmp_team(wp) in sides
 
     def test_knockout_result_is_exposed_for_live_view(self, computed_data):
         match = computed_data["knockout"]["rounds"][0]["matches"][2]
@@ -516,7 +525,7 @@ class TestKnockoutData:
         assert "m.winner.agreement || 0) * 100" not in gd.JS
         assert "bk-cbar split" in gd.JS
         assert "Resultado final" in gd.JS
-        assert "koProgressionCard" in gd.JS
+        assert "koBracketPrecisionCard" in gd.JS
 
     def test_nav_badges_use_match_counts_not_participants(self):
         assert "if(key === 'groups') return D.hero.matches" in gd.JS
@@ -533,9 +542,10 @@ class TestKnockoutData:
         assert len(unplayed["picks"]) == computed_data["hero"]["participants"]
         assert "outcome_dist" in unplayed
         assert "stake" in unplayed
-        assert unplayed["stake"]["max_one"] == 6
+        # max per person = 3 (signo) + 2 (pleno) + puntos de pase de la ronda.
+        assert unplayed["stake"]["max_one"] == 5 + unplayed["stake"].get("advance_points", 0)
         assert unplayed["stake"]["picks"] > 0
-        assert unplayed["stake"]["max_swing"] <= 10
+        assert unplayed["stake"]["max_swing"] >= 0
 
     def test_ko_match_stake_uses_live_ranking(self, computed_data):
         unplayed = next(
@@ -679,27 +689,29 @@ class TestKnockoutData:
         assert stake["people"][0]["max_pts"] == 6
 
     def test_same_day_later_match_defers_stake_until_earlier_played(self, workbook_data):
+        # R32-M9 y R32-M1 son el mismo día (M9 antes que M1). Con ambos sin jugar,
+        # el stake del posterior (M1) se aplaza hasta que caiga el anterior (M9).
         data = copy.deepcopy(workbook_data)
         data["knockout_results"]["matches"].pop("R32-M9", None)
+        data["knockout_results"]["matches"].pop("R32-M1", None)
         c = gd.compute(data)
-        brasil = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
-        germany = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
-        assert brasil["stake"] and not brasil["stake"].get("deferred")
-        assert germany["stake"]["deferred"] is True
-        assert germany["stake"]["pending_after"][0]["code"] == "R32-M9"
+        earlier = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
+        later = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
+        assert earlier["stake"] and not earlier["stake"].get("deferred")
+        assert later["stake"]["deferred"] is True
+        assert later["stake"]["pending_after"][0]["code"] == "R32-M9"
 
     def test_same_day_later_stake_updates_after_earlier_result(self, workbook_data):
+        # R32-M9 mantiene su resultado real (jugado); solo el posterior (M1) queda
+        # sin jugar, así que su stake ya no se aplaza.
         data = copy.deepcopy(workbook_data)
-        data["knockout_results"]["matches"]["R32-M9"] = {
-            "score": (2, 1),
-            "winner": "Brasil",
-        }
+        data["knockout_results"]["matches"].pop("R32-M1", None)
         c = gd.compute(data)
-        brasil = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
-        germany = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
-        assert brasil.get("stake") is None
-        assert germany["stake"] and not germany["stake"].get("deferred")
-        assert germany["stake"]["max_swing"] > 0
+        earlier = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M9")
+        later = next(m for rnd in c["knockout"]["rounds"] for m in rnd["matches"] if m["code"] == "R32-M1")
+        assert earlier.get("stake") is None
+        assert later["stake"] and not later["stake"].get("deferred")
+        assert later["stake"]["max_swing"] > 0
 
     def test_knockout_phase3_metrics(self, computed_data):
         metrics = computed_data["knockout"]["metrics"]

@@ -1422,6 +1422,52 @@ def compute_knockout(data, live_table=None, matches=None):
     }
 
 
+# Rondas de cuadro con hueco (W##): al apostar no sabías qué equipos jugarían,
+# así que el signo/marcador solo puntúa si además aciertas quién gana el cruce.
+# R32 tiene equipos reales, así que nunca se condiciona. Final/3.º puesto (rnd=None)
+# tampoco se condicionan aquí: su "ganador" es el campeón/tercero, apostado aparte.
+KO_GATED_ROUND_KEYS = {"r16", "qf", "sf"}
+
+
+def _ko_scoreline_counts(match, rnd, result):
+    """Máscara por persona: ¿cuenta el signo/marcador de este cruce?
+
+    R32 y finales -> siempre cuenta. Rondas de cuadro con hueco -> solo si el
+    pick de ganador del cruce coincide con el ganador real.
+    """
+    n = len(match["score_picks"])
+    key = rnd.get("key") if rnd else None
+    if key not in KO_GATED_ROUND_KEYS:
+        return [True] * n
+    actual = result.get("winner") if result else None
+    winner_picks = match.get("winner_picks")
+    if not actual or not winner_picks:
+        return [True] * n
+    actual_key = _cmp_team(actual)
+    return [bool(pick) and _cmp_team(pick) == actual_key for pick in winner_picks]
+
+
+# La Final y el 3.º puesto no tienen pick de ganador propio: su "ganador" es el
+# campeón / tercero, apostado en las casillas outright. Condicionamos su marcador
+# a ese pick, igual que las rondas de cuadro se condicionan a "quién pasa".
+KO_FINAL_GATE_OUTRIGHT = {"FINAL": "champion", "3P": "third_place"}
+
+
+def _ko_final_scoreline_counts(match, data):
+    """Máscara por persona para Final / 3.º puesto: el marcador solo cuenta si
+    aciertas el campeón (Final) o el tercero (3.º puesto)."""
+    n = data["n"]
+    outright_key = KO_FINAL_GATE_OUTRIGHT.get(match["code"])
+    if not outright_key:
+        return [True] * n
+    actual = data["knockout_results"]["outright"].get(outright_key)
+    meta = data["knockouts"]["outright"].get(outright_key)
+    if not actual or not meta:
+        return [True] * n
+    actual_key = _cmp_team(actual)
+    return [bool(pick) and _cmp_team(pick) == actual_key for pick in meta["picks"]]
+
+
 def compute_knockout_scoring(data):
     results = data["knockout_results"]
     if not (results["matches"] or results["outright"] or results["awards"]):
@@ -1434,12 +1480,14 @@ def compute_knockout_scoring(data):
     outcome_hits = [0] * n
     advance_hits = [0] * n
 
-    def add_score_points(match, result):
+    def add_score_points(match, result, counts):
         if "score" not in result:
             return
         rh, ra = result["score"]
         for i, (h, a) in enumerate(match["score_picks"]):
             if h is None or a is None:
+                continue
+            if not counts[i]:
                 continue
             if outcome(h, a) == outcome(rh, ra):
                 totals[i] += 3
@@ -1451,9 +1499,9 @@ def compute_knockout_scoring(data):
     def add_text_points(picks, actual, points, bucket=None):
         if not actual:
             return
-        actual_key = _cmp_text(actual)
+        actual_key = _cmp_team(actual)
         for i, pick in enumerate(picks):
-            if pick and _cmp_text(pick) == actual_key:
+            if pick and _cmp_team(pick) == actual_key:
                 totals[i] += points
                 if bucket is not None:
                     bucket[i] += 1
@@ -1463,14 +1511,14 @@ def compute_knockout_scoring(data):
             result = results["matches"].get(match["code"])
             if not result:
                 continue
-            add_score_points(match, result)
+            add_score_points(match, result, _ko_scoreline_counts(match, rnd, result))
             add_text_points(match["winner_picks"], result.get("winner"), rnd["advance_points"], advance_hits)
 
     for match in data["knockouts"]["final_matches"]:
         result = results["matches"].get(match["code"])
         if not result:
             continue
-        add_score_points(match, result)
+        add_score_points(match, result, _ko_final_scoreline_counts(match, data))
 
     for key, meta in data["knockouts"]["outright"].items():
         actual = results["outright"].get(key)
@@ -1818,23 +1866,26 @@ def _ko_match_scenarios(match):
     return list(scenarios.values())
 
 
-def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts):
+def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts, gated=False):
     if h is None or a is None:
         return None
     pts = 0
-    if outcome(h, a) == outcome(rh, ra):
+    winner_ok = bool(
+        res_winner and winner_pick and _cmp_team(winner_pick) == _cmp_team(res_winner)
+    )
+    if outcome(h, a) == outcome(rh, ra) and (not gated or winner_ok):
         pts += 3
         if h == rh and a == ra:
             pts += 2
-    if advance_pts and res_winner and winner_pick:
-        if _cmp_text(winner_pick) == _cmp_text(res_winner):
-            pts += advance_pts
+    if advance_pts and winner_ok:
+        pts += advance_pts
     return pts
 
 
 def compute_ko_match_stake(match, rnd, names, live_table):
     """Cuánto puede mover el ranking general un cruce KO (escenarios realistas)."""
     advance_pts = rnd["advance_points"] if rnd else 0
+    gated = bool(rnd and rnd.get("key") in KO_GATED_ROUND_KEYS)
     has_winner = bool(match.get("winner_picks"))
     max_one = (3 + 2 + advance_pts) if has_winner else 5
     if not live_table:
@@ -1851,7 +1902,7 @@ def compute_ko_match_stake(match, rnd, names, live_table):
         if h is None and not winner:
             return None
         rh, ra, res_winner = scenario
-        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts)
+        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts, gated)
 
     extra = {"max_one": max_one, "advance_points": advance_pts}
     stake = _compute_scenario_stake(
@@ -1934,30 +1985,6 @@ def _ko_champion_fell_round(person_idx, data):
     return 0
 
 
-def _ko_w_map_from_results(data):
-    """Ganadores reales por W-number según resultados cargados."""
-    w_map = {}
-    for rnd in data["knockouts"]["rounds"]:
-        for match in rnd["matches"]:
-            w = ko_w_number(match["code"])
-            result = data["knockout_results"]["matches"].get(match["code"])
-            if w and result and result.get("winner"):
-                w_map[w] = _cmp_team(result["winner"])
-    return w_map
-
-
-def _ko_w_map_for_person(person_idx, data):
-    """Cuadro predicho de la persona (solo picks, sin sustituir por resultados reales)."""
-    w_map = {}
-    for rnd in data["knockouts"]["rounds"]:
-        for match in rnd["matches"]:
-            w = ko_w_number(match["code"])
-            pick = match["winner_picks"][person_idx]
-            if w and pick:
-                w_map[w] = _cmp_team(pick)
-    return w_map
-
-
 def _ko_round_matches(raw, key):
     if key == "final":
         return [m for m in raw["final_matches"] if m["key"] == "final"]
@@ -1983,27 +2010,20 @@ def _ko_fixture_pair(match, w_map):
     return tuple(sorted(sides))
 
 
-def _ko_match_feeder_drift(match, actual_w, person_w):
-    """True si algún W del cruce ya diverge entre cuadro real y el predicho."""
-    for side in ("home", "away"):
-        val = match.get(f"fixture_{side}", "")
-        wm = re.match(r"^W(\d+)$", str(val))
-        if not wm:
-            continue
-        w = int(wm.group(1))
-        actual = actual_w.get(w)
-        person = person_w.get(w)
-        if actual and person and actual != person:
-            return True
-    return False
-
-
 def _ko_person_bracket_rounds(person_idx, data):
-    """Precisión del cuadro por fase, con desvío en ramas posteriores al fallo."""
+    """Precisión del cuadro por fase.
+
+    - Cruce ya jugado: acierto si el ganador que pusiste es el real; si no, fallo
+      (rojo), da igual si tu rama diverge — no puntuaste.
+    - Cruce futuro: si el equipo que pusiste como ganador ya está eliminado, la
+      rama está muerta (rayado). Si sigue vivo, aún pendiente.
+    """
     raw = data["knockouts"]
     results = data["knockout_results"]["matches"]
-    actual_w = _ko_w_map_from_results(data)
-    person_w = _ko_w_map_for_person(person_idx, data)
+    alive = _ko_alive_teams(data)
+    # La Final no tiene pick de ganador por partido: su "ganador" es el campeón.
+    champ_meta = data["knockouts"]["outright"].get("champion")
+    champ_result = data["knockout_results"]["outright"].get("champion")
     rounds = []
 
     for rnd_meta in KO_BRACKET_ROUNDS:
@@ -2011,37 +2031,25 @@ def _ko_person_bracket_rounds(person_idx, data):
         total = len(matches)
         hits = misses = drift = played = 0
         for match in matches:
-            result = results.get(match["code"])
-            has_result = bool(result and result.get("winner"))
-            actual_pair = _ko_fixture_pair(match, actual_w)
-            person_pair = _ko_fixture_pair(match, person_w)
-
-            if _ko_match_feeder_drift(match, actual_w, person_w):
-                drift += 1
-                if has_result:
-                    played += 1
-                continue
-
-            if not actual_pair:
-                continue
-
-            if person_pair != actual_pair:
-                drift += 1
-                if has_result:
-                    played += 1
-                continue
-
-            if not has_result:
-                continue
-
-            played += 1
-            pick = match["winner_picks"][person_idx] if match.get("winner_picks") else None
-            if not pick:
-                continue
-            if _cmp_team(pick) == _cmp_team(result["winner"]):
-                hits += 1
+            if match["code"] == "FINAL":
+                pick = champ_meta["picks"][person_idx] if champ_meta else None
+                actual_winner = champ_result
             else:
-                misses += 1
+                result = results.get(match["code"])
+                actual_winner = result["winner"] if (result and result.get("winner")) else None
+                pick = match["winner_picks"][person_idx] if match.get("winner_picks") else None
+
+            if actual_winner:
+                played += 1
+                if not pick:
+                    continue
+                if _cmp_team(pick) == _cmp_team(actual_winner):
+                    hits += 1
+                else:
+                    misses += 1
+            elif pick and _cmp_team(pick) not in alive:
+                # Cruce por jugar cuyo ganador que pusiste ya está fuera: rama muerta.
+                drift += 1
 
         rounds.append({
             "hits": hits,
@@ -2104,8 +2112,15 @@ def compute_ko_progression(data):
         ro = outcome(rh, ra)
         adv_pts = rnd["advance_points"] if rnd else 0
 
+        counts = (
+            _ko_scoreline_counts(match, rnd, result)
+            if rnd
+            else _ko_final_scoreline_counts(match, data)
+        )
         for i, (h, a) in enumerate(match["score_picks"]):
             if h is None or a is None:
+                continue
+            if not counts[i]:
                 continue
             if outcome(h, a) == ro:
                 pts[i] += 3
@@ -2115,9 +2130,9 @@ def compute_ko_progression(data):
                     exact[i] += 1
 
         if rnd and result.get("winner"):
-            actual = _cmp_text(result["winner"])
+            actual = _cmp_team(result["winner"])
             for i, pick in enumerate(match["winner_picks"]):
-                if pick and _cmp_text(pick) == actual:
+                if pick and _cmp_team(pick) == actual:
                     pts[i] += adv_pts
                     advance[i] += 1
 
@@ -2151,10 +2166,10 @@ def compute_ko_progression(data):
             "code": match["code"],
             "date": pub["date"],
             "dt": pub.get("dt", ""),
-            "home": pub["fixture_home"],
-            "away": pub["fixture_away"],
-            "home_flag": pub["fixture_home_flag"],
-            "away_flag": pub["fixture_away_flag"],
+            "home": pub.get("resolved_home") or pub["fixture_home"],
+            "away": pub.get("resolved_away") or pub["fixture_away"],
+            "home_flag": pub.get("resolved_home_flag") or pub["fixture_home_flag"],
+            "away_flag": pub.get("resolved_away_flag") or pub["fixture_away_flag"],
             "phase_es": phase_es,
             "phase_en": phase_en,
             "result": {"home": rh, "away": ra, "outcome": ro},
@@ -2992,12 +3007,12 @@ def _latest_knockout_result_match(data):
             "code": m["code"],
             "date": pub["date"],
             "dt": pub.get("dt", ""),
-            "home": pub["fixture_home"],
-            "away": pub["fixture_away"],
+            "home": pub.get("resolved_home") or pub["fixture_home"],
+            "away": pub.get("resolved_away") or pub["fixture_away"],
             "home_en": pub["fixture_home_en"],
             "away_en": pub["fixture_away_en"],
-            "home_flag": pub["fixture_home_flag"],
-            "away_flag": pub["fixture_away_flag"],
+            "home_flag": pub.get("resolved_home_flag") or pub["fixture_home_flag"],
+            "away_flag": pub.get("resolved_away_flag") or pub["fixture_away_flag"],
             "phase_es": phase_es,
             "phase_en": phase_en,
             "result": {"home": rh, "away": ra, "outcome": outcome(rh, ra)},
@@ -3018,28 +3033,31 @@ def compute_recent_results(data, matches, limit=6):
     names = data["names"]
     played = []
 
-    def score_groups(picks, rh, ra):
+    def score_groups(picks, rh, ra, counts=None):
+        """Reparte a cada persona en pleno/signo/palmada. En cruces con regla de
+        rama, quien acertó el signo pero falló quién pasa va a `voided`
+        (el "cementerio del cruce"): 0 puntos, pero distinto de una palmada."""
         ro = outcome(rh, ra)
-        exact = []
-        sign = []
-        miss = []
-        for name, (h, a) in zip(names, picks):
+        exact, sign, miss, voided = [], [], [], []
+        for idx, (name, (h, a)) in enumerate(zip(names, picks)):
+            counted = counts[idx] if counts is not None else True
+            entry = {"name": name, "pick": f"{h}-{a}" if h is not None else "–"}
             if h is None or a is None:
-                miss.append({"name": name, "pick": "–"})
+                miss.append(entry)
             elif h == rh and a == ra:
-                exact.append({"name": name, "pick": f"{h}-{a}"})
+                (exact if counted else voided).append(entry)
             elif outcome(h, a) == ro:
-                sign.append({"name": name, "pick": f"{h}-{a}"})
+                (sign if counted else voided).append(entry)
             else:
-                miss.append({"name": name, "pick": f"{h}-{a}"})
-        return exact, sign, miss
+                miss.append(entry)
+        return exact, sign, miss, voided
 
     for m in matches:
         if m["code"] not in results:
             continue
         rh, ra = results[m["code"]]
         ro = outcome(rh, ra)
-        exact, sign, miss = score_groups(m["picks"], rh, ra)
+        exact, sign, miss, _ = score_groups(m["picks"], rh, ra)
         played.append({
             "code": m["code"], "group": m["group"], "date": m["date"],
             "dt": m.get("dt", ""),
@@ -3060,15 +3078,16 @@ def compute_recent_results(data, matches, limit=6):
                 continue
             rh, ra = result["score"]
             ro = outcome(rh, ra)
-            exact, sign, miss = score_groups(m["score_picks"], rh, ra)
+            counts = _ko_scoreline_counts(m, rnd, result)
+            exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
             advance = []
             winner = result.get("winner")
             if winner:
-                winner_key = _cmp_text(winner)
+                winner_key = _cmp_team(winner)
                 advance = [
                     {"name": name, "pick": team_es(pick)}
                     for name, pick in zip(names, m["winner_picks"])
-                    if pick and _cmp_text(pick) == winner_key
+                    if pick and _cmp_team(pick) == winner_key
                 ]
             pub = _knockout_public_schedule(m)
             resolve_knockout_fixture(pub, winner_by_w)
@@ -3079,10 +3098,10 @@ def compute_recent_results(data, matches, limit=6):
                 "dt": pub.get("dt", ""),
                 "home_en": pub["fixture_home_en"],
                 "away_en": pub["fixture_away_en"],
-                "home": pub["fixture_home"],
-                "away": pub["fixture_away"],
-                "home_flag": pub["fixture_home_flag"],
-                "away_flag": pub["fixture_away_flag"],
+                "home": pub.get("resolved_home") or pub["fixture_home"],
+                "away": pub.get("resolved_away") or pub["fixture_away"],
+                "home_flag": pub.get("resolved_home_flag") or pub["fixture_home_flag"],
+                "away_flag": pub.get("resolved_away_flag") or pub["fixture_away_flag"],
                 "result": {
                     "home": rh,
                     "away": ra,
@@ -3093,8 +3112,10 @@ def compute_recent_results(data, matches, limit=6):
                 "exact": exact,
                 "sign": sign,
                 "miss": miss,
+                "voided": voided,
                 "advance": advance,
                 "is_knockout": True,
+                "scoreline_gated": rnd["key"] in KO_GATED_ROUND_KEYS,
                 "phase_es": rnd["label_es"],
                 "phase_en": rnd["label_en"],
                 "advance_points": rnd["advance_points"],
@@ -3106,7 +3127,8 @@ def compute_recent_results(data, matches, limit=6):
             continue
         rh, ra = result["score"]
         ro = outcome(rh, ra)
-        exact, sign, miss = score_groups(m["score_picks"], rh, ra)
+        counts = _ko_final_scoreline_counts(m, data)
+        exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
         pub = _knockout_public_schedule(m)
         resolve_knockout_fixture(pub, winner_by_w)
         played.append({
@@ -3116,16 +3138,18 @@ def compute_recent_results(data, matches, limit=6):
             "dt": pub.get("dt", ""),
             "home_en": pub["fixture_home_en"],
             "away_en": pub["fixture_away_en"],
-            "home": pub["fixture_home"],
-            "away": pub["fixture_away"],
-            "home_flag": pub["fixture_home_flag"],
-            "away_flag": pub["fixture_away_flag"],
+            "home": pub.get("resolved_home") or pub["fixture_home"],
+            "away": pub.get("resolved_away") or pub["fixture_away"],
+            "home_flag": pub.get("resolved_home_flag") or pub["fixture_home_flag"],
+            "away_flag": pub.get("resolved_away_flag") or pub["fixture_away_flag"],
             "result": {"home": rh, "away": ra, "outcome": ro},
             "exact": exact,
             "sign": sign,
             "miss": miss,
+            "voided": voided,
             "advance": [],
             "is_knockout": True,
+            "scoreline_gated": True,
             "phase_es": m["label_es"],
             "phase_en": m["label_en"],
             "advance_points": 0,
@@ -3455,6 +3479,9 @@ footer .brand svg{height:20px;width:auto}
 .result-box .rb-title{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .result-box .rb-count{font-family:'Space Grotesk';font-weight:700;color:var(--mint)}
 .result-box.miss .rb-count{color:var(--red)}
+.result-box.voided,.result-box.dead{background:rgba(150,120,190,.1);border:1px solid rgba(160,130,200,.28)}
+.result-box.voided .rb-count,.result-box.dead .rb-count{color:#c9a9ff}
+.result-box .rb-sub{font-size:.68rem;color:var(--muted);margin:-4px 0 8px;font-style:italic}
 .result-names{display:flex;flex-wrap:wrap;gap:6px}
 .result-person{display:inline-flex;gap:5px;align-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:.78rem;min-width:0}
 .result-person b{font-weight:700;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3683,6 +3710,9 @@ footer .brand svg{height:20px;width:auto}
 .me-bet-consensus .badge.disagree{background:rgba(255,180,80,.12);color:#ffb450}
 .me-bet-stake{font-size:.82rem;line-height:1.45}
 .me-bet-stake .swing{font:800 1.1rem 'Space Grotesk';color:var(--mint)}
+.me-bet-void{margin-top:6px;padding:11px 13px;border-radius:10px;background:rgba(150,120,190,.16);border:1px solid rgba(170,140,210,.4);
+  font:800 1.08rem 'Space Grotesk';color:#d3b8ff;display:flex;flex-direction:column;gap:3px}
+.me-bet-void span{font:500 .8rem/1.4 'Inter',sans-serif;color:var(--muted)}
 .race-me-step{margin-top:10px;padding:10px 12px;background:rgba(122,252,208,.08);border:1px solid rgba(122,252,208,.22);
   border-radius:10px;font-size:.84rem;line-height:1.45}
 .race-me-step b{color:var(--mint)}
@@ -3690,6 +3720,7 @@ footer .brand svg{height:20px;width:auto}
   border-radius:8px;font:700 .84rem 'Space Grotesk';color:var(--mint)}
 .me-result-strip.miss{color:#ff8a8a;background:rgba(255,100,100,.08);border-color:rgba(255,100,100,.25)}
 .me-result-strip.sign{color:#c8d4ff;background:rgba(150,170,255,.08);border-color:rgba(150,170,255,.22)}
+.me-result-strip.voided{color:#d3b8ff;background:rgba(150,120,190,.1);border-color:rgba(160,130,200,.28)}
 .kp-scatter circle.is-me{stroke:#fff;stroke-width:2.5}
 """
 
@@ -3783,6 +3814,7 @@ function meRecentOutcome(m){
   const lists = [
     {key:'exact', kind:'exact'},
     {key:'sign', kind:'sign'},
+    {key:'voided', kind:'voided'},
     {key:'miss', kind:'miss'},
     {key:'advance', kind:'advance'},
   ];
@@ -4304,6 +4336,7 @@ function buildHero(){
 /* ---- HOY ---- */
 function todayScheduleMatches(){
   const groupMatches = (D.today && D.today.matches) || [];
+  const GATED_KO = {r16:1, qf:1, sf:1};
   const koRounds = ((D.knockout && D.knockout.rounds) || []).flatMap(r =>
     (r.matches || []).map(m => ({
       ...m,
@@ -4311,9 +4344,10 @@ function todayScheduleMatches(){
       phase_en:r.label_en,
       is_knockout:true,
       advance_points:r.advance_points,
+      scoreline_gated: !!GATED_KO[r.key],
     })));
   const koFinals = ((D.knockout && D.knockout.final_matches) || [])
-    .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true, advance_points:0}));
+    .map(m => ({...m, phase_es:m.label_es, phase_en:m.label_en, is_knockout:true, advance_points:0, scoreline_gated:false}));
   const knockoutMatches = koRounds.concat(koFinals).map(m => ({
     ...m,
     home:m.resolved_home || m.fixture_home,
@@ -4407,10 +4441,14 @@ function meTodayOutcome(m){
   if(rh == null || ra == null) return null;
   const ph = pick.home, pa = pick.away;
   const pickStr = `${ph}-${pa}`;
-  if(ph === rh && pa === ra) return {kind:'exact', pick: pickStr};
+  // En cruces con regla de rama (R16/QF/SF), el marcador solo cuenta si además
+  // acertaste quién pasa. Si fallaste la rama, tu signo/pleno se anula → cementerio.
+  const nm = v => (v || '').toString().trim().toLowerCase();
+  const branchFell = !!m.scoreline_gated && (!m.result.winner || !pick.winner || nm(pick.winner) !== nm(m.result.winner));
   const ps = ph > pa ? '1' : ph === pa ? 'X' : '2';
   const rs = rh > ra ? '1' : rh === ra ? 'X' : '2';
-  if(ps === rs) return {kind:'sign', pick: pickStr};
+  if(ph === rh && pa === ra) return {kind: branchFell ? 'voided' : 'exact', pick: pickStr};
+  if(ps === rs) return {kind: branchFell ? 'voided' : 'sign', pick: pickStr};
   return {kind:'miss', pick: pickStr};
 }
 
@@ -4419,6 +4457,7 @@ function meResultStripText(outcome){
   switch(outcome.kind){
     case 'exact': return `✓ ${L('Pleno','Exact score')} — ${L('apostaste','you picked')} ${pick}`;
     case 'sign': return `~ ${L('Signo','Outcome')} — ${L('apostaste','you picked')} ${pick}`;
+    case 'voided': return `💀 ${L('Cementerio del cruce','Match graveyard')} — ${L('acertaste el signo pero cayó tu rama, 0 pts','right outcome but your branch fell, 0 pts')} (${pick})`;
     case 'miss': return `✗ ${L('Fallaste','Missed')} — ${L('tenías','you had')} ${pick}`;
     case 'advance': return `✓ ${L('Acertaste el pase','Correct advance')}`;
     default: return '';
@@ -4429,7 +4468,7 @@ function meResultStripHtml(m){
   if(!ME) return '';
   const outcome = meRecentOutcome(m);
   if(!outcome) return '';
-  const cls = outcome.kind === 'miss' ? ' miss' : outcome.kind === 'sign' ? ' sign' : '';
+  const cls = outcome.kind === 'miss' ? ' miss' : outcome.kind === 'voided' ? ' voided' : outcome.kind === 'sign' ? ' sign' : '';
   return `<div class="me-result-strip${cls}">${meResultStripText(outcome)}</div>`;
 }
 
@@ -4438,6 +4477,7 @@ function meBetBlockHtml(m){
   const pick = mePickInMatch(m);
   if(!pick) return '';
   const knockout = !!m.is_knockout;
+  const dead = branchDeadForPick(m, pick);
   const pickLbl = pickScoreLbl(pick, knockout);
   const pickScore = pick.home != null ? `${pick.home}-${pick.away}` : '';
   const consensus = knockout
@@ -4447,7 +4487,7 @@ function meBetBlockHtml(m){
     ? (m.score ? Math.round(m.score.agreement || 0) : null)
     : (m.modal_scoreline_share != null ? Math.round(m.modal_scoreline_share * 100) : null);
   let consensusHtml = '';
-  if(consensus){
+  if(consensus && !dead){
     const agree = pickScore === consensus;
     const badge = agree
       ? `<span class="badge agree">${L('Vas con el pueblo','With the crowd')}</span>`
@@ -4457,7 +4497,9 @@ function meBetBlockHtml(m){
   let stakeHtml = '';
   const st = m.stake;
   const meSt = st ? meStakePerson(st) : null;
-  if(st && st.deferred){
+  if(dead){
+    stakeHtml = `<div class="me-bet-void">💀 <b>${L('No importa','Doesn\'t matter')}</b><span>${L('pusiste que pasa','you picked')} ${pick.winner_flag || ''} ${esc(team(pick.winner))} — ${L('no está en este cruce, 0 pts','not in this tie, 0 pts')}</span></div>`;
+  } else if(st && st.deferred){
     stakeHtml = `<div class="me-bet-stake muted">${L('Tu swing se calcula cuando caigan los resultados anteriores de hoy', 'Your swing is calculated once earlier today\'s results are in')}</div>`;
   } else if(meSt && (meSt.swing_up || meSt.swing_down || meSt.max_pts)){
     const parts = [];
@@ -4537,11 +4579,24 @@ function koMatchStakeHtml(m){
   </div>`;
 }
 
+function branchDeadForPick(m, pick){
+  // Un pick de cruce está "muerto" si el equipo que pusiste como ganador no es
+  // ninguno de los dos del cruce: apostaste por un equipo que no llegó / ya está
+  // fuera, así que tu apuesta de este partido no puede puntuar (0 pts).
+  if(!m || !m.is_knockout || !pick || !pick.winner) return false;
+  const home = m.home || '', away = m.away || '';
+  if(!home || !away || /^W\d+$/i.test(home) || /^W\d+$/i.test(away)) return false; // cruce sin resolver
+  const nm = v => (v || '').toString().trim().toLowerCase();
+  const w = nm(pick.winner);
+  return w !== nm(home) && w !== nm(away);
+}
+
 function todayPicksHtml(picks, match){
   if(!picks || !picks.length) return '';
   const knockout = !!match.is_knockout;
-  const buckets = {'1': [], 'X': [], '2': [], '?': []};
+  const buckets = {'1': [], 'X': [], '2': [], '?': [], dead: []};
   picks.forEach(p => {
+    if(branchDeadForPick(match, p)){ buckets.dead.push(p); return; }
     let key = '?';
     if(p.home != null && p.away != null){
       key = p.home > p.away ? '1' : p.home === p.away ? 'X' : '2';
@@ -4574,6 +4629,18 @@ function todayPicksHtml(picks, match){
       <div class="result-names">${people(list)}</div>
     </div>`;
   }).join('');
+  if(buckets.dead.length){
+    const list = sort(buckets.dead);
+    const deadPill = p => {
+      const score = p.home != null ? `${p.home}-${p.away}` : '–';
+      return `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${score} · 💀 ${p.winner_flag || ''} ${esc(team(p.winner))}</span></span>`;
+    };
+    html += `<div class="result-box dead">
+      <div class="rb-title">💀 ${L('Apuesta muerta','Dead pick')} <span class="rb-count">${list.length}</span></div>
+      <div class="rb-sub">${L('su ganador no está en este cruce → 0 pts','their winner isn\'t in this tie → 0 pts')}</div>
+      <div class="result-names">${list.map(deadPill).join('')}</div>
+    </div>`;
+  }
   if(buckets['?'].length){
     const list = sort(buckets['?']);
     html += `<div class="result-box pick-empty">
@@ -4722,6 +4789,12 @@ function buildUltimos(){
           <div class="rb-title">${L('Pase','Advance')} <span class="rb-count">${(m.advance || []).length}</span></div>
           <div class="result-names">${people(m.advance || [])}</div>
         </div>` : '';
+    const graveBox = (m.voided && m.voided.length) ? `
+        <div class="result-box voided">
+          <div class="rb-title">💀 ${L('Cementerio del cruce','Match graveyard')} <span class="rb-count">${m.voided.length}</span></div>
+          <div class="rb-sub">${L('el signo era suyo, la rama no','right outcome, wrong branch')}</div>
+          <div class="result-names">${people(m.voided)}</div>
+        </div>` : '';
     s.appendChild(el('div','today-match reveal',
       `<div class="tm-head">
         <div class="tm-teams">${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>
@@ -4738,6 +4811,7 @@ function buildUltimos(){
           <div class="rb-title">${L('Signo','Outcome')} <span class="rb-count">${m.sign.length}</span></div>
           <div class="result-names">${people(m.sign)}</div>
         </div>
+        ${graveBox}
         <div class="result-box miss">
           <div class="rb-title">${L('Palmada','Missed')} <span class="rb-count">${m.miss.length}</span></div>
           <div class="result-names">${people(m.miss)}</div>
@@ -5498,53 +5572,13 @@ function koBracketPrecisionCard(){
   }).join('');
   const legend = `<div class="surv-legend">
     <span><i class="lg-grad"></i>${L('Proporcional a la fase (1 fallo en 16 ≠ todo rojo)','Scaled to the round (1 miss in 16 ≠ all red)')}</span>
-    <span><i class="surv-cell"><span class="br-layer br-drift" style="opacity:.85;position:relative;display:block;height:100%"></span></i>${L('Rama desviada','Off-branch')}</span>
+    <span><i class="surv-cell"><span class="br-layer br-drift" style="opacity:.85;position:relative;display:block;height:100%"></span></i>${L('Rama muerta (tu equipo ya está fuera)','Dead branch (your team is already out)')}</span>
   </div>`;
   return el('div','survive reveal',
     `<h3>${L('Tu cuadro, fase a fase','Your bracket, round by round')}</h3>
-     <p class="muted" style="margin-bottom:14px">${L('Verde y rojo son proporcionales a los cruces de cada fase (16 en 1/16, 8 en octavos…). Rayado = tu rama ya no cuadra con el torneo real.',
-        'Green and red are proportional to ties in each round (16 in R32, 8 in R16…). Stripes = your branch no longer matches the real tournament.')}</p>
+     <p class="muted" style="margin-bottom:14px">${L('Verde y rojo son proporcionales a los cruces de cada fase (16 en 1/16, 8 en octavos…). Rojo = jugado y fallaste al que pasa. Rayado = cruce por jugar cuyo ganador que pusiste ya está eliminado.',
+        'Green and red are proportional to ties in each round (16 in R32, 8 in R16…). Red = played and you missed who advanced. Stripes = an upcoming tie whose winner you picked is already out.')}</p>
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>${legend}`);
-}
-function koProgressionCard(k){
-  const prog = k.progression;
-  if(!prog || !prog.progression || !prog.progression.length) return null;
-  const steps = prog.progression;
-  const last = steps[steps.length - 1];
-  const matchTitle = `${last.home_flag || ''} ${team(last.home)} – ${team(last.away)} ${last.away_flag || ''}`;
-  const gainers = last.table.filter(r => r.delta > 0).sort((a,b) => b.delta - a.delta || a.rank - b.rank).slice(0,5);
-  const losers = last.table.filter(r => r.delta < 0).sort((a,b) => a.delta - b.delta || b.rank - a.rank).slice(0,5);
-  const scorers = last.table.filter(r => r.round_pts > 0).sort((a,b) => b.round_pts - a.round_pts).slice(0,5);
-  const row = (r, extra) => `<div class="kp-prog-row"><span class="nm" style="color:${personColor(r.name)}">${esc(r.name)}</span><span>${extra}</span></div>`;
-  const gainHtml = gainers.length
-    ? gainers.map(r => row(r, `<b class="mint">+${r.round_pts} pts</b> · ↑${r.delta}`)).join('')
-    : `<p class="muted">${L('Sin subidas de puesto.','No rank climbs.')}</p>`;
-  const loseHtml = losers.length
-    ? losers.map(r => row(r, `<b class="muted">+${r.round_pts} pts</b> · ↓${Math.abs(r.delta)}`)).join('')
-    : `<p class="muted">${L('Sin bajadas de puesto.','No rank drops.')}</p>`;
-  const scoreHtml = scorers.length
-    ? scorers.map(r => row(r, `<b>+${r.round_pts}</b> (${r.round_exact ? r.round_exact + ' pleno' : ''}${r.round_exact && r.round_outcomes ? ' · ' : ''}${r.round_outcomes ? r.round_outcomes + ' signo' : ''}${r.round_advance ? ' · ' + r.round_advance + ' pase' : ''})`)).join('')
-    : `<p class="muted">${L('Nadie sumó en este cruce.','Nobody scored in this tie.')}</p>`;
-  let timelineHtml = '';
-  if(steps.length > 1){
-    timelineHtml = `<div class="kp-prog-timeline">${steps.map(s => {
-      const t = `${s.home_flag || ''} ${team(s.home)} ${s.result.home}-${s.result.away} ${team(s.away)} ${s.away_flag || ''}`;
-      const top = s.table.filter(r => r.round_pts > 0).sort((a,b) => b.round_pts - a.round_pts)[0];
-      const topTxt = top ? `${esc(top.name)} +${top.round_pts}` : L('nadie sumó','nobody scored');
-      return `<div class="kp-prog-step"><b>${L(s.phase_es, s.phase_en)}</b> · ${esc(t)} · ${topTxt}</div>`;
-    }).join('')}</div>`;
-  }
-  return el('div','kp-prog reveal',
-    `<h3>${steps.length > 1
-      ? L('Subidón y batacazo (último cruce)','Ups and downs (latest tie)')
-      : L('Subidón y batacazo del último cruce','Ups and downs from the latest tie')}</h3>
-     <p class="muted" style="margin-bottom:14px"><b>${esc(matchTitle)}</b> · ${last.result.home}-${last.result.away} · ${L(last.phase_es, last.phase_en)}</p>
-     ${timelineHtml}
-     <div class="kp-prog-grid">
-       <div class="kp-act-viz"><span class="k">${L('🚀 Subidón','🚀 Climbers')}</span>${gainHtml}</div>
-       <div class="kp-act-viz"><span class="k">${L('📉 Batacazo','📉 Slides')}</span>${loseHtml}</div>
-       <div class="kp-act-viz"><span class="k">${L('⚽ Quién sumó','⚽ Who scored')}</span>${scoreHtml}</div>
-     </div>`);
 }
 function buildKnockouts(){
   const k = D.knockout || {};
@@ -5781,11 +5815,6 @@ function buildKoStoryBody(){
                                 'What you get right each round and where your branch drifts off from the real tournament.')}</p>`,
       koBracketPrecisionCard() || el('div','muted', L('Sin resultados KO todavía.','No knockout results yet.')));
     sec.appendChild(bracketAct);
-    const progCard = koProgressionCard(k);
-    if(progCard){
-      progCard.style.marginTop = '18px';
-      bracketAct.appendChild(progCard);
-    }
   }
 
   sec.appendChild(koAct(
