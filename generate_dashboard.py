@@ -85,12 +85,12 @@ KNOCKOUT_MATCH_SCHEDULE = {
     "R32-M14": {"home": "Australia", "away": "Egypt", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-03T14:00"},
     "R32-M15": {"home": "Switzerland", "away": "Algeria", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-02T23:00"},
     "R32-M16": {"home": "Colombia", "away": "Ghana", "venue": "Kansas City Stadium", "city": "Kansas City", "kickoff_et": "2026-07-03T21:30"},
-    "R16-M1": {"home": "W73", "away": "W74", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-07-04T13:00"},
-    "R16-M2": {"home": "W75", "away": "W76", "venue": "Philadelphia Stadium", "city": "Philadelphia", "kickoff_et": "2026-07-04T17:00"},
-    "R16-M3": {"home": "W77", "away": "W78", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-05T16:00"},
-    "R16-M4": {"home": "W79", "away": "W80", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-07-05T20:00"},
-    "R16-M5": {"home": "W81", "away": "W82", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-06T15:00"},
-    "R16-M6": {"home": "W83", "away": "W84", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-06T20:00"},
+    "R16-M1": {"home": "W73", "away": "W74", "venue": "Philadelphia Stadium", "city": "Philadelphia", "kickoff_et": "2026-07-04T17:00"},
+    "R16-M2": {"home": "W75", "away": "W76", "venue": "Houston Stadium", "city": "Houston", "kickoff_et": "2026-07-04T13:00"},
+    "R16-M3": {"home": "W77", "away": "W78", "venue": "Dallas Stadium", "city": "Dallas", "kickoff_et": "2026-07-06T15:00"},
+    "R16-M4": {"home": "W79", "away": "W80", "venue": "Seattle Stadium", "city": "Seattle", "kickoff_et": "2026-07-06T20:00"},
+    "R16-M5": {"home": "W81", "away": "W82", "venue": "New York/New Jersey Stadium", "city": "New Jersey", "kickoff_et": "2026-07-05T16:00"},
+    "R16-M6": {"home": "W83", "away": "W84", "venue": "Mexico City Stadium", "city": "Mexico City", "kickoff_et": "2026-07-05T20:00"},
     "R16-M7": {"home": "W85", "away": "W86", "venue": "Atlanta Stadium", "city": "Atlanta", "kickoff_et": "2026-07-07T12:00"},
     "R16-M8": {"home": "W87", "away": "W88", "venue": "BC Place Vancouver", "city": "Vancouver", "kickoff_et": "2026-07-07T16:00"},
     "QF-M1": {"home": "W89", "away": "W90", "venue": "Boston Stadium", "city": "Boston", "kickoff_et": "2026-07-09T16:00"},
@@ -1545,11 +1545,16 @@ def _match_sort_key(match):
 def _iter_scheduled_matches(data, matches):
     for m in matches:
         yield {**m, "kind": "group"}
+    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
     for rnd in data["knockouts"]["rounds"]:
         for m in rnd["matches"]:
-            yield {**m, "kind": "ko", "advance_points": rnd["advance_points"]}
+            mm = {**m, "kind": "ko", "advance_points": rnd["advance_points"]}
+            resolve_knockout_fixture(mm, winner_by_w)
+            yield mm
     for m in data["knockouts"]["final_matches"]:
-        yield {**m, "kind": "ko", "advance_points": 0}
+        mm = {**m, "kind": "ko", "advance_points": 0}
+        resolve_knockout_fixture(mm, winner_by_w)
+        yield mm
 
 
 def _has_match_result(match, data):
@@ -1575,10 +1580,10 @@ def _pending_earlier_same_day(data, matches, match):
             continue
         pending.append({
             "code": m["code"],
-            "home": m.get("fixture_home") or m.get("home", ""),
-            "away": m.get("fixture_away") or m.get("away", ""),
-            "home_flag": m.get("fixture_home_flag") or m.get("home_flag", ""),
-            "away_flag": m.get("fixture_away_flag") or m.get("away_flag", ""),
+            "home": m.get("resolved_home") or m.get("fixture_home") or m.get("home", ""),
+            "away": m.get("resolved_away") or m.get("fixture_away") or m.get("away", ""),
+            "home_flag": m.get("resolved_home_flag") or m.get("fixture_home_flag") or m.get("home_flag", ""),
+            "away_flag": m.get("resolved_away_flag") or m.get("fixture_away_flag") or m.get("away_flag", ""),
             "time_es": m.get("time_es", ""),
         })
     return pending
