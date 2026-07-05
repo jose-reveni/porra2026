@@ -1342,6 +1342,7 @@ def compute_knockout(data, live_table=None, matches=None):
                 **_knockout_public_schedule(m),
             }
             resolve_knockout_fixture(pub, winner_by_w)
+            _attach_matchup_ok(pub, m, data)
             trivia_idx = KO_TRIVIA_INDEX.get(rnd["key"])
             if trivia_idx is not None:
                 pub["home_trivia"] = match_trivia(pub.get("fixture_home_en"), trivia_idx)
@@ -1374,6 +1375,7 @@ def compute_knockout(data, live_table=None, matches=None):
             **_knockout_public_schedule(m),
         }
         resolve_knockout_fixture(pub, winner_by_w)
+        _attach_matchup_ok(pub, m, data)
         if not result or "score" not in result:
             pub["stake"] = stake_for_ko_match(m, None, names, data, matches, live_table)
         final_matches.append(pub)
@@ -1422,50 +1424,57 @@ def compute_knockout(data, live_table=None, matches=None):
     }
 
 
-# Rondas de cuadro con hueco (W##): al apostar no sabías qué equipos jugarían,
-# así que el signo/marcador solo puntúa si además aciertas quién gana el cruce.
-# R32 tiene equipos reales, así que nunca se condiciona. Final/3.º puesto (rnd=None)
-# tampoco se condicionan aquí: su "ganador" es el campeón/tercero, apostado aparte.
-KO_GATED_ROUND_KEYS = {"r16", "qf", "sf"}
+def _ko_w_map_from_results(data):
+    """W-number -> ganador real (clave canónica) según resultados cargados."""
+    w_map = {}
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            result = data["knockout_results"]["matches"].get(match["code"])
+            if w and result and result.get("winner"):
+                w_map[w] = _cmp_team(result["winner"])
+    return w_map
 
 
-def _ko_scoreline_counts(match, rnd, result):
-    """Máscara por persona: ¿cuenta el signo/marcador de este cruce?
+def _ko_w_map_for_person(person_idx, data):
+    """Cuadro predicho de una persona: W-number -> ganador que puso (canónico)."""
+    w_map = {}
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            pick = match["winner_picks"][person_idx] if match.get("winner_picks") else None
+            if w and pick:
+                w_map[w] = _cmp_team(pick)
+    return w_map
 
-    R32 y finales -> siempre cuenta. Rondas de cuadro con hueco -> solo si el
-    pick de ganador del cruce coincide con el ganador real.
+
+def _ko_matchup_counts(match, data):
+    """Máscara por persona: ¿cuenta el marcador (signo/pleno) de este cruce?
+
+    Solo cuenta si acertaste el CRUCE ENTERO: los dos equipos que juegan el
+    partido son los que tú predijiste. Si acertaste al ganador pero el rival era
+    otro (fallaste un feeder), el marcador no cuenta — pusiste los goles de otro
+    partido; solo te llevas el punto del pase (que se otorga aparte).
+
+    R32 tiene equipos reales fijos -> el cruce coincide para todos.
+    Cruce sin resolver (feeder por jugar) -> no se condiciona.
     """
-    n = len(match["score_picks"])
-    key = rnd.get("key") if rnd else None
-    if key not in KO_GATED_ROUND_KEYS:
-        return [True] * n
-    actual = result.get("winner") if result else None
-    winner_picks = match.get("winner_picks")
-    if not actual or not winner_picks:
-        return [True] * n
-    actual_key = _cmp_team(actual)
-    return [bool(pick) and _cmp_team(pick) == actual_key for pick in winner_picks]
-
-
-# La Final y el 3.º puesto no tienen pick de ganador propio: su "ganador" es el
-# campeón / tercero, apostado en las casillas outright. Condicionamos su marcador
-# a ese pick, igual que las rondas de cuadro se condicionan a "quién pasa".
-KO_FINAL_GATE_OUTRIGHT = {"FINAL": "champion", "3P": "third_place"}
-
-
-def _ko_final_scoreline_counts(match, data):
-    """Máscara por persona para Final / 3.º puesto: el marcador solo cuenta si
-    aciertas el campeón (Final) o el tercero (3.º puesto)."""
     n = data["n"]
-    outright_key = KO_FINAL_GATE_OUTRIGHT.get(match["code"])
-    if not outright_key:
+    actual_pair = _ko_fixture_pair(match, _ko_w_map_from_results(data))
+    if actual_pair is None:
         return [True] * n
-    actual = data["knockout_results"]["outright"].get(outright_key)
-    meta = data["knockouts"]["outright"].get(outright_key)
-    if not actual or not meta:
-        return [True] * n
-    actual_key = _cmp_team(actual)
-    return [bool(pick) and _cmp_team(pick) == actual_key for pick in meta["picks"]]
+    return [
+        _ko_fixture_pair(match, _ko_w_map_for_person(i, data)) == actual_pair
+        for i in range(n)
+    ]
+
+
+def _attach_matchup_ok(pub, match, data):
+    """Marca en cada pick público si el cruce coincide con el que predijo la
+    persona (lo usa la web para saber si su marcador puntúa o no)."""
+    mask = _ko_matchup_counts(match, data)
+    for i, pick in enumerate(pub.get("picks", [])):
+        pick["matchup_ok"] = mask[i]
 
 
 def compute_knockout_scoring(data):
@@ -1511,14 +1520,14 @@ def compute_knockout_scoring(data):
             result = results["matches"].get(match["code"])
             if not result:
                 continue
-            add_score_points(match, result, _ko_scoreline_counts(match, rnd, result))
+            add_score_points(match, result, _ko_matchup_counts(match, data))
             add_text_points(match["winner_picks"], result.get("winner"), rnd["advance_points"], advance_hits)
 
     for match in data["knockouts"]["final_matches"]:
         result = results["matches"].get(match["code"])
         if not result:
             continue
-        add_score_points(match, result, _ko_final_scoreline_counts(match, data))
+        add_score_points(match, result, _ko_matchup_counts(match, data))
 
     for key, meta in data["knockouts"]["outright"].items():
         actual = results["outright"].get(key)
@@ -1693,7 +1702,7 @@ def stake_for_ko_match(match, rnd, names, data, matches, live_table):
     if _earlier_unplayed_same_day(data, matches, match):
         return _deferred_stake(match, data, matches)
     table = live_table_before_match(data, matches, match) or live_table
-    return compute_ko_match_stake(match, rnd, names, table)
+    return compute_ko_match_stake(match, rnd, names, table, _ko_matchup_counts(match, data))
 
 
 def stake_for_group_match(match, data, matches, live_table):
@@ -1866,26 +1875,29 @@ def _ko_match_scenarios(match):
     return list(scenarios.values())
 
 
-def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts, gated=False):
+def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts, marcador_counts=True):
     if h is None or a is None:
         return None
     pts = 0
-    winner_ok = bool(
-        res_winner and winner_pick and _cmp_team(winner_pick) == _cmp_team(res_winner)
-    )
-    if outcome(h, a) == outcome(rh, ra) and (not gated or winner_ok):
+    if marcador_counts and outcome(h, a) == outcome(rh, ra):
         pts += 3
         if h == rh and a == ra:
             pts += 2
+    winner_ok = bool(
+        res_winner and winner_pick and _cmp_team(winner_pick) == _cmp_team(res_winner)
+    )
     if advance_pts and winner_ok:
         pts += advance_pts
     return pts
 
 
-def compute_ko_match_stake(match, rnd, names, live_table):
-    """Cuánto puede mover el ranking general un cruce KO (escenarios realistas)."""
+def compute_ko_match_stake(match, rnd, names, live_table, matchup=None):
+    """Cuánto puede mover el ranking general un cruce KO (escenarios realistas).
+
+    `matchup[i]` indica si el cruce coincide con el que predijo la persona i; si
+    no, su marcador no puede puntuar (solo el pase).
+    """
     advance_pts = rnd["advance_points"] if rnd else 0
-    gated = bool(rnd and rnd.get("key") in KO_GATED_ROUND_KEYS)
     has_winner = bool(match.get("winner_picks"))
     max_one = (3 + 2 + advance_pts) if has_winner else 5
     if not live_table:
@@ -1902,7 +1914,8 @@ def compute_ko_match_stake(match, rnd, names, live_table):
         if h is None and not winner:
             return None
         rh, ra, res_winner = scenario
-        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts, gated)
+        marcador_counts = matchup[i] if matchup is not None else True
+        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts, marcador_counts)
 
     extra = {"max_one": max_one, "advance_points": advance_pts}
     stake = _compute_scenario_stake(
@@ -2112,11 +2125,7 @@ def compute_ko_progression(data):
         ro = outcome(rh, ra)
         adv_pts = rnd["advance_points"] if rnd else 0
 
-        counts = (
-            _ko_scoreline_counts(match, rnd, result)
-            if rnd
-            else _ko_final_scoreline_counts(match, data)
-        )
+        counts = _ko_matchup_counts(match, data)
         for i, (h, a) in enumerate(match["score_picks"]):
             if h is None or a is None:
                 continue
@@ -3078,7 +3087,7 @@ def compute_recent_results(data, matches, limit=6):
                 continue
             rh, ra = result["score"]
             ro = outcome(rh, ra)
-            counts = _ko_scoreline_counts(m, rnd, result)
+            counts = _ko_matchup_counts(m, data)
             exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
             advance = []
             winner = result.get("winner")
@@ -3115,7 +3124,7 @@ def compute_recent_results(data, matches, limit=6):
                 "voided": voided,
                 "advance": advance,
                 "is_knockout": True,
-                "scoreline_gated": rnd["key"] in KO_GATED_ROUND_KEYS,
+                "scoreline_gated": rnd["key"] in ("r16", "qf", "sf"),
                 "phase_es": rnd["label_es"],
                 "phase_en": rnd["label_en"],
                 "advance_points": rnd["advance_points"],
@@ -3127,7 +3136,7 @@ def compute_recent_results(data, matches, limit=6):
             continue
         rh, ra = result["score"]
         ro = outcome(rh, ra)
-        counts = _ko_final_scoreline_counts(m, data)
+        counts = _ko_matchup_counts(m, data)
         exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
         pub = _knockout_public_schedule(m)
         resolve_knockout_fixture(pub, winner_by_w)
@@ -4441,10 +4450,9 @@ function meTodayOutcome(m){
   if(rh == null || ra == null) return null;
   const ph = pick.home, pa = pick.away;
   const pickStr = `${ph}-${pa}`;
-  // En cruces con regla de rama (R16/QF/SF), el marcador solo cuenta si además
-  // acertaste quién pasa. Si fallaste la rama, tu signo/pleno se anula → cementerio.
-  const nm = v => (v || '').toString().trim().toLowerCase();
-  const branchFell = !!m.scoreline_gated && (!m.result.winner || !pick.winner || nm(pick.winner) !== nm(m.result.winner));
+  // En cruces con hueco, el marcador solo cuenta si acertaste el cruce entero
+  // (los dos equipos). Si el rival era otro, tu signo/pleno se anula → cementerio.
+  const branchFell = pick.matchup_ok === false;
   const ps = ph > pa ? '1' : ph === pa ? 'X' : '2';
   const rs = rh > ra ? '1' : rh === ra ? 'X' : '2';
   if(ph === rh && pa === ra) return {kind: branchFell ? 'voided' : 'exact', pick: pickStr};
