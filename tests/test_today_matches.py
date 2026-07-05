@@ -811,3 +811,33 @@ class TestKnockoutData:
         assert "attachBracketHovers" in gd.JS
         assert "koBoldBarsHtml" in gd.JS
         assert "Acto 10" in gd.JS
+
+    def test_alive_teams_drops_r16_loser_via_feeder(self, workbook_data):
+        """Perdedor de octavos (cruce con feeders W##) debe salir de `alive`.
+
+        Regresión: `_ko_alive_teams` solo descartaba lados con nombre real, así
+        que octavos+ (fixtures W##) dejaban vivos a los perdedores. Brasil cae
+        0-2 con Noruega en R16-M5 y debe quedar eliminado."""
+        alive = gd._ko_alive_teams(workbook_data)
+        # Perdedores reales de octavos ya jugados.
+        assert "brazil" not in alive
+        assert "canada" not in alive
+        assert "paraguay" not in alive
+        # Los que avanzaron siguen vivos.
+        assert {"norway", "france", "morocco"} <= alive
+
+    def test_fallen_champions_include_brazil_backers(self, computed_data, workbook_data):
+        """El cementerio (Acto 6) lista a quienes pusieron un campeón ya fuera."""
+        metrics = computed_data["knockout"]["metrics"]
+        grave_champs = {gd._cmp_team(g["champ"]) for g in metrics["grave"]}
+        brazil_backers = [
+            workbook_data["names"][i]
+            for i, pick in enumerate(
+                workbook_data["knockouts"]["outright"]["champion"]["picks"]
+            )
+            if pick and gd._cmp_team(pick) == "brazil"
+        ]
+        assert brazil_backers  # el escenario tiene apostantes por Brasil
+        assert "brazil" in grave_champs
+        grave_names = {g["name"] for g in metrics["grave"]}
+        assert set(brazil_backers) <= grave_names

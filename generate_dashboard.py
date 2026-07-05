@@ -2218,6 +2218,15 @@ def _team_prestige(data):
     return prestige
 
 
+def _ko_resolved_side_key(match, side, w_map):
+    """Clave canónica del equipo en un lado del cruce, resolviendo feeders W##."""
+    val = str(match.get(f"fixture_{side}", ""))
+    wm = re.match(r"^W(\d+)$", val)
+    if wm:
+        return w_map.get(int(wm.group(1)))
+    return _cmp_team(val) if val else None
+
+
 def _ko_alive_teams(data):
     """Equipos que aún pueden ganar el torneo (en R32 y sin derrota KO)."""
     alive = set()
@@ -2231,6 +2240,9 @@ def _ko_alive_teams(data):
                     alive.add(_cmp_team(name))
 
     results = data["knockout_results"]["matches"]
+    # Los cruces de octavos en adelante llevan feeders W## en fixture_home/away;
+    # hay que resolverlos al ganador real para poder descartar al perdedor.
+    w_map = _ko_w_map_from_results(data)
     for rnd in data["knockouts"]["rounds"]:
         for match in rnd["matches"]:
             result = results.get(match["code"])
@@ -2238,11 +2250,9 @@ def _ko_alive_teams(data):
                 continue
             winner_key = _cmp_team(result["winner"])
             for side in ("home", "away"):
-                name = match.get(f"fixture_{side}", "")
-                if name and not str(name).startswith("W"):
-                    side_key = _cmp_team(name)
-                    if side_key != winner_key:
-                        alive.discard(side_key)
+                side_key = _ko_resolved_side_key(match, side, w_map)
+                if side_key and side_key != winner_key:
+                    alive.discard(side_key)
     return alive
 
 
