@@ -1702,7 +1702,14 @@ def stake_for_ko_match(match, rnd, names, data, matches, live_table):
     if _earlier_unplayed_same_day(data, matches, match):
         return _deferred_stake(match, data, matches)
     table = live_table_before_match(data, matches, match) or live_table
-    return compute_ko_match_stake(match, rnd, names, table, _ko_matchup_counts(match, data))
+    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    pub = _knockout_public_schedule(match)
+    resolve_knockout_fixture(pub, winner_by_w)
+    home = pub.get("resolved_home") or pub.get("fixture_home")
+    away = pub.get("resolved_away") or pub.get("fixture_away")
+    return compute_ko_match_stake(
+        match, rnd, names, table, _ko_matchup_counts(match, data), home, away
+    )
 
 
 def stake_for_group_match(match, data, matches, live_table):
@@ -1852,26 +1859,29 @@ def _group_points_for_pick(h, a, rh, ra):
     return 0
 
 
-def _ko_match_scenarios(match):
-    """Resultados plausibles: cada apuesta única (marcador + ganador en empate)."""
-    scenarios = {}
+def _ko_match_scenarios(match, home=None, away=None):
+    """Resultados plausibles del cruce REAL: cada marcador único de las apuestas,
+    con el ganador limitado a los dos equipos que de verdad juegan (empate ->
+    penaltis, cualquiera de los dos). Usa los equipos resueltos, no el hueco W##,
+    para no inventar escenarios imposibles (p.ej. '1-1 · España' en Brasil-Noruega)."""
+    home = home or match.get("fixture_home") or match.get("fixture_home_en", "")
+    away = away or match.get("fixture_away") or match.get("fixture_away_en", "")
     has_winner = bool(match.get("winner_picks"))
-    home = match.get("fixture_home") or match.get("fixture_home_en", "")
-    away = match.get("fixture_away") or match.get("fixture_away_en", "")
-    for i, (h, a) in enumerate(match["score_picks"]):
+    scenarios = {}
+    for h, a in match["score_picks"]:
         if h is None or a is None:
             continue
-        if h == a:
-            if not has_winner:
-                continue
-            res_winner = match["winner_picks"][i]
-            if not res_winner:
-                continue
-        elif h > a:
-            res_winner = home
+        if h > a:
+            options = [home]
+        elif a > h:
+            options = [away]
+        elif has_winner:
+            options = [home, away]  # empate -> penaltis a cualquiera de los dos
         else:
-            res_winner = away
-        scenarios[(h, a, _cmp_text(res_winner))] = (h, a, res_winner)
+            continue
+        for res_winner in options:
+            if res_winner:
+                scenarios[(h, a, _cmp_text(res_winner))] = (h, a, res_winner)
     return list(scenarios.values())
 
 
@@ -1891,11 +1901,12 @@ def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts, marc
     return pts
 
 
-def compute_ko_match_stake(match, rnd, names, live_table, matchup=None):
+def compute_ko_match_stake(match, rnd, names, live_table, matchup=None, home=None, away=None):
     """Cuánto puede mover el ranking general un cruce KO (escenarios realistas).
 
     `matchup[i]` indica si el cruce coincide con el que predijo la persona i; si
-    no, su marcador no puede puntuar (solo el pase).
+    no, su marcador no puede puntuar (solo el pase). `home`/`away` son los equipos
+    reales resueltos, para generar escenarios (y el pase) con los equipos correctos.
     """
     advance_pts = rnd["advance_points"] if rnd else 0
     has_winner = bool(match.get("winner_picks"))
@@ -1903,7 +1914,7 @@ def compute_ko_match_stake(match, rnd, names, live_table, matchup=None):
     if not live_table:
         live_table = [{"name": name, "pts": 0} for name in names]
     name_index = {name: i for i, name in enumerate(names)}
-    scenarios = _ko_match_scenarios(match)
+    scenarios = _ko_match_scenarios(match, home, away)
     if not scenarios:
         return None
 
