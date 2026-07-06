@@ -3848,9 +3848,11 @@ function meRecentOutcome(m){
     {key:'miss', kind:'miss'},
     {key:'advance', kind:'advance'},
   ];
+  const advanced = (m.advance || []).some(p => p.name === ME);
+  const advancePts = m.advance_points || 0;
   for(const {key, kind} of lists){
     const hit = (m[key] || []).find(p => p.name === ME);
-    if(hit) return {kind, pick: hit.pick};
+    if(hit) return {kind, pick: hit.pick, advanced, advancePts};
   }
   return null;
 }
@@ -4483,12 +4485,18 @@ function meTodayOutcome(m){
 
 function meResultStripText(outcome){
   const pick = esc(outcome.pick || '');
+  const pase = outcome.advanced && outcome.advancePts
+    ? ` · ${L('acertaste el pase','right advance')} +${outcome.advancePts}`
+    : '';
   switch(outcome.kind){
-    case 'exact': return `✓ ${L('Pleno','Exact score')} — ${L('apostaste','you picked')} ${pick}`;
-    case 'sign': return `~ ${L('Signo','Outcome')} — ${L('apostaste','you picked')} ${pick}`;
-    case 'voided': return `💀 ${L('Cementerio del cruce','Match graveyard')} — ${L('acertaste el signo pero cayó tu rama, 0 pts','right outcome but your branch fell, 0 pts')} (${pick})`;
-    case 'miss': return `✗ ${L('Fallaste','Missed')} — ${L('tenías','you had')} ${pick}`;
-    case 'advance': return `✓ ${L('Acertaste el pase','Correct advance')}`;
+    case 'exact': return `✓ ${L('Pleno','Exact score')} — ${L('apostaste','you picked')} ${pick}${pase}`;
+    case 'sign': return `~ ${L('Signo','Outcome')} — ${L('apostaste','you picked')} ${pick}${pase}`;
+    case 'voided':
+      return outcome.advanced && outcome.advancePts
+        ? `✓ ${L('Acertaste el pase','Right advance')} +${outcome.advancePts} · 💀 ${L('tu marcador cae en el cementerio del cruce','your scoreline falls in the match graveyard')} (${pick})`
+        : `💀 ${L('Cementerio del cruce','Match graveyard')} — ${L('acertaste el signo pero cayó tu rama, 0 pts','right outcome but your branch fell, 0 pts')} (${pick})`;
+    case 'miss': return `✗ ${L('Fallaste','Missed')} — ${L('tenías','you had')} ${pick}${pase}`;
+    case 'advance': return `✓ ${L('Acertaste el pase','Correct advance')}${outcome.advancePts ? ` +${outcome.advancePts}` : ''}`;
     default: return '';
   }
 }
@@ -4497,7 +4505,9 @@ function meResultStripHtml(m){
   if(!ME) return '';
   const outcome = meRecentOutcome(m);
   if(!outcome) return '';
-  const cls = outcome.kind === 'miss' ? ' miss' : outcome.kind === 'voided' ? ' voided' : outcome.kind === 'sign' ? ' sign' : '';
+  // Si acertaste el pase, la franja es positiva aunque el marcador caiga en el cementerio.
+  const scored = outcome.advanced && outcome.advancePts;
+  const cls = scored ? '' : outcome.kind === 'miss' ? ' miss' : outcome.kind === 'voided' ? ' voided' : outcome.kind === 'sign' ? ' sign' : '';
   return `<div class="me-result-strip${cls}">${meResultStripText(outcome)}</div>`;
 }
 
