@@ -85,6 +85,17 @@ predicciones y resultados.
 
 ## Marca
 
-Identidad visual de **Reveni**: teal oscuro `#022f36`, acento menta `#7afcd0`,
-logo en `reveni-logo.svg`. La tipografía corporativa real es *Garnett* (de pago);
-aquí se usan **Space Grotesk + Inter** como sustitutas libres.
+Nuevo branding de **Reveni** (concepto visual 2026). Paleta:
+
+- **Reveni dark green** `#042503` — color base / fondo
+- **Reveni Mint** `#6CE869` — acento principal (botones, barras, resaltados)
+- **Reveni orange** `#F28536` — acento puntual (antes "gold")
+- Verdes de escala de grises (`#556654` → `#F2F5F2`) para textos y superficies
+
+Tipografía: **Shippori Mincho** (serif) para titulares y cifras grandes,
+**DM Sans** para texto e interfaz y **DM Mono** para etiquetas/kickers en
+mayúsculas. Logo en `reveni-logo.svg` (se tiñe con `currentColor`).
+
+**Fondo interactivo:** una red de puntos naranjas unidos por líneas menta
+(`#bgnet`, canvas a pantalla completa) que reacciona al ratón — el motivo de
+"conexión" de la marca. Se desactiva con `prefers-reduced-motion`.
