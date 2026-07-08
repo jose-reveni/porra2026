@@ -3518,6 +3518,7 @@ footer .brand svg{height:20px;width:auto}
 .result-person span{font-family:'Space Grotesk';color:var(--muted);white-space:nowrap}
 .no-today{text-align:center;padding:46px 22px}
 .no-today .em{font-size:3rem}
+.no-today-img{width:100%;max-width:340px;border-radius:14px;margin:0 auto 6px;display:block;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 .no-today .next{margin-top:22px;text-align:left}
 .no-today .next-match{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.92rem}
 .no-today .next-date{color:var(--muted);font-size:.78rem;min-width:80px}
@@ -4710,7 +4711,7 @@ function buildHoy(){
       ).join('') + '</div>';
     }
     s.appendChild(el('div','card no-today reveal',
-      `<div class="em">📅</div><h3 style="margin:10px 0 6px">${L('Hoy no hay partidos','No matches today')}</h3>
+      `<img class="no-today-img" src="pablo.jpg" alt="" loading="lazy"><h3 style="margin:10px 0 6px">${L('Hoy no hay partidos','No matches today')}</h3>
        <p class="muted">${L('Próximos partidos:','Upcoming matches:')}</p>${nextHtml}`));
     return;
   }
