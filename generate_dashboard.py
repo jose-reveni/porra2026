@@ -575,6 +575,12 @@ def knockout_schedule_info(code):
     base = datetime.fromisoformat(item["kickoff_et"])
     home = _fixture_team(item["home"])
     away = _fixture_team(item["away"])
+    local_es = base + _ET_OFFSETS["es"]
+    # Partidos de madrugada (antes de las 6h) siguen contando como la jornada
+    # anterior, igual que matchdayDateStr() en el JS del dashboard.
+    matchday_date = local_es.date()
+    if local_es.hour < 6:
+        matchday_date -= timedelta(days=1)
     out = {
         "fixture_home": home["name"],
         "fixture_away": away["name"],
@@ -582,8 +588,8 @@ def knockout_schedule_info(code):
         "fixture_away_en": away["name_en"],
         "fixture_home_flag": home["flag"],
         "fixture_away_flag": away["flag"],
-        "date": (base + _ET_OFFSETS["es"]).date().isoformat(),
-        "dt": (base + _ET_OFFSETS["es"]).isoformat(),
+        "date": matchday_date.isoformat(),
+        "dt": local_es.isoformat(),
         "venue": item["venue"],
         "city": item["city"],
     }
@@ -3497,7 +3503,15 @@ footer .brand svg{height:20px;width:auto}
   .race-round,.race-row .bar-val{font-size:.8rem}
   .race-row .rank-delta{font-size:.68rem;padding:3px 6px}
 }
-.today-date{font-family:var(--fu);font-size:1.1rem;color:var(--mint);margin-bottom:22px;letter-spacing:.04em}
+.today-date{font-family:var(--fu);font-size:1.1rem;color:var(--mint);margin-bottom:0;letter-spacing:.04em}
+.hoy-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:22px}
+.hoy-nav-mid{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;text-align:center}
+.hoy-arrow{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#021802;color:var(--mint);
+  font:800 1.1rem var(--fu);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .15s ease}
+.hoy-arrow:disabled{opacity:.28;cursor:default}
+.hoy-today-btn{border:1px solid var(--line);background:rgba(108,232,105,.1);color:var(--mint);border-radius:999px;
+  font:700 .72rem var(--fu);letter-spacing:.04em;padding:4px 12px;cursor:pointer}
+@media(max-width:560px){.hoy-nav{gap:8px}.today-date{font-size:.98rem}}
 .today-match{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;margin-bottom:20px}
 .today-match .tm-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .today-match .tm-teams{font-family:var(--fu);font-size:1.3rem;font-weight:700;display:flex;align-items:center;gap:8px}
@@ -3774,6 +3788,7 @@ const ES2EN = D.es2en || {};
 const logo = `__LOGO__`;
 let LANG = 'es';
 let wrap = null;
+let HOY_DATE = null; // null = jornada real de hoy; si no, fecha YYYY-MM-DD elegida con las flechas
 
 /* ---- USER IDENTITY (localStorage + ?user=) ---- */
 const USER_KEY = 'porra2026.currentUser';
@@ -4550,13 +4565,27 @@ function meBetBlockHtml(m){
   let stakeHtml = '';
   const st = m.stake;
   const meSt = st ? meStakePerson(st) : null;
+  const meSwingHints = () => {
+    if(!meSt || (!meSt.swing_up && !meSt.swing_down)) return '';
+    const parts = [];
+    if(meSt.swing_up) parts.push(`+${meSt.swing_up}`);
+    if(meSt.swing_down) parts.push(`−${meSt.swing_down}`);
+    let hints = `<div style="margin-top:6px">${L('Tu swing','Your swing')}: <span class="swing">${parts.join(' / ')}</span> ${L('puestos','places')}</div>`;
+    if(meSt.swing_up && meSt.best_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:2px">+${meSt.swing_up} ${L('si sale','if')} <b>${stakeResultLbl(meSt.best_result)}</b></div>`;
+    }
+    if(meSt.swing_down && meSt.worst_result){
+      hints += `<div class="muted" style="font-size:.75rem;margin-top:2px">−${meSt.swing_down} ${L('si sale','if')} <b>${stakeResultLbl(meSt.worst_result)}</b></div>`;
+    }
+    return hints;
+  };
   if(dead){
     stakeHtml = `<div class="me-bet-void">💀 <b>${L('No importa','Doesn\'t matter')}</b><span>${L('pusiste que pasa','you picked')} ${pick.winner_flag || ''} ${esc(team(pick.winner))} — ${L('no está en este cruce, 0 pts','not in this tie, 0 pts')}</span></div>`;
   } else if(scoreVoid){
     const nm = v => (v || '').toString().trim().toLowerCase();
     const other = nm(pick.winner) === nm(m.home) ? m.away : m.home;
     const adv = (meSt && meSt.max_pts) || m.advance_points || 0;
-    stakeHtml = `<div class="me-bet-void">💀 <b>${L('Tu marcador no cuenta','Your scoreline is void')}</b><span>${L('acertaste que pasa','you have')} ${pick.winner_flag || ''} ${esc(team(pick.winner))}, ${L('pero el rival del cruce es','but the opponent in this tie is')} ${esc(team(other))} ${L('(tú pusiste otro) — solo el pase sigue vivo','(you picked another) — only the advance point is live')}${adv ? ` (${L('hasta','up to')} +${adv})` : ''}</span></div>`;
+    stakeHtml = `<div class="me-bet-void">💀 <b>${L('Tu marcador no cuenta','Your scoreline is void')}</b><span>${L('acertaste que pasa','you have')} ${pick.winner_flag || ''} ${esc(team(pick.winner))}, ${L('pero el rival del cruce es','but the opponent in this tie is')} ${esc(team(other))} ${L('(tú pusiste otro) — solo el pase sigue vivo','(you picked another) — only the advance point is live')}${adv ? ` (${L('hasta','up to')} +${adv})` : ''}</span>${meSwingHints()}</div>`;
   } else if(st && st.deferred){
     stakeHtml = `<div class="me-bet-stake muted">${L('Tu swing se calcula cuando caigan los resultados anteriores de hoy', 'Your swing is calculated once earlier today\'s results are in')}</div>`;
   } else if(meSt && (meSt.swing_up || meSt.swing_down || meSt.max_pts)){
@@ -4681,7 +4710,7 @@ function todayPicksHtml(picks, match){
     }
     if(scorelineVoidForPick(match, p)){
       anyVoid = true;
-      return `<span class="result-person${meClass(p.name)}" title="${L('acertó el equipo que pasa pero no el rival del cruce → solo suma el pase','right side advancing but wrong opponent → only the advance point counts')}"><b>${esc(p.name)}</b><span><s style="opacity:.55">${score}</s> · <span style="color:var(--gold);font-weight:700">${L('solo pase','advance only')}</span></span></span>`;
+      return `<span class="result-person${meClass(p.name)}" title="${L('acertó el equipo que pasa pero no el rival del cruce → solo suma el pase','right side advancing but wrong opponent → only the advance point counts')}"><b>${esc(p.name)}</b><span><s style="opacity:.55">${score}</s> · <span style="color:var(--gold);font-weight:700">${L('solo pase','advance only')}</span>${extra}</span></span>`;
     }
     return `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${score}${extra}</span></span>`;
   };
@@ -4726,16 +4755,44 @@ function todayPicksHtml(picks, match){
 }
 
 
+function hoyDateLabel(dateStr){
+  const dateObj = new Date(dateStr + 'T12:00:00');
+  const opts = {weekday:'long', day:'numeric', month:'long', year:'numeric'};
+  const str = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', opts);
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+function setHoyDate(d){ HOY_DATE = d; rebuild(); }
 function buildHoy(){
   const s = section('hoy', L('⚽ Hoy','⚽ Today'),
     L('Los partidos de hoy','Today\'s matches'),
     L('Qué se juega hoy, qué ha puesto cada uno y cuánto puede mover el ranking.','What\'s on today, everyone\'s picks, and how much the standings can swing.'));
   const allM = todayScheduleMatches();
-  const todayStr = matchdayDateStr(new Date());
-  const todayMatches = allM.filter(m => m.date === todayStr)
+  const realToday = matchdayDateStr(new Date());
+  const dates = [...new Set(allM.map(m => m.date).filter(Boolean))].sort();
+  const viewDate = (HOY_DATE && dates.includes(HOY_DATE)) ? HOY_DATE : realToday;
+  const before = dates.filter(d => d < viewDate);
+  const after = dates.filter(d => d > viewDate);
+  const prevDate = before.length ? before[before.length - 1] : null;
+  const nextDate = after.length ? after[0] : null;
+  const nav = el('div','hoy-nav reveal',
+    `<button class="hoy-arrow" data-dir="prev"${prevDate?'':' disabled'} aria-label="${L('Día anterior','Previous day')}">‹</button>
+     <div class="hoy-nav-mid">
+       <div class="today-date">${esc(hoyDateLabel(viewDate))}</div>
+       ${viewDate !== realToday ? `<button class="hoy-today-btn" data-action="today">${L('Volver a hoy','Back to today')}</button>` : ''}
+     </div>
+     <button class="hoy-arrow" data-dir="next"${nextDate?'':' disabled'} aria-label="${L('Día siguiente','Next day')}">›</button>`);
+  nav.addEventListener('click', e => {
+    if(e.target.closest('[data-action="today"]')){ setHoyDate(null); return; }
+    const btn = e.target.closest('[data-dir]');
+    if(!btn || btn.disabled) return;
+    const target = btn.dataset.dir === 'prev' ? prevDate : nextDate;
+    if(target) setHoyDate(target);
+  });
+  s.appendChild(nav);
+  const todayMatches = allM.filter(m => m.date === viewDate)
     .sort((a,b) => (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code));
   if(!todayMatches.length){
-    const upcoming = allM.filter(m => m.date > todayStr).sort((a,b) => a.date.localeCompare(b.date) || (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code)).slice(0,6);
+    const upcoming = allM.filter(m => m.date > viewDate).sort((a,b) => a.date.localeCompare(b.date) || (a.dt||'').localeCompare(b.dt||'') || a.code.localeCompare(b.code)).slice(0,6);
     let nextHtml = '';
     if(upcoming.length){
       const grouped = {};
@@ -4744,15 +4801,12 @@ function buildHoy(){
         ms.map(m => `<div class="next-match"><span class="next-date" title="${koTime(m)?esc(koTz()):''}">${dt.slice(5)}${koTime(m)?' · '+esc(koTime(m))+(koNext(m)?'<span class="tm-next">+1</span>':''):''}</span>${m.home_flag} ${esc(team(m.home))} – ${esc(team(m.away))} ${m.away_flag}</div>`).join('')
       ).join('') + '</div>';
     }
+    const emptyTitle = viewDate === realToday ? L('Hoy no hay partidos','No matches today') : L('Ese día no hay partidos','No matches that day');
     s.appendChild(el('div','card no-today reveal',
-      `<img class="no-today-img" src="pablo.jpg" alt="" loading="lazy"><h3 style="margin:10px 0 6px">${L('Hoy no hay partidos','No matches today')}</h3>
+      `<img class="no-today-img" src="pablo.jpg" alt="" loading="lazy"><h3 style="margin:10px 0 6px">${emptyTitle}</h3>
        <p class="muted">${L('Próximos partidos:','Upcoming matches:')}</p>${nextHtml}`));
     return;
   }
-  const dateObj = new Date(todayStr + 'T12:00:00');
-  const opts = {weekday:'long', day:'numeric', month:'long', year:'numeric'};
-  const dateStr = dateObj.toLocaleDateString(LANG==='es'?'es-ES':'en-US', opts);
-  s.appendChild(el('div','today-date reveal', dateStr.charAt(0).toUpperCase() + dateStr.slice(1)));
   todayMatches.forEach(m => {
     if(m.is_knockout){
       const resultHtml = m.result && m.result.score
