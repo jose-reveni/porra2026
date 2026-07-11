@@ -248,6 +248,10 @@ footer .brand svg{height:20px;width:auto}
 .today-match .tm-stat{background:rgba(0,0,0,.15);border-radius:12px;padding:12px;text-align:center}
 .today-match .tm-stat .val{font-family:var(--fu);font-size:1.3rem;font-weight:700;color:var(--mint)}
 .today-match .tm-stat .lab{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.today-match .tm-stat.tm-stat-dead{opacity:.5;background:rgba(0,0,0,.28)}
+.today-match .tm-stat.tm-stat-dead .val{color:var(--muted)}
+.today-match .tm-stat.tm-stat-dead .lab{text-decoration:line-through;text-decoration-color:var(--muted)}
+.today-match .tm-stat.tm-stat-dead .dead-x{color:var(--red);text-decoration:none;font-weight:700;margin-left:2px}
 .today-picks{margin-top:14px}
 .today-picks .tp-title{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
 .pick-groups{margin-top:4px}
@@ -1557,13 +1561,17 @@ function buildHoy(){
       const scoreHtml = m.score && m.score.value
         ? `<div class="tm-stat"><div class="val">${esc(m.score.value)}</div><div class="lab">${L('Marcador más repetido','Most common scoreline')} (${pf(Math.round((m.score.agreement || 0)))})</div></div>`
         : '';
-      const o = m.outcome_dist || {}, tot = (o['1']||0)+(o['X']||0)+(o['2']||0);
-      const pct = k => tot ? Math.round((o[k]||0)/tot*100) : 0;
       const statsCount = 1 + (resultHtml ? 1 : 0) + (winnerHtml ? 1 : 0) + (scoreHtml ? 1 : 0);
-      const outcomeHtml = tot ? `<div class="tm-stats" style="grid-template-columns:repeat(3,1fr)">
-        <div class="tm-stat"><div class="val">${pct('1')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.home))}</div></div>
-        <div class="tm-stat"><div class="val">${pct('X')}%</div><div class="lab">${L('Empate','Draw')}</div></div>
-        <div class="tm-stat"><div class="val">${pct('2')}%</div><div class="lab">${L('Gana','Win')} ${esc(team(m.away))}</div></div>
+      // En eliminatorias cada uno predijo su propio cuadro, así que el signo del
+      // marcador (local/visitante del hueco) NO equivale a "gana <equipo real>".
+      // Mostramos el reparto real: a qué equipo puso cada uno ganando el cruce.
+      const wd = (m.winner && m.winner.dist) || [];
+      // Cruce ya resuelto (equipos reales, no huecos W##/RU): los picks de
+      // equipos que no están en el cruce ya no pueden ganar → se marcan en gris.
+      const koResolved = m.home && m.away && !/^(W\d|RU)/.test(m.home) && !/^(W\d|RU)/.test(m.away);
+      const koAlive = new Set(koResolved ? [m.home, m.away] : []);
+      const outcomeHtml = wd.length ? `<div class="tm-stats" style="grid-template-columns:repeat(${Math.min(wd.length,4)},1fr)">
+        ${wd.slice(0,4).map(d => { const dead = koResolved && !koAlive.has(d.value); return `<div class="tm-stat${dead?' tm-stat-dead':''}"${dead?` title="${L('Ya no está en este cruce','No longer in this tie')}"`:''}><div class="val">${N ? Math.round(d.count/N*100) : 0}%</div><div class="lab">${L('Gana','Win')} ${d.flag||''} ${esc(team(d.value))}${dead?' <span class="dead-x">✕</span>':''}</div></div>`; }).join('')}
       </div>` : '';
       const picksHtml = todayPicksHtml(m.picks, m);
       s.appendChild(el('div','today-match reveal',
