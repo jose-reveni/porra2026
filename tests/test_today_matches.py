@@ -455,6 +455,21 @@ class TestKnockoutData:
         assert r16m2["resolved_home"] == "Canadá"
         assert r16m2["resolved_home_flag"] == "🇨🇦"
 
+    def test_knockout_bracket_resolves_runner_up_into_third_place(self, computed_data):
+        sf_m1 = next(
+            m for rnd in computed_data["knockout"]["rounds"]
+            for m in rnd["matches"] if m["code"] == "SF-M1"
+        )
+        third_place = next(
+            m for m in computed_data["knockout"]["final_matches"] if m["code"] == "3P"
+        )
+        if not (sf_m1.get("result") and sf_m1["result"].get("winner")):
+            pytest.skip("SF-M1 result not loaded in workbook")
+        assert third_place["fixture_home"] == "RU101"
+        assert third_place["resolved_home"] == "Francia"
+        assert third_place["resolved_home_flag"] == "🇫🇷"
+        assert third_place["score"]["value"]
+
     def test_knockout_consensus_handles_empty_template(self):
         empty_data = {
             "names": ["A"],

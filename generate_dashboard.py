@@ -1304,17 +1304,75 @@ def build_ko_winner_map(knockout_results, knockouts_raw):
     return winners
 
 
-def resolve_knockout_fixture(pub_match, winner_by_w):
-    """Expose resolved team names without replacing W## feeder placeholders."""
+def _ko_resolved_side_team(match, side, winner_by_w):
+    """Team dict for one bracket slot, resolving W## feeders."""
+    val = match.get(f"fixture_{side}", "")
+    if not val:
+        return None
+    wm = re.match(r"^W(\d+)$", val)
+    if wm:
+        return winner_by_w.get(int(wm.group(1)))
+    canonical = FIFA_TEAM_ALIASES.get(val, val)
+    return {
+        "name": team_es(canonical),
+        "name_en": canonical,
+        "flag": team_flag(canonical),
+    }
+
+
+def _ko_match_loser(match, result, winner_by_w):
+    if not result or not result.get("winner"):
+        return None
+    winner_key = _cmp_team(result["winner"])
+    for side in ("home", "away"):
+        team = _ko_resolved_side_team(match, side, winner_by_w)
+        if team and _cmp_team(team.get("name_en") or team.get("name")) != winner_key:
+            return team
+    return None
+
+
+def build_ko_runner_up_map(knockout_results, knockouts_raw, winner_by_w=None):
+    """Map RU-numbers to runners-up as knockout results land."""
+    if winner_by_w is None:
+        winner_by_w = build_ko_winner_map(knockout_results, knockouts_raw)
+    runners = {}
+    kr_matches = knockout_results.get("matches", {})
+    for rnd in knockouts_raw["rounds"]:
+        for m in rnd["matches"]:
+            w = ko_w_number(m["code"])
+            result = kr_matches.get(m["code"])
+            if not w or not result or not result.get("winner"):
+                continue
+            loser = _ko_match_loser(m, result, winner_by_w)
+            if loser:
+                runners[w] = loser
+    return runners
+
+
+def build_ko_fixture_maps(knockout_results, knockouts_raw):
+    winner_by_w = build_ko_winner_map(knockout_results, knockouts_raw)
+    runner_by_ru = build_ko_runner_up_map(knockout_results, knockouts_raw, winner_by_w)
+    return winner_by_w, runner_by_ru
+
+
+def resolve_knockout_fixture(pub_match, winner_by_w, runner_by_ru=None):
+    """Expose resolved team names without replacing W##/RU## feeder placeholders."""
+    runner_by_ru = runner_by_ru or {}
     for side in ("home", "away"):
         val = pub_match.get(f"fixture_{side}", "")
         wm = re.match(r"^W(\d+)$", val)
-        if not wm:
+        if wm:
+            team = winner_by_w.get(int(wm.group(1)))
+            if team:
+                pub_match[f"resolved_{side}"] = team["name"]
+                pub_match[f"resolved_{side}_flag"] = team["flag"]
             continue
-        team = winner_by_w.get(int(wm.group(1)))
-        if team:
-            pub_match[f"resolved_{side}"] = team["name"]
-            pub_match[f"resolved_{side}_flag"] = team["flag"]
+        rm = re.match(r"^RU(\d+)$", val)
+        if rm:
+            team = runner_by_ru.get(int(rm.group(1)))
+            if team:
+                pub_match[f"resolved_{side}"] = team["name"]
+                pub_match[f"resolved_{side}_flag"] = team["flag"]
 
 
 def compute_knockout(data, live_table=None, matches=None):
@@ -1322,7 +1380,7 @@ def compute_knockout(data, live_table=None, matches=None):
     n = data["n"]
     raw = data["knockouts"]
     matches = matches or data.get("matches") or []
-    winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], raw)
     scoring = compute_knockout_scoring(data)
 
     total_rows = 0
@@ -1347,7 +1405,7 @@ def compute_knockout(data, live_table=None, matches=None):
                 **_ko_public_pick_fields(m, names, n),
                 **_knockout_public_schedule(m),
             }
-            resolve_knockout_fixture(pub, winner_by_w)
+            resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
             _attach_matchup_ok(pub, m, data)
             trivia_idx = KO_TRIVIA_INDEX.get(rnd["key"])
             if trivia_idx is not None:
@@ -1380,7 +1438,7 @@ def compute_knockout(data, live_table=None, matches=None):
             **_ko_public_pick_fields(m, names, n),
             **_knockout_public_schedule(m),
         }
-        resolve_knockout_fixture(pub, winner_by_w)
+        resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
         _attach_matchup_ok(pub, m, data)
         if not result or "score" not in result:
             pub["stake"] = stake_for_ko_match(m, None, names, data, matches, live_table)
@@ -1608,15 +1666,15 @@ def _match_sort_key(match):
 def _iter_scheduled_matches(data, matches):
     for m in matches:
         yield {**m, "kind": "group"}
-    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
     for rnd in data["knockouts"]["rounds"]:
         for m in rnd["matches"]:
             mm = {**m, "kind": "ko", "advance_points": rnd["advance_points"]}
-            resolve_knockout_fixture(mm, winner_by_w)
+            resolve_knockout_fixture(mm, winner_by_w, runner_by_ru)
             yield mm
     for m in data["knockouts"]["final_matches"]:
         mm = {**m, "kind": "ko", "advance_points": 0}
-        resolve_knockout_fixture(mm, winner_by_w)
+        resolve_knockout_fixture(mm, winner_by_w, runner_by_ru)
         yield mm
 
 
@@ -1708,9 +1766,9 @@ def stake_for_ko_match(match, rnd, names, data, matches, live_table):
     if _earlier_unplayed_same_day(data, matches, match):
         return _deferred_stake(match, data, matches)
     table = live_table_before_match(data, matches, match) or live_table
-    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
     pub = _knockout_public_schedule(match)
-    resolve_knockout_fixture(pub, winner_by_w)
+    resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
     home = pub.get("resolved_home") or pub.get("fixture_home")
     away = pub.get("resolved_away") or pub.get("fixture_away")
     return compute_ko_match_stake(
@@ -1987,7 +2045,7 @@ def _ko_champion_fell_round(person_idx, data):
     if champ_key in _ko_alive_teams(data):
         return fell_alive
 
-    winner_by_w = build_ko_winner_map(data["knockout_results"], raw)
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], raw)
     results = data["knockout_results"]["matches"]
 
     for round_idx, rnd_meta in enumerate(KO_SURVIVAL_ROUNDS):
@@ -2006,7 +2064,7 @@ def _ko_champion_fell_round(person_idx, data):
             if not result or not result.get("winner"):
                 continue
             pub = _knockout_public_schedule(match)
-            resolve_knockout_fixture(pub, winner_by_w)
+            resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
             if champ_key not in _ko_match_side_keys(match, pub, winner_by_w):
                 continue
             if _cmp_team(result["winner"]) != champ_key:
@@ -2094,7 +2152,7 @@ def _ko_person_bracket_rounds(person_idx, data):
 def _iter_knockout_played_matches(data):
     """Cruces KO jugados en orden cronológico."""
     results = data["knockout_results"]["matches"]
-    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
     played = []
 
     for rnd in data["knockouts"]["rounds"]:
@@ -2103,7 +2161,7 @@ def _iter_knockout_played_matches(data):
             if not result or "score" not in result:
                 continue
             pub = _knockout_public_schedule(match)
-            resolve_knockout_fixture(pub, winner_by_w)
+            resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
             played.append((rnd, match, result, pub))
 
     for match in data["knockouts"]["final_matches"]:
@@ -2111,7 +2169,7 @@ def _iter_knockout_played_matches(data):
         if not result or "score" not in result:
             continue
         pub = _knockout_public_schedule(match)
-        resolve_knockout_fixture(pub, winner_by_w)
+        resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
         played.append((None, match, result, pub))
 
     played.sort(key=lambda item: (item[3]["date"], item[3].get("dt", ""), item[1]["code"]))
@@ -3029,7 +3087,7 @@ def compute_live(data, matches):
 
 def _latest_knockout_result_match(data):
     results = data["knockout_results"]["matches"]
-    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
     played = []
 
     def add_match(m, phase_es, phase_en):
@@ -3038,7 +3096,7 @@ def _latest_knockout_result_match(data):
             return
         rh, ra = result["score"]
         pub = _knockout_public_schedule(m)
-        resolve_knockout_fixture(pub, winner_by_w)
+        resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
         played.append({
             "code": m["code"],
             "date": pub["date"],
@@ -3106,7 +3164,7 @@ def compute_recent_results(data, matches, limit=6):
             "miss": miss,
         })
 
-    winner_by_w = build_ko_winner_map(data["knockout_results"], data["knockouts"])
+    winner_by_w, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
     for rnd in data["knockouts"]["rounds"]:
         for m in rnd["matches"]:
             result = data["knockout_results"]["matches"].get(m["code"])
@@ -3126,7 +3184,7 @@ def compute_recent_results(data, matches, limit=6):
                     if pick and _cmp_team(pick) == winner_key
                 ]
             pub = _knockout_public_schedule(m)
-            resolve_knockout_fixture(pub, winner_by_w)
+            resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
             played.append({
                 "code": m["code"],
                 "group": "",
@@ -3166,7 +3224,7 @@ def compute_recent_results(data, matches, limit=6):
         counts = _ko_matchup_counts(m, data)
         exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
         pub = _knockout_public_schedule(m)
-        resolve_knockout_fixture(pub, winner_by_w)
+        resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
         played.append({
             "code": m["code"],
             "group": "",
@@ -5498,11 +5556,14 @@ function attachBracketHovers(root){
 function bkMatchNode(m, opts){
   opts = opts || {};
   const k = D.knockout || {};
-  const ready = k.ready && m.winner && m.winner.value;
+  const hasWinnerPick = !!(m.winner && m.winner.value);
+  const hasScorePick = !!(m.score && m.score.value);
+  const ready = k.ready && (hasWinnerPick || hasScorePick);
   const played = !!(m.result && m.result.winner);
   const realScore = played && m.result.score
     ? `${m.result.score.home}-${m.result.score.away}` : '';
-  const pct = ready ? Math.round(m.winner.agreement || 0) : 0;
+  const pct = ready && hasWinnerPick ? Math.round(m.winner.agreement || 0) : 0;
+  const scorePct = ready && hasScorePick ? Math.round(m.score.agreement || 0) : 0;
   const norm = v => (v || '').toString().trim().toLowerCase();
   const distCount = value => ((m.winner && m.winner.dist) || [])
     .filter(x => norm(x.value) === norm(value))
@@ -5514,9 +5575,9 @@ function bkMatchNode(m, opts){
     return name && !/^W\d+$/.test(name) && !/^RU\d+$/.test(name) ? name : '';
   };
   const homeName = realSide('home'), awayName = realSide('away');
-  const homeCount = ready && homeName ? distCount(homeName) : 0;
-  const awayCount = ready && awayName ? distCount(awayName) : 0;
-  const hasSplit = ready && homeName && awayName && (homeCount || awayCount);
+  const homeCount = ready && hasWinnerPick && homeName ? distCount(homeName) : 0;
+  const awayCount = ready && hasWinnerPick && awayName ? distCount(awayName) : 0;
+  const hasSplit = ready && hasWinnerPick && homeName && awayName && (homeCount || awayCount);
   const homePct = N ? Math.round(homeCount / N * 100) : 0;
   const awayPct = N ? Math.round(awayCount / N * 100) : 0;
   const sideHtml = (side) => {
@@ -5524,13 +5585,13 @@ function bkMatchNode(m, opts){
     const name = sideName(side);
     const count = side === 'home' ? homeCount : awayCount;
     const sidePct = side === 'home' ? homePct : awayPct;
-    const isPick = ready && m.winner.value === name;
+    const isPick = ready && hasWinnerPick && m.winner.value === name;
     const isRealWin = played && norm(m.result.winner) === norm(name);
     const isRealOut = played && homeName && awayName && norm(name) === norm(side === 'home' ? homeName : awayName) && !isRealWin;
     const goals = played && m.result.score
       ? `<span class="bk-goals">${m.result.score[side]}</span>` : '';
     const pctHtml = !played && count ? `<span class="bk-pct">${sidePct}%</span>` : '';
-    const cls = [ready && !isPick ? ' dim' : '', isRealWin ? ' won' : '', isRealOut ? ' out' : ''].join('');
+    const cls = [ready && hasWinnerPick && !isPick ? ' dim' : '', isRealWin ? ' won' : '', isRealOut ? ' out' : ''].join('');
     return `<div class="bk-side${cls}">`
       + `<span class="bk-flag">${flag}</span><span class="bk-nm">${esc(team(name))}</span>`
       + `${goals || pctHtml}</div>`;
@@ -5540,8 +5601,10 @@ function bkMatchNode(m, opts){
     : (ready
       ? (hasSplit
         ? `<div class="bk-cbar split"><span class="home" style="width:${homePct}%"></span><span class="away" style="width:${awayPct}%"></span></div>`
-        : `<div class="bk-cbar"><span style="width:${pct}%"></span></div>`)
-        + `<div class="bk-tip">${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}</div>`
+        : `<div class="bk-cbar"><span style="width:${hasWinnerPick ? pct : scorePct}%"></span></div>`)
+        + `<div class="bk-tip">${hasWinnerPick
+          ? `${L('consenso','consensus')} ${m.winner.count}/${N} · ${L('marcador','score')} ${m.score && m.score.value ? m.score.value : '–'}`
+          : `${L('consenso','consensus')} ${m.score.count}/${N} · ${L('marcador','score')} ${m.score.value || '–'}`}</div>`
       : `<div class="bk-tip">${L('pendiente de subir apuestas','picks not uploaded yet')}</div>`);
   const cls = (opts.cls ? ' ' + opts.cls : '') + (played ? ' played' : '');
   const feeders = opts.feeders ? ` data-feeders="${opts.feeders.join(',')}"` : '';
