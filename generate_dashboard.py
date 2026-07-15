@@ -690,6 +690,9 @@ def parse_workbook(path):
 
     knockouts = parse_knockouts(raw, participants)
     knockout_results = parse_knockout_results(wb)
+    _enrich_final_winner_picks(
+        {"n": n, "knockouts": knockouts, "knockout_results": knockout_results}
+    )
 
     # ¿Hay resultados reales?
     results = parse_results(wb)
@@ -1422,12 +1425,16 @@ def compute_knockout(data, live_table=None, matches=None):
             "matches": match_rows,
         })
 
+    champ_picks = raw.get("outright", {}).get("champion", {}).get("picks")
+    third_picks = raw.get("outright", {}).get("third_place", {}).get("picks")
     final_matches = []
     for m in raw["final_matches"]:
         score = _score_consensus(m["score_picks"], n)
         result = data["knockout_results"]["matches"].get(m["code"])
         filled_rows += _filled_score_picks(m["score_picks"])
-        total_rows += n
+        if m.get("winner_picks"):
+            filled_rows += _filled_text_picks(m["winner_picks"])
+        total_rows += n * (2 if m.get("winner_picks") else 1)
         pub = {
             "key": m["key"],
             "code": m["code"],
@@ -1435,7 +1442,7 @@ def compute_knockout(data, live_table=None, matches=None):
             "label_en": m["label_en"],
             "score": score,
             "result": _knockout_public_result(result),
-            **_ko_public_pick_fields(m, names, n),
+            **_ko_public_pick_fields(m, names, n, champ_picks, third_picks),
             **_knockout_public_schedule(m),
         }
         resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
@@ -1488,6 +1495,115 @@ def compute_knockout(data, live_table=None, matches=None):
     }
 
 
+def _cmp_key_to_pick_name(key):
+    """Convierte clave canónica (_cmp_team) al nombre EN usado en winner_picks."""
+    if not key:
+        return None
+    for eng in TEAMS:
+        if _cmp_team(eng) == key:
+            return eng
+    return key
+
+
+def _ko_person_fixture_sides(match, w_map, ru_map=None):
+    """Home/away canónicos del cruce según el cuadro predicho de una persona."""
+    ru_map = ru_map or {}
+    sides = {}
+    for side in ("home", "away"):
+        val = match.get(f"fixture_{side}", "")
+        wm = re.match(r"^W(\d+)$", str(val))
+        rm = re.match(r"^RU(\d+)$", str(val))
+        if wm:
+            key = w_map.get(int(wm.group(1)))
+            if not key:
+                return None, None
+            sides[side] = key
+        elif rm:
+            key = ru_map.get(int(rm.group(1)))
+            if not key:
+                return None, None
+            sides[side] = key
+        elif val:
+            sides[side] = _cmp_team(val)
+        else:
+            return None, None
+    return sides.get("home"), sides.get("away")
+
+
+def _ko_winner_from_score(home_key, away_key, score, tiebreaker):
+    h, a = score
+    if h is None or a is None:
+        return None
+    if h > a:
+        return home_key
+    if a > h:
+        return away_key
+    if tiebreaker:
+        return _cmp_team(tiebreaker)
+    return None
+
+
+def _enrich_final_winner_picks(data):
+    """Deriva winner_picks en finales resolviendo el cuadro de cada persona."""
+    raw = data["knockouts"]
+    outright = raw.get("outright", {})
+    champ_picks = outright.get("champion", {}).get("picks") or []
+    third_picks = outright.get("third_place", {}).get("picks") or []
+    for match in raw["final_matches"]:
+        schedule = {**match, **knockout_schedule_info(match["code"])}
+        is_third = match.get("code") == "3P"
+        fallback_picks = third_picks if is_third else champ_picks
+        winner_picks = []
+        for i in range(data["n"]):
+            w_map = _ko_w_map_for_person(i, data)
+            ru_map = _ko_ru_map_for_person(i, data)
+            home_key, away_key = _ko_person_fixture_sides(schedule, w_map, ru_map)
+            score = match["score_picks"][i]
+            tiebreaker = match["penalty_picks"][i]
+            winner_key = (
+                _ko_winner_from_score(home_key, away_key, score, tiebreaker)
+                if home_key and away_key
+                else None
+            )
+            if winner_key:
+                winner = _cmp_key_to_pick_name(winner_key)
+            else:
+                winner = fallback_picks[i] if i < len(fallback_picks) else None
+            winner_picks.append(winner)
+        match["winner_picks"] = winner_picks
+
+
+def _ko_ru_map_from_results(data):
+    """RU-number -> perdedor real (clave canónica) según resultados cargados."""
+    _, runner_by_ru = build_ko_fixture_maps(data["knockout_results"], data["knockouts"])
+    return {
+        ru: _cmp_team(team.get("name_en") or team.get("name"))
+        for ru, team in runner_by_ru.items()
+    }
+
+
+def _ko_ru_map_for_person(person_idx, data):
+    """Cuadro predicho: RU-number -> perdedor que implica el ganador que pusiste."""
+    ru_map = {}
+    w_map = _ko_w_map_for_person(person_idx, data)
+    for rnd in data["knockouts"]["rounds"]:
+        for match in rnd["matches"]:
+            w = ko_w_number(match["code"])
+            pick = match["winner_picks"][person_idx] if match.get("winner_picks") else None
+            if not w or not pick:
+                continue
+            winner_key = _cmp_team(pick)
+            schedule = {**match, **knockout_schedule_info(match["code"])}
+            home_key, away_key = _ko_person_fixture_sides(schedule, w_map)
+            if not home_key or not away_key:
+                continue
+            for key in (home_key, away_key):
+                if key != winner_key:
+                    ru_map[w] = key
+                    break
+    return ru_map
+
+
 def _ko_w_map_from_results(data):
     """W-number -> ganador real (clave canónica) según resultados cargados."""
     w_map = {}
@@ -1524,11 +1640,15 @@ def _ko_matchup_counts(match, data):
     Cruce sin resolver (feeder por jugar) -> no se condiciona.
     """
     n = data["n"]
-    actual_pair = _ko_fixture_pair(match, _ko_w_map_from_results(data))
+    actual_pair = _ko_fixture_pair(
+        match, _ko_w_map_from_results(data), _ko_ru_map_from_results(data),
+    )
     if actual_pair is None:
         return [True] * n
     return [
-        _ko_fixture_pair(match, _ko_w_map_for_person(i, data)) == actual_pair
+        _ko_fixture_pair(
+            match, _ko_w_map_for_person(i, data), _ko_ru_map_for_person(i, data),
+        ) == actual_pair
         for i in range(n)
     ]
 
@@ -1630,17 +1750,23 @@ KO_SURVIVAL_ROUNDS = [
 KO_BRACKET_ROUNDS = KO_SURVIVAL_ROUNDS[:-1]
 
 
-def _ko_public_pick_fields(match, names, n):
+def _ko_public_pick_fields(match, names, n, champion_picks=None, third_place_picks=None):
     """Picks individuales y analítica agregada para la vista Hoy."""
     picks = []
     for i, (h, a) in enumerate(match["score_picks"]):
         winner = match["winner_picks"][i] if match.get("winner_picks") else None
+        champ = champion_picks[i] if champion_picks else None
+        third = third_place_picks[i] if third_place_picks else None
         picks.append({
             "name": names[i],
             "home": h,
             "away": a,
             "winner": team_es(winner) if winner else None,
             "winner_flag": team_flag(winner) if winner else "",
+            "champion": team_es(champ) if champ else None,
+            "champion_flag": team_flag(champ) if champ else "",
+            "third_place": team_es(third) if third else None,
+            "third_place_flag": team_flag(third) if third else "",
         })
     o1 = sum(1 for h, a in match["score_picks"] if h is not None and h > a)
     ox = sum(1 for h, a in match["score_picks"] if h is not None and h == a)
@@ -2080,14 +2206,22 @@ def _ko_round_matches(raw, key):
     return rnd["matches"] if rnd else []
 
 
-def _ko_fixture_pair(match, w_map):
+def _ko_fixture_pair(match, w_map, ru_map=None):
     """Par de selecciones (ordenado) que juegan el cruce, o None si no se resuelve."""
     sides = []
     for side in ("home", "away"):
         val = match.get(f"fixture_{side}", "")
         wm = re.match(r"^W(\d+)$", str(val))
+        rm = re.match(r"^RU(\d+)$", str(val))
         if wm:
             team = w_map.get(int(wm.group(1)))
+            if not team:
+                return None
+            sides.append(team)
+        elif rm:
+            if ru_map is None:
+                return None
+            team = ru_map.get(int(rm.group(1)))
             if not team:
                 return None
             sides.append(team)
@@ -4642,7 +4776,8 @@ function meBetBlockHtml(m){
     return hints;
   };
   if(dead){
-    stakeHtml = `<div class="me-bet-void">💀 <b>${L('No importa','Doesn\'t matter')}</b><span>${L('pusiste que pasa','you picked')} ${pick.winner_flag || ''} ${esc(team(pick.winner))} — ${L('no está en este cruce, 0 pts','not in this tie, 0 pts')}</span></div>`;
+    const deadMeta = deadPickMeta(m, pick);
+    stakeHtml = `<div class="me-bet-void">💀 <b>${L('No importa','Doesn\'t matter')}</b><span>${deadMeta.lbl} ${deadMeta.flag} ${esc(team(deadMeta.team))} — ${L('no está en este cruce, 0 pts','not in this tie, 0 pts')}</span></div>`;
   } else if(scoreVoid){
     const nm = v => (v || '').toString().trim().toLowerCase();
     const other = nm(pick.winner) === nm(m.home) ? m.away : m.home;
@@ -4728,14 +4863,35 @@ function koMatchStakeHtml(m){
   </div>`;
 }
 
+function deadPickMeta(m, pick){
+  if((m.code === 'FINAL' || m.key === 'final') && pick.champion){
+    return {team: pick.champion, flag: pick.champion_flag || '', lbl: L('tu campeón era','your champion was')};
+  }
+  if((m.code === '3P' || m.key === 'third_place_match') && pick.third_place){
+    return {team: pick.third_place, flag: pick.third_place_flag || '', lbl: L('tu tercer puesto era','your third place was')};
+  }
+  return {team: pick.winner, flag: pick.winner_flag || '', lbl: L('pusiste que pasa','you picked')};
+}
+
 function branchDeadForPick(m, pick){
   // Un pick de cruce está "muerto" si el equipo que pusiste como ganador no es
   // ninguno de los dos del cruce: apostaste por un equipo que no llegó / ya está
   // fuera, así que tu apuesta de este partido no puede puntuar (0 pts).
-  if(!m || !m.is_knockout || !pick || !pick.winner) return false;
-  const home = m.home || '', away = m.away || '';
+  if(!m || !m.is_knockout || !pick) return false;
+  const home = m.home || m.resolved_home || '', away = m.away || m.resolved_away || '';
   if(!home || !away || /^W\d+$/i.test(home) || /^W\d+$/i.test(away)) return false; // cruce sin resolver
   const nm = v => (v || '').toString().trim().toLowerCase();
+  // En la Final, si tu campeón no está en el cruce real la rama está muerta (0 pts).
+  if((m.code === 'FINAL' || m.key === 'final') && pick.matchup_ok === false && pick.champion){
+    const champ = nm(pick.champion);
+    if(champ !== nm(home) && champ !== nm(away)) return true;
+  }
+  // En el 3er puesto, si tu pick de tercero no está en el cruce real, 0 pts.
+  if((m.code === '3P' || m.key === 'third_place_match') && pick.matchup_ok === false && pick.third_place){
+    const third = nm(pick.third_place);
+    if(third !== nm(home) && third !== nm(away)) return true;
+  }
+  if(!pick.winner) return false;
   const w = nm(pick.winner);
   return w !== nm(home) && w !== nm(away);
 }

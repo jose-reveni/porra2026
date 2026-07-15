@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import sys
 import subprocess
@@ -541,6 +542,71 @@ class TestKnockoutData:
         assert "bk-cbar split" in gd.JS
         assert "Resultado final" in gd.JS
         assert "koBracketPrecisionCard" in gd.JS
+
+    def test_final_winner_picks_are_derived_from_person_bracket(self, workbook_data, computed_data):
+        """La Final no tiene fila de ganador en el Excel; se infiere del marcador
+        en el cuadro predicho de cada persona (y del campeón si empate sin penaltis)."""
+        final_raw = next(m for m in workbook_data["knockouts"]["final_matches"] if m["code"] == "FINAL")
+        assert final_raw.get("winner_picks")
+        je_idx = workbook_data["names"].index("JE")
+        assert gd._cmp_team(final_raw["winner_picks"][je_idx]) == gd._cmp_team("France")
+
+        final_pub = next(m for m in computed_data["knockout"]["final_matches"] if m["code"] == "FINAL")
+        je_pick = next(p for p in final_pub["picks"] if p["name"] == "JE")
+        assert je_pick["winner"] == "Francia"
+        assert je_pick["champion"] == "Francia"
+        assert je_pick["matchup_ok"] is False
+
+        branch_dead = _extract_js_function(gd.JS, "branchDeadForPick")
+        script = f"""
+{branch_dead}
+const m = {json.dumps({
+            "code": "FINAL",
+            "key": "final",
+            "is_knockout": True,
+            "home": final_pub["resolved_home"],
+            "away": final_pub["resolved_away"],
+        })};
+const pick = {json.dumps(je_pick)};
+process.stdout.write(branchDeadForPick(m, pick) ? '1' : '0');
+"""
+        result = subprocess.check_output(["node", "-e", script], text=True)
+        assert result == "1"
+
+    def test_third_place_matchup_uses_runner_up_bracket(self, workbook_data, computed_data):
+        """El 3er puesto usa RU##: hay que resolver el perdedor de cada semi
+        en el cuadro de cada persona, no comparar los literales RU101/RU102."""
+        third_raw = next(m for m in workbook_data["knockouts"]["final_matches"] if m["code"] == "3P")
+        je_idx = workbook_data["names"].index("JE")
+        assert gd._cmp_team(third_raw["winner_picks"][je_idx]) == gd._cmp_team("England")
+
+        counts = gd._ko_matchup_counts(third_raw, workbook_data)
+        assert counts[je_idx] is False
+
+        third_pub = next(m for m in computed_data["knockout"]["final_matches"] if m["code"] == "3P")
+        je_pick = next(p for p in third_pub["picks"] if p["name"] == "JE")
+        assert je_pick["winner"] == "Inglaterra"
+        assert je_pick["third_place"] == "Inglaterra"
+        assert je_pick["matchup_ok"] is False
+
+        matt_idx = workbook_data["names"].index("Matt")
+        assert counts[matt_idx] is False
+        matt_pick = next(p for p in third_pub["picks"] if p["name"] == "Matt")
+        branch_dead = _extract_js_function(gd.JS, "branchDeadForPick")
+        script = f"""
+{branch_dead}
+const m = {json.dumps({
+            "code": "3P",
+            "key": "third_place_match",
+            "is_knockout": True,
+            "home": third_pub["resolved_home"],
+            "away": third_pub["resolved_away"],
+        })};
+const pick = {json.dumps(matt_pick)};
+process.stdout.write(branchDeadForPick(m, pick) ? '1' : '0');
+"""
+        result = subprocess.check_output(["node", "-e", script], text=True)
+        assert result == "1"
 
     def test_nav_badges_use_match_counts_not_participants(self):
         assert "if(key === 'groups') return D.hero.matches" in gd.JS
