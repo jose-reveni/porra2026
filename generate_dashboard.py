@@ -20,6 +20,7 @@ import json
 import re
 import sys
 import statistics
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import date as _date, datetime, timedelta
 from pathlib import Path
@@ -63,6 +64,54 @@ AWARD_ROWS = {
     "top_scorer": {"row": 228, "label_es": "Máximo goleador", "label_en": "Top scorer", "points": 8},
     "ballon_dor": {"row": 229, "label_es": "Balón de Oro", "label_en": "Ballon d'Or", "points": 8},
 }
+
+# Jugador -> selección (nombre EN, canonizado luego por _cmp_team). Sirve para
+# marcar un pick de premio como "muerto" cuando su selección ya está eliminada.
+# La clave se busca sin acentos ni mayúsculas (_award_player_key), así aguanta
+# variantes tipográficas aunque los nombres se limpien en el propio Excel.
+AWARD_PLAYER_TEAM = {
+    "messi": "Argentina",
+    "julian alvarez": "Argentina",
+    "alvarez": "Argentina",
+    "mbappe": "France",
+    "dembele": "France",
+    "griezmann": "France",
+    "kane": "England",
+    "bellingham": "England",
+    "foden": "England",
+    "saka": "England",
+    "oyarzabal": "Spain",
+    "yamal": "Spain",
+    "lamine": "Spain",
+    "lamine yamal": "Spain",
+    "morata": "Spain",
+    "olmo": "Spain",
+    "haaland": "Norway",
+    "vinicius": "Brazil",
+    "vini": "Brazil",
+    "rodrygo": "Brazil",
+    "raphinha": "Brazil",
+    "neymar": "Brazil",
+    "ronaldo": "Portugal",
+    "cr7": "Portugal",
+    "musiala": "Germany",
+    "wirtz": "Germany",
+    "kane harry": "England",
+    "lukaku": "Belgium",
+    "de bruyne": "Belgium",
+}
+
+
+def _award_player_key(text):
+    """Clave de jugador sin acentos ni mayúsculas para el mapa jugador→selección."""
+    if text is None:
+        return None
+    norm = unicodedata.normalize("NFKD", str(text).strip().casefold())
+    return "".join(c for c in norm if not unicodedata.combining(c))
+
+
+def _award_player_team(pick):
+    return AWARD_PLAYER_TEAM.get(_award_player_key(pick))
 
 # Calendario oficial FIFA descargado de la página de fixtures el 2026-06-28.
 # kickoff_et guarda el instante base en Eastern Time; el dashboard lo muestra
@@ -2459,6 +2508,36 @@ def _ko_alive_teams(data):
     return alive
 
 
+def _ko_award_alive_teams(data):
+    """Selecciones que aún tienen algún partido KO por jugar, incluido el partido
+    por el tercer puesto.
+
+    Para los premios individuales (Balón de Oro, Pichichi) un jugador solo queda
+    'muerto' cuando su selección ya no tiene ningún partido pendiente: un equipo
+    que pierde la semifinal sigue vivo hasta que juegue el 3.º y 4.º puesto, así
+    que sus jugadores siguen pudiendo marcar/optar al premio.
+    """
+    results = data["knockout_results"]["matches"]
+    w_map = _ko_w_map_from_results(data)
+    ru_map = _ko_ru_map_from_results(data)
+    all_matches = []
+    for rnd in data["knockouts"]["rounds"]:
+        all_matches.extend(rnd["matches"])
+    all_matches.extend(data["knockouts"].get("final_matches", []))
+
+    alive = set()
+    for match in all_matches:
+        if results.get(match["code"]):
+            continue  # partido ya jugado, no aporta futuro
+        pair = _ko_fixture_pair(match, w_map, ru_map)
+        if not pair:
+            # Feeder sin resolver todavía (p. ej. cruce futuro cuyo origen aún no
+            # se ha jugado): no podemos descartar a nadie por este partido.
+            continue
+        alive.update(k for k in pair if k)
+    return alive
+
+
 def _ko_team_pair(match):
     home = match.get("fixture_home", "")
     away = match.get("fixture_away", "")
@@ -2708,6 +2787,84 @@ def _compute_ko_honors(names, people, reventador, scoring_table):
     }
 
 
+def _ko_award_bets(awards, award_results, n, alive):
+    """Convierte cada premio (Balón de Oro, Pichichi) en una 'apuesta de paso'.
+
+    Por cada pick calcula la cuota parimutuel (cuanta menos gente lo apueste,
+    más alta), los puntos en juego, si ya está resuelto (acierto/fallo) y si el
+    pick está 'muerto' porque la selección del jugador ya está eliminada.
+    Devuelve (bets_por_persona, meta_por_premio).
+    """
+    bets = [dict() for _ in range(n)]
+    meta = {}
+    for key, meta_row in AWARD_ROWS.items():
+        award = awards.get(key)
+        if not award:
+            continue
+        picks = award.get("picks", [None] * n)
+        points = meta_row["points"]
+        filled = sum(1 for p in picks if p)
+        counts = Counter(p.strip() for p in picks if p)
+        result = award_results.get(key)
+        result_key = _award_player_key(result) if result else None
+        decided = result_key is not None
+
+        dist = []
+        for pick, count in counts.most_common():
+            team = _award_player_team(pick)
+            dead = bool(team) and _cmp_team(team) not in alive
+            dist.append({
+                "name": pick,
+                "count": count,
+                "odds": round(filled / count, 2) if count else None,
+                "flag": team_flag(team) if team else "🏳️",
+                "team": team_es(team) if team else None,
+                "dead": dead,
+                "won": decided and _award_player_key(pick) == result_key,
+            })
+        best_odds = max(
+            (d["odds"] for d in dist if not d["dead"] and d["odds"]),
+            default=None,
+        )
+
+        meta[key] = {
+            "label_es": meta_row["label_es"],
+            "label_en": meta_row["label_en"],
+            "points": points,
+            "filled": filled,
+            "total": n,
+            "result": result,
+            "resultFlag": team_flag(_award_player_team(result)) if result else "🏳️",
+            "decided": decided,
+            "dist": dist,
+            "bestOdds": best_odds,
+        }
+
+        for i, pick in enumerate(picks):
+            if not pick:
+                bets[i][key] = None
+                continue
+            pick = pick.strip()
+            count = counts[pick]
+            team = _award_player_team(pick)
+            dead = bool(team) and _cmp_team(team) not in alive
+            odds = round(filled / count, 2) if count else None
+            bets[i][key] = {
+                "pick": pick,
+                "count": count,
+                "odds": odds,
+                "share": round(100 * count / filled) if filled else 0,
+                "points": points,
+                "flag": team_flag(team) if team else "🏳️",
+                "team": team_es(team) if team else None,
+                "dead": dead,
+                "decided": decided,
+                "won": decided and _award_player_key(pick) == result_key,
+                "topShot": best_odds is not None and not dead and odds == best_odds,
+            }
+    return bets, meta
+
+
 def compute_knockout_metrics(data):
     """Métricas del relato KO derivadas de las porras reales."""
     names = data["names"]
@@ -2735,6 +2892,10 @@ def compute_knockout_metrics(data):
 
     ts_counter = Counter(p for p in awards.get("top_scorer", {}).get("picks", []) if p)
     ts_rank = [{"name": t, "count": c} for t, c in ts_counter.most_common(8)]
+
+    award_results = (data.get("knockout_results") or {}).get("awards", {})
+    award_alive = _ko_award_alive_teams(data)
+    award_bets, awards_meta = _ko_award_bets(awards, award_results, n, award_alive)
 
     reventador = _ko_reventador_counts(data, prestige)
     champ_team = champ_consensus.get("value")
@@ -2822,6 +2983,7 @@ def compute_knockout_metrics(data):
             "vsPueblo": diffs,
             "vsPuebloTotal": total,
             "reventador": reventador[i],
+            "awards": award_bets[i],
         })
 
     bold_rank = sorted(people, key=lambda p: (-p["boldPct"], p["name"].lower()))
@@ -2834,6 +2996,7 @@ def compute_knockout_metrics(data):
         "bracketRounds": bracket_round_labels,
         "champRank": champ_rank,
         "tsRank": ts_rank,
+        "awardsMeta": awards_meta,
         "depth": depth,
         "twins": twin_pairs,
         "grave": grave,
@@ -3672,6 +3835,53 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .fstats .v{font-family:var(--fu);font-weight:700;color:var(--mint)}
 .fline{font-size:.82rem;color:var(--muted);margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 .fline b{color:var(--text)}
+/* --- Premios individuales (apuestas de paso) --- */
+.aw-heroes{margin-bottom:22px}
+.aw-hero.card{display:flex;flex-direction:column;gap:6px}
+.aw-hero .k{margin-bottom:2px}
+.aw-hero-fav{font-size:.9rem}
+.aw-hero-fav b{color:var(--mint)}
+.aw-hero-shot{font-size:.9rem}
+.aw-hero-shot b{color:var(--gold)}
+.aw-hero-res{font-size:.86rem;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.aw-hero-res b{color:var(--text)}
+.aw-ficha{padding:16px}
+.aw-ficha .fh{margin-bottom:8px}
+.aw-rows{display:flex;flex-direction:column;gap:8px}
+.aw-row{display:flex;flex-direction:column;gap:5px;padding:9px 11px;border-radius:10px;
+  background:var(--surface2);border:1px solid var(--line)}
+.aw-head{display:flex;align-items:center;gap:6px}
+.aw-head .aw-ico{font-size:.95rem;line-height:1}
+.aw-head .aw-lab{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.66rem}
+.aw-main{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.aw-main .aw-pick{font-weight:700;font-size:.98rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aw-meta{display:flex;align-items:baseline;gap:10px;flex:none;white-space:nowrap}
+.aw-count{font-family:var(--fm);font-size:.82rem;color:var(--muted)}
+.aw-pts{font-family:var(--fm);font-size:.82rem;font-weight:700;color:var(--gold)}
+.aw-res{font-family:var(--fm);font-size:.8rem;font-weight:700}
+.aw-res.ok{color:var(--mint)}
+.aw-res.ko{color:var(--red)}
+.aw-res.dead{color:var(--red);font-weight:600}
+.aw-row.aw-dead{opacity:.6}
+.aw-row.aw-dead .aw-pick{text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2px;color:var(--muted)}
+.aw-row.aw-win{border-color:var(--mint2);background:rgba(47,191,44,.12)}
+.aw-row.aw-miss{opacity:.55}
+.aw-row.aw-shot{border-color:rgba(242,133,54,.5);background:rgba(242,133,54,.07)}
+.aw-row.aw-shot .aw-count{color:var(--gold)}
+.aw-row.aw-empty .aw-pick{color:var(--muted);font-weight:400;font-style:italic}
+.aw-wolf{font-size:.82rem}
+/* Vista inversa (En directo): un card por candidato */
+.aw-inv-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.aw-inv-card .tm-head{align-items:center}
+.aw-inv-card .tm-teams{font-size:1.08rem}
+.aw-inv-tag{font-family:var(--fm);font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:6px}
+.aw-inv-tag.dead{color:var(--red);background:rgba(255,138,122,.12)}
+.aw-inv-tag.win{color:var(--mint);background:rgba(47,191,44,.14)}
+.aw-inv-dead{opacity:.72}
+.aw-inv-dead .tm-teams{text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2px;color:var(--muted)}
+.aw-inv-win{border-color:var(--mint2);background:rgba(47,191,44,.06)}
+.aw-inv-card .today-picks{margin-top:10px}
+.aw-inv-card .result-names{display:flex;flex-wrap:wrap;gap:6px}
 /* premios */
 .award{background:linear-gradient(160deg,var(--surface2),var(--surface));border:1px solid var(--line);
   border-radius:18px;padding:22px;text-align:center}
@@ -5132,6 +5342,51 @@ function buildHoy(){
   });
 }
 
+/* ---- APUESTAS DE PASO (vista inversa: por jugador) ---- */
+function buildHoyAwards(){
+  // Solo a partir del miércoles 15 (final a la vuelta de la esquina); antes, oculto.
+  if(matchdayDateStr(new Date()) < '2026-07-15') return;
+  const dz = koMetricsData();
+  const meta = dz && dz.awardsMeta;
+  if(!dz || !meta) return;
+  const order = [
+    {key:'ballon_dor', icon:'🏆', es:'Balón de Oro', en:"Ballon d'Or"},
+    {key:'top_scorer', icon:'👟', es:'Pichichi', en:'Top scorer'},
+  ].filter(o => meta[o.key]);
+  order.forEach(o => {
+    const m = meta[o.key];
+    // Vista inversa: para cada candidato, quién lo ha apostado.
+    const groups = {};
+    dz.people.forEach(p => {
+      const bet = p.awards && p.awards[o.key];
+      if(bet && bet.pick){ (groups[bet.pick] = groups[bet.pick] || []).push({name:p.name, dead:bet.dead, won:bet.won}); }
+    });
+    const sub = m.decided
+      ? `${L('Ganador','Winner')}: <b>${m.resultFlag && m.resultFlag!=='🏳️' ? m.resultFlag+' ' : ''}${esc(m.result)}</b>. ${L('Cada candidato y quién lo apostó.','Each candidate and who backed them.')}`
+      : L('Cada candidato y quién lo apostó. +8 pts para quien acierte. 💀 = su selección ya no tiene más partidos.',
+          'Each candidate and who backed them. +8 pts if you nail it. 💀 = their team has no games left.');
+    const s = section('hoy-'+o.key, `${o.icon} ${L(o.es, o.en)}`, L('¿A quién apostamos?','Who did we back?'), sub);
+    const box = el('div','aw-inv-wrap reveal');
+    (m.dist || []).forEach(d => {
+      const list = sortPeople(groups[d.name] || []);
+      const cls = 'today-match aw-inv-card' + (d.dead ? ' aw-inv-dead' : '') + (m.decided && d.won ? ' aw-inv-win' : '');
+      const tags = `<span class="tm-group">${d.count}/${m.total}</span>`
+        + (d.dead ? `<span class="aw-inv-tag dead">💀 ${L('fuera','out')}</span>` : '')
+        + (m.decided && d.won ? `<span class="aw-inv-tag win">✓ ${L('acierto','hit')}</span>` : '');
+      const names = list.length
+        ? list.map(pp => `<span class="result-person${meClass(pp.name)}"><b>${esc(pp.name)}</b></span>`).join('')
+        : `<span class="muted">${L('Nadie','Nobody')}</span>`;
+      box.appendChild(el('div', cls,
+        `<div class="tm-head">
+          <div class="tm-teams">${d.flag && d.flag!=='🏳️' ? d.flag+' ' : ''}${esc(d.name)}</div>
+          <div class="tm-tags">${tags}</div>
+        </div>
+        <div class="today-picks"><div class="result-names">${names}</div></div>`));
+    });
+    s.appendChild(box);
+  });
+}
+
 /* ---- ÚLTIMOS RESULTADOS ---- */
 function buildUltimos(){
   const s = section('ultimos', L('🧾 Últimos','🧾 Latest'),
@@ -5636,7 +5891,7 @@ function renderView(view){
       buildMeSummary(meSec);
       wrap.appendChild(meSec);
     }
-    buildHoy(); buildAciertos(); buildUltimos();
+    buildHoy(); buildHoyAwards(); buildAciertos(); buildUltimos();
   }
 }
 
@@ -5955,6 +6210,75 @@ function koBracketPrecisionCard(){
         'Green and red are proportional to ties in each round (16 in R32, 8 in R16…). Red = played and you missed who advanced. Stripes = an upcoming tie whose winner you picked is already out.')}</p>
      <div class="surv-scroll"><div class="surv-grid" style="--rounds:${rounds.length}">${head}${body}</div></div>${legend}`);
 }
+function koAwardRow(icon, label, bet){
+  const head = `<div class="aw-head"><span class="aw-ico">${icon}</span><span class="aw-lab">${label}</span></div>`;
+  if(!bet) return `<div class="aw-row aw-empty">${head}
+    <div class="aw-main"><span class="aw-pick">${L('sin apuesta','no bet')}</span></div></div>`;
+  const cls = (bet.dead ? ' aw-dead' : '') + (bet.decided && bet.won ? ' aw-win' : '')
+            + (bet.decided && !bet.won ? ' aw-miss' : '') + (bet.topShot ? ' aw-shot' : '');
+  let tail;
+  if(bet.decided) tail = bet.won
+    ? `<span class="aw-res ok">✓ +${bet.points}</span>`
+    : `<span class="aw-res ko">✗ 0</span>`;
+  else if(bet.dead) tail = `<span class="aw-res dead" title="${L('su selección ya no tiene más partidos','their team has no games left')}">💀 ${L('fuera','out')}</span>`;
+  else tail = `<span class="aw-pts" title="${L('puntos si acierta','points if it lands')}">+${bet.points} pts</span>`;
+  const cntTitle = L('lo apuestan '+bet.count+' de '+N, bet.count+' of '+N+' back it');
+  const wolf = bet.topShot ? ` <span class="aw-wolf" title="${L('el pick más arriesgado: casi nadie lo apuesta','the boldest pick: almost nobody backs it')}">🐺</span>` : '';
+  return `<div class="aw-row${cls}">${head}
+    <div class="aw-main">
+      <span class="aw-pick">${bet.flag && bet.flag!=='🏳️' ? bet.flag+' ' : ''}${esc(bet.pick)}${wolf}</span>
+      <span class="aw-meta"><span class="aw-count" title="${cntTitle}">${bet.count}/${N}</span>${tail}</span>
+    </div></div>`;
+}
+function buildKoAwardsBet(){
+  const dz = koMetricsData();
+  const meta = dz && dz.awardsMeta;
+  if(!dz || !meta || (!meta.ballon_dor && !meta.top_scorer)) return;
+  const icons = {ballon_dor:'⚽', top_scorer:'👟'};
+  const order = ['ballon_dor','top_scorer'].filter(kk => meta[kk]);
+  const s = section('ko-awards', L('🏅 Premios individuales','🏅 Individual awards'),
+    L('Las apuestas de paso 🎲','The side bets 🎲'),
+    L('El Balón de Oro y el Pichichi de cada uno, como una apuesta: <b>+8 puntos</b> si aciertas. Al lado ves <b>cuánta gente lo apuesta</b> (p. ej. 3/28): cuantos menos, más te la juegas. <b>🐺</b> = el pick más arriesgado del premio. <b>💀</b> = su selección ya no tiene más partidos.',
+      'Everyone\'s Ballon d\'Or and Top Scorer as a bet: <b>+8 pts</b> if you nail it. Next to it you see <b>how many back it</b> (e.g. 3/28): the fewer, the bolder. <b>🐺</b> = the boldest pick of that award. <b>💀</b> = their team has no games left.'));
+
+  // Héroes: quién se la juega más + consenso por premio.
+  const heroes = order.map(kk => {
+    const m = meta[kk];
+    const shots = dz.people.filter(p => p.awards && p.awards[kk] && p.awards[kk].topShot);
+    const shot = shots[0] && shots[0].awards[kk];
+    const who = shots.map(p => `<span style="color:${personColor(p.name)}">${esc(p.name)}</span>`).join(', ') || '–';
+    const fav = (m.dist || [])[0];
+    const resolved = m.decided
+      ? `<div class="aw-hero-res">${m.resultFlag && m.resultFlag!=='🏳️' ? m.resultFlag+' ' : ''}${L('Ganador','Winner')}: <b>${esc(m.result)}</b></div>` : '';
+    return `<div class="aw-hero card">
+      <span class="k">${icons[kk]} ${L(m.label_es, m.label_en)}</span>
+      <div class="aw-hero-fav">${L('Favorito','Favourite')}: <b>${fav ? esc(fav.name) : '–'}</b>${fav ? ` <span class="muted">(${fav.count}/${m.total})</span>` : ''}</div>
+      <div class="aw-hero-shot">🐺 ${L('El que más se la juega','Biggest gambler')}: <b>${who}</b>${shot ? ` <span class="muted">— ${esc(shot.pick)} (${shot.count}/${m.total})</span>` : ''}</div>
+      ${resolved}</div>`;
+  }).join('');
+  s.appendChild(el('div','grid g2 reveal aw-heroes', heroes));
+
+  // Rejilla de fichas por persona con buscador.
+  const box = el('div','kp-fichas-wrap reveal');
+  const inp = el('input','search'); inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  if(ME) inp.value = ME;
+  const grid = el('div','grid g3 aw-grid');
+  dz.people.slice().sort((a,b) => a.name.localeCompare(b.name,'es')).forEach(p => {
+    const aw = p.awards || {};
+    const card = el('div','ficha aw-ficha'+meClass(p.name)); card.dataset.name = p.name.toLowerCase();
+    card.innerHTML = `
+      <div class="fh"><div class="fn">${esc(p.name)}</div></div>
+      <div class="aw-rows">
+        ${koAwardRow(icons.ballon_dor, L("Balón de Oro","Ballon d'Or"), aw.ballon_dor)}
+        ${koAwardRow(icons.top_scorer, L('Pichichi','Top scorer'), aw.top_scorer)}
+      </div>`;
+    grid.appendChild(card);
+  });
+  inp.addEventListener('input', () => { const q = inp.value.toLowerCase().trim();
+    grid.querySelectorAll('.aw-ficha').forEach(f => { f.style.display = f.dataset.name.includes(q) ? '' : 'none'; }); });
+  box.appendChild(inp); box.appendChild(grid);
+  s.appendChild(box);
+}
 function buildKnockouts(){
   const k = D.knockout || {};
   if(!k.ready || !k.metrics){
@@ -5963,6 +6287,7 @@ function buildKnockouts(){
   }
   buildKoStoryBody();
   buildEliminatoriasSchedule();
+  buildKoAwardsBet();
   const coverage = koCoverageBlock(k);
   if(coverage){
     const s = el('section','sec');
