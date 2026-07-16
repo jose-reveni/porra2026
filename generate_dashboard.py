@@ -1539,6 +1539,11 @@ def _ko_winner_from_score(home_key, away_key, score, tiebreaker):
     if a > h:
         return away_key
     if tiebreaker:
+        side = _cmp_text(tiebreaker)
+        if side == "home":
+            return home_key
+        if side == "away":
+            return away_key
         return _cmp_team(tiebreaker)
     return None
 
@@ -4864,13 +4869,27 @@ function koMatchStakeHtml(m){
 }
 
 function deadPickMeta(m, pick){
-  if((m.code === 'FINAL' || m.key === 'final') && pick.champion){
-    return {team: pick.champion, flag: pick.champion_flag || '', lbl: L('tu campeón era','your champion was')};
+  const nm = v => (v || '').toString().trim().toLowerCase();
+  const home = m.home || m.resolved_home || '';
+  const away = m.away || m.resolved_away || '';
+  if((m.code === 'FINAL' || m.key === 'final') && pick.matchup_ok === false && pick.champion){
+    const champ = nm(pick.champion);
+    if(champ !== nm(home) && champ !== nm(away)){
+      return {team: pick.champion, flag: pick.champion_flag || '', lbl: L('tu campeón era','your champion was')};
+    }
   }
-  if((m.code === '3P' || m.key === 'third_place_match') && pick.third_place){
-    return {team: pick.third_place, flag: pick.third_place_flag || '', lbl: L('tu tercer puesto era','your third place was')};
+  if((m.code === '3P' || m.key === 'third_place_match') && pick.matchup_ok === false && pick.third_place){
+    const third = nm(pick.third_place);
+    if(third !== nm(home) && third !== nm(away)){
+      return {team: pick.third_place, flag: pick.third_place_flag || '', lbl: L('tu tercer puesto era','your third place was')};
+    }
   }
-  return {team: pick.winner, flag: pick.winner_flag || '', lbl: L('pusiste que pasa','you picked')};
+  let teamName = pick.winner;
+  let flag = pick.winner_flag || '';
+  const w = nm(teamName);
+  if(w === 'home'){ teamName = home; flag = m.home_flag || m.resolved_home_flag || ''; }
+  else if(w === 'away'){ teamName = away; flag = m.away_flag || m.resolved_away_flag || ''; }
+  return {team: teamName, flag, lbl: L('pusiste que pasa','you picked')};
 }
 
 function branchDeadForPick(m, pick){
@@ -4953,7 +4972,8 @@ function todayPicksHtml(picks, match){
     const list = sort(buckets.dead);
     const deadPill = p => {
       const score = p.home != null ? `${p.home}-${p.away}` : '–';
-      return `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${score} · 💀 ${p.winner_flag || ''} ${esc(team(p.winner))}</span></span>`;
+      const meta = deadPickMeta(match, p);
+      return `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b><span>${score} · 💀 ${meta.flag || ''} ${esc(team(meta.team))}</span></span>`;
     };
     html += `<div class="result-box dead">
       <div class="rb-title">💀 ${L('Apuesta muerta','Dead pick')} <span class="rb-count">${list.length}</span></div>

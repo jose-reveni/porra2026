@@ -608,6 +608,24 @@ process.stdout.write(branchDeadForPick(m, pick) ? '1' : '0');
         result = subprocess.check_output(["node", "-e", script], text=True)
         assert result == "1"
 
+    def test_ko_winner_from_score_resolves_home_away_tiebreaker(self):
+        home = gd._cmp_team("France")
+        away = gd._cmp_team("Portugal")
+        assert gd._ko_winner_from_score(home, away, (1, 1), "home") == home
+        assert gd._ko_winner_from_score(home, away, (2, 2), "away") == away
+        assert gd._cmp_key_to_pick_name(
+            gd._ko_winner_from_score(home, away, (1, 1), "home")
+        ) == "France"
+
+    def test_third_place_winner_picks_resolve_home_away_tiebreaker(self, workbook_data, computed_data):
+        third_raw = next(m for m in workbook_data["knockouts"]["final_matches"] if m["code"] == "3P")
+        for winner in third_raw.get("winner_picks") or []:
+            assert winner not in ("home", "away")
+
+        third_pub = next(m for m in computed_data["knockout"]["final_matches"] if m["code"] == "3P")
+        for pick in third_pub["picks"]:
+            assert pick.get("winner") not in ("home", "away")
+
     def test_nav_badges_use_match_counts_not_participants(self):
         assert "if(key === 'groups') return D.hero.matches" in gd.JS
         assert "D.recent_results && D.recent_results.total" in gd.JS
