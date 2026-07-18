@@ -65,8 +65,16 @@ AWARD_ROWS = {
     "ballon_dor": {"row": 229, "label_es": "Balón de Oro", "label_en": "Ballon d'Or", "points": 8},
 }
 
+# Tachado (💀) por premio. El Balón de Oro se decide por el torneo completo,
+# así que la eliminación de una selección no descarta a nadie; en el Pichichi
+# solo está fuera quien ya no puede alcanzar al líder de la tabla de goleadores.
+AWARD_DEAD_PICKS = {
+    "ballon_dor": frozenset(),
+    "top_scorer": frozenset({"kane"}),
+}
+
 # Jugador -> selección (nombre EN, canonizado luego por _cmp_team). Sirve para
-# marcar un pick de premio como "muerto" cuando su selección ya está eliminada.
+# poner bandera y selección junto a cada pick de premio.
 # La clave se busca sin acentos ni mayúsculas (_award_player_key), así aguanta
 # variantes tipográficas aunque los nombres se limpien en el propio Excel.
 AWARD_PLAYER_TEAM = {
@@ -1476,6 +1484,7 @@ def compute_knockout(data, live_table=None, matches=None):
 
     champ_picks = raw.get("outright", {}).get("champion", {}).get("picks")
     third_picks = raw.get("outright", {}).get("third_place", {}).get("picks")
+    runner_picks = raw.get("outright", {}).get("runner_up", {}).get("picks")
     final_matches = []
     for m in raw["final_matches"]:
         score = _score_consensus(m["score_picks"], n)
@@ -1491,10 +1500,11 @@ def compute_knockout(data, live_table=None, matches=None):
             "label_en": m["label_en"],
             "score": score,
             "result": _knockout_public_result(result),
-            **_ko_public_pick_fields(m, names, n, champ_picks, third_picks),
+            **_ko_public_pick_fields(m, names, n, champ_picks, third_picks, runner_picks),
             **_knockout_public_schedule(m),
         }
         resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
+        _attach_final_match_winner(pub, data["knockout_results"])
         _attach_matchup_ok(pub, m, data)
         if not result or "score" not in result:
             pub["stake"] = stake_for_ko_match(m, None, names, data, matches, live_table)
@@ -1804,13 +1814,14 @@ KO_SURVIVAL_ROUNDS = [
 KO_BRACKET_ROUNDS = KO_SURVIVAL_ROUNDS[:-1]
 
 
-def _ko_public_pick_fields(match, names, n, champion_picks=None, third_place_picks=None):
+def _ko_public_pick_fields(match, names, n, champion_picks=None, third_place_picks=None, runner_up_picks=None):
     """Picks individuales y analítica agregada para la vista Hoy."""
     picks = []
     for i, (h, a) in enumerate(match["score_picks"]):
         winner = match["winner_picks"][i] if match.get("winner_picks") else None
         champ = champion_picks[i] if champion_picks else None
         third = third_place_picks[i] if third_place_picks else None
+        runner = runner_up_picks[i] if runner_up_picks else None
         picks.append({
             "name": names[i],
             "home": h,
@@ -1821,6 +1832,8 @@ def _ko_public_pick_fields(match, names, n, champion_picks=None, third_place_pic
             "champion_flag": team_flag(champ) if champ else "",
             "third_place": team_es(third) if third else None,
             "third_place_flag": team_flag(third) if third else "",
+            "runner_up": team_es(runner) if runner else None,
+            "runner_up_flag": team_flag(runner) if runner else "",
         })
     o1 = sum(1 for h, a in match["score_picks"] if h is not None and h > a)
     ox = sum(1 for h, a in match["score_picks"] if h is not None and h == a)
@@ -1942,6 +1955,32 @@ def _deferred_stake(match, data, matches):
     }
 
 
+# Apuestas outright que decide cada partido de la jornada final: se suman al
+# "en juego" del cruce (campeón y subcampeón salen de la final; el 3.º, del 3P).
+FINAL_OUTRIGHT_STAKES = {
+    "3P": (("third_place", "winner"),),
+    "FINAL": (("champion", "winner"), ("runner_up", "loser")),
+}
+
+
+def _ko_match_outright_stakes(match, data):
+    """Apuestas outright aún sin resolver que este cruce dejará decididas."""
+    stakes = []
+    for okey, target in FINAL_OUTRIGHT_STAKES.get(match["code"], ()):
+        meta = data["knockouts"]["outright"].get(okey)
+        if not meta or data["knockout_results"]["outright"].get(okey):
+            continue
+        stakes.append({
+            "key": okey,
+            "target": target,
+            "points": meta["points"],
+            "label_es": meta["label_es"],
+            "label_en": meta["label_en"],
+            "picks": meta["picks"],
+        })
+    return stakes
+
+
 def stake_for_ko_match(match, rnd, names, data, matches, live_table):
     if _earlier_unplayed_same_day(data, matches, match):
         return _deferred_stake(match, data, matches)
@@ -1952,7 +1991,8 @@ def stake_for_ko_match(match, rnd, names, data, matches, live_table):
     home = pub.get("resolved_home") or pub.get("fixture_home")
     away = pub.get("resolved_away") or pub.get("fixture_away")
     return compute_ko_match_stake(
-        match, rnd, names, table, _ko_matchup_counts(match, data), home, away
+        match, rnd, names, table, _ko_matchup_counts(match, data), home, away,
+        _ko_match_outright_stakes(match, data),
     )
 
 
@@ -2110,7 +2150,6 @@ def _ko_match_scenarios(match, home=None, away=None):
     para no inventar escenarios imposibles (p.ej. '1-1 · España' en Brasil-Noruega)."""
     home = home or match.get("fixture_home") or match.get("fixture_home_en", "")
     away = away or match.get("fixture_away") or match.get("fixture_away_en", "")
-    has_winner = bool(match.get("winner_picks"))
     scenarios = {}
     for h, a in match["score_picks"]:
         if h is None or a is None:
@@ -2119,10 +2158,8 @@ def _ko_match_scenarios(match, home=None, away=None):
             options = [home]
         elif a > h:
             options = [away]
-        elif has_winner:
-            options = [home, away]  # empate -> penaltis a cualquiera de los dos
         else:
-            continue
+            options = [home, away]  # empate -> penaltis a cualquiera de los dos
         for res_winner in options:
             if res_winner:
                 scenarios[(h, a, _cmp_text(res_winner))] = (h, a, res_winner)
@@ -2145,16 +2182,19 @@ def _ko_points_for_pick(h, a, winner_pick, rh, ra, res_winner, advance_pts, marc
     return pts
 
 
-def compute_ko_match_stake(match, rnd, names, live_table, matchup=None, home=None, away=None):
+def compute_ko_match_stake(match, rnd, names, live_table, matchup=None, home=None, away=None, outrights=None):
     """Cuánto puede mover el ranking general un cruce KO (escenarios realistas).
 
     `matchup[i]` indica si el cruce coincide con el que predijo la persona i; si
     no, su marcador no puede puntuar (solo el pase). `home`/`away` son los equipos
     reales resueltos, para generar escenarios (y el pase) con los equipos correctos.
+    `outrights` son apuestas (campeón/subcampeón/3.º) que este partido decide:
+    sus puntos entran en los escenarios según el ganador o el perdedor del cruce.
     """
     advance_pts = rnd["advance_points"] if rnd else 0
     has_winner = bool(match.get("winner_picks"))
-    max_one = (3 + 2 + advance_pts) if has_winner else 5
+    outrights = outrights or []
+    max_one = ((3 + 2 + advance_pts) if has_winner else 5) + sum(o["points"] for o in outrights)
     if not live_table:
         live_table = [{"name": name, "pts": 0} for name in names]
     name_index = {name: i for i, name in enumerate(names)}
@@ -2166,13 +2206,29 @@ def compute_ko_match_stake(match, rnd, names, live_table, matchup=None, home=Non
         i = name_index[name]
         h, a = match["score_picks"][i]
         winner = match["winner_picks"][i] if has_winner else None
-        if h is None and not winner:
+        if h is None and not winner and not any(o["picks"][i] for o in outrights):
             return None
         rh, ra, res_winner = scenario
         marcador_counts = matchup[i] if matchup is not None else True
-        return _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts, marcador_counts)
+        pts = _ko_points_for_pick(h, a, winner, rh, ra, res_winner, advance_pts, marcador_counts) or 0
+        if res_winner and outrights:
+            loser = None
+            if home and away:
+                loser = away if _cmp_team(res_winner) == _cmp_team(home) else home
+            for o in outrights:
+                target = res_winner if o["target"] == "winner" else loser
+                pick = o["picks"][i]
+                if pick and target and _cmp_team(pick) == _cmp_team(target):
+                    pts += o["points"]
+        return pts
 
     extra = {"max_one": max_one, "advance_points": advance_pts}
+    if outrights:
+        extra["outrights"] = [
+            {"key": o["key"], "points": o["points"],
+             "label_es": o["label_es"], "label_en": o["label_en"]}
+            for o in outrights
+        ]
     stake = _compute_scenario_stake(
         names,
         live_table,
@@ -2379,6 +2435,12 @@ def compute_ko_progression(data):
     previous_ranks = {}
     progression = []
 
+    # Apuestas outright que se deciden en un partido concreto: se reparten en
+    # el step de ese partido (no en el step sintético de "Premios KO").
+    outright_meta = data["knockouts"]["outright"]
+    outright_results = data["knockout_results"]["outright"]
+    outright_by_code = {"3P": ("third_place",), "FINAL": ("champion", "runner_up")}
+
     for idx, (rnd, match, result, pub) in enumerate(played, 1):
         before_pts = pts[:]
         before_exact = exact[:]
@@ -2407,6 +2469,18 @@ def compute_ko_progression(data):
                 if pick and _cmp_team(pick) == actual:
                     pts[i] += adv_pts
                     advance[i] += 1
+
+        if rnd is None:
+            for key in outright_by_code.get(match["code"], ()):
+                meta = outright_meta.get(key)
+                actual = outright_results.get(key)
+                if not meta or not actual:
+                    continue
+                actual_key = _cmp_team(actual)
+                for i, pick in enumerate(meta["picks"]):
+                    if pick and _cmp_team(pick) == actual_key:
+                        pts[i] += meta["points"]
+                        advance[i] += 1
 
         rows = []
         for i in range(n):
@@ -2505,36 +2579,6 @@ def _ko_alive_teams(data):
                 side_key = _ko_resolved_side_key(match, side, w_map)
                 if side_key and side_key != winner_key:
                     alive.discard(side_key)
-    return alive
-
-
-def _ko_award_alive_teams(data):
-    """Selecciones que aún tienen algún partido KO por jugar, incluido el partido
-    por el tercer puesto.
-
-    Para los premios individuales (Balón de Oro, Pichichi) un jugador solo queda
-    'muerto' cuando su selección ya no tiene ningún partido pendiente: un equipo
-    que pierde la semifinal sigue vivo hasta que juegue el 3.º y 4.º puesto, así
-    que sus jugadores siguen pudiendo marcar/optar al premio.
-    """
-    results = data["knockout_results"]["matches"]
-    w_map = _ko_w_map_from_results(data)
-    ru_map = _ko_ru_map_from_results(data)
-    all_matches = []
-    for rnd in data["knockouts"]["rounds"]:
-        all_matches.extend(rnd["matches"])
-    all_matches.extend(data["knockouts"].get("final_matches", []))
-
-    alive = set()
-    for match in all_matches:
-        if results.get(match["code"]):
-            continue  # partido ya jugado, no aporta futuro
-        pair = _ko_fixture_pair(match, w_map, ru_map)
-        if not pair:
-            # Feeder sin resolver todavía (p. ej. cruce futuro cuyo origen aún no
-            # se ha jugado): no podemos descartar a nadie por este partido.
-            continue
-        alive.update(k for k in pair if k)
     return alive
 
 
@@ -2787,12 +2831,12 @@ def _compute_ko_honors(names, people, reventador, scoring_table):
     }
 
 
-def _ko_award_bets(awards, award_results, n, alive):
+def _ko_award_bets(awards, award_results, n):
     """Convierte cada premio (Balón de Oro, Pichichi) en una 'apuesta de paso'.
 
     Por cada pick calcula la cuota parimutuel (cuanta menos gente lo apueste,
     más alta), los puntos en juego, si ya está resuelto (acierto/fallo) y si el
-    pick está 'muerto' porque la selección del jugador ya está eliminada.
+    pick está 'muerto' (ya no puede ganar el premio, ver AWARD_DEAD_PICKS).
     Devuelve (bets_por_persona, meta_por_premio).
     """
     bets = [dict() for _ in range(n)]
@@ -2809,10 +2853,11 @@ def _ko_award_bets(awards, award_results, n, alive):
         result_key = _award_player_key(result) if result else None
         decided = result_key is not None
 
+        dead_picks = AWARD_DEAD_PICKS.get(key, frozenset())
         dist = []
         for pick, count in counts.most_common():
             team = _award_player_team(pick)
-            dead = bool(team) and _cmp_team(team) not in alive
+            dead = _award_player_key(pick) in dead_picks
             dist.append({
                 "name": pick,
                 "count": count,
@@ -2847,7 +2892,7 @@ def _ko_award_bets(awards, award_results, n, alive):
             pick = pick.strip()
             count = counts[pick]
             team = _award_player_team(pick)
-            dead = bool(team) and _cmp_team(team) not in alive
+            dead = _award_player_key(pick) in dead_picks
             odds = round(filled / count, 2) if count else None
             bets[i][key] = {
                 "pick": pick,
@@ -2894,8 +2939,7 @@ def compute_knockout_metrics(data):
     ts_rank = [{"name": t, "count": c} for t, c in ts_counter.most_common(8)]
 
     award_results = (data.get("knockout_results") or {}).get("awards", {})
-    award_alive = _ko_award_alive_teams(data)
-    award_bets, awards_meta = _ko_award_bets(awards, award_results, n, award_alive)
+    award_bets, awards_meta = _ko_award_bets(awards, award_results, n)
 
     reventador = _ko_reventador_counts(data, prestige)
     champ_team = champ_consensus.get("value")
@@ -3042,6 +3086,39 @@ def _knockout_public_result(result):
         out["winner"] = team_es(result["winner"])
         out["winner_flag"] = team_flag(result["winner"])
     return out or None
+
+
+def _attach_final_match_winner(pub, knockout_results):
+    """La final y el 3.er puesto no tienen fila de 'ganador' en el Excel: se
+    deriva del marcador (o del outright campeón/3.º si hubo penaltis) para que
+    el cuadro pueda resaltar al ganador y tachar al perdedor."""
+    res = pub.get("result")
+    if not res or res.get("winner"):
+        return
+    home, away = pub.get("resolved_home"), pub.get("resolved_away")
+    winner = winner_flag = None
+    if "score" in res:
+        h, a = res["score"]["home"], res["score"]["away"]
+        if h > a:
+            winner, winner_flag = home, pub.get("resolved_home_flag", "")
+        elif a > h:
+            winner, winner_flag = away, pub.get("resolved_away_flag", "")
+    if winner is None:
+        # Empate a 90' (resuelto por penaltis) o sin marcador: usa el outright.
+        key = "third_place" if pub.get("code") == "3P" else "champion"
+        outval = knockout_results.get("outright", {}).get(key)
+        if outval:
+            cand = team_es(outval)
+            for side_name, side_flag in ((home, pub.get("resolved_home_flag", "")),
+                                         (away, pub.get("resolved_away_flag", ""))):
+                if side_name and _cmp_team(side_name) == _cmp_team(cand):
+                    winner, winner_flag = side_name, side_flag
+                    break
+            if winner is None:
+                winner, winner_flag = cand, team_flag(outval)
+    if winner:
+        res["winner"] = winner
+        res["winner_flag"] = winner_flag or ""
 
 
 def _filled_score_picks(picks):
@@ -3517,6 +3594,9 @@ def compute_recent_results(data, matches, limit=6):
                 "advance_points": rnd["advance_points"],
             })
 
+    # La apuesta outright que se decide en cada partido de la jornada final:
+    # su acierto llena el hueco de "Pase" (aquí no hay puntos de pase clásicos).
+    outright_by_code = {"3P": "third_place", "FINAL": "champion"}
     for m in data["knockouts"]["final_matches"]:
         result = data["knockout_results"]["matches"].get(m["code"])
         if not result or "score" not in result:
@@ -3527,6 +3607,30 @@ def compute_recent_results(data, matches, limit=6):
         exact, sign, miss, voided = score_groups(m["score_picks"], rh, ra, counts)
         pub = _knockout_public_schedule(m)
         resolve_knockout_fixture(pub, winner_by_w, runner_by_ru)
+        # El ganador no se teclea aparte (como en las rondas): se deriva del
+        # marcador, y en empate del texto de penaltis.
+        winner, winner_flag = None, ""
+        side = {"1": "home", "2": "away"}.get(ro)
+        if side is None and result.get("penalties"):
+            pen = _cmp_text(result["penalties"])
+            if pen in ("home", "away"):
+                side = pen
+            else:
+                winner = team_es(result["penalties"])
+                winner_flag = team_flag(result["penalties"])
+        if side:
+            winner = pub.get(f"resolved_{side}") or pub[f"fixture_{side}"]
+            winner_flag = pub.get(f"resolved_{side}_flag") or pub[f"fixture_{side}_flag"]
+        advance = []
+        okey = outright_by_code.get(m["code"])
+        actual = data["knockout_results"]["outright"].get(okey) if okey else None
+        if actual:
+            actual_key = _cmp_team(actual)
+            advance = [
+                {"name": name, "pick": team_es(pick)}
+                for name, pick in zip(names, data["knockouts"]["outright"][okey]["picks"])
+                if pick and _cmp_team(pick) == actual_key
+            ]
         played.append({
             "code": m["code"],
             "group": "",
@@ -3538,12 +3642,13 @@ def compute_recent_results(data, matches, limit=6):
             "away": pub.get("resolved_away") or pub["fixture_away"],
             "home_flag": pub.get("resolved_home_flag") or pub["fixture_home_flag"],
             "away_flag": pub.get("resolved_away_flag") or pub["fixture_away_flag"],
-            "result": {"home": rh, "away": ra, "outcome": ro},
+            "result": {"home": rh, "away": ra, "outcome": ro,
+                       "winner": winner, "winner_flag": winner_flag},
             "exact": exact,
             "sign": sign,
             "miss": miss,
             "voided": voided,
-            "advance": [],
+            "advance": advance,
             "is_knockout": True,
             "scoreline_gated": True,
             "phase_es": m["label_es"],
@@ -3872,6 +3977,11 @@ section.sec{padding:74px 0;border-top:1px solid var(--line)}
 .aw-wolf{font-size:.82rem}
 /* Vista inversa (En directo): un card por candidato */
 .aw-inv-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.aw-two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.aw-two-col .aw-inv-wrap{grid-template-columns:1fr}
+.aw-col-title{font-size:1.1rem;font-weight:700;margin:0 0 12px}
+.aw-col-title .aw-col-win{font-weight:600;color:var(--mint);font-size:.9rem}
+@media(max-width:720px){.aw-two-col{grid-template-columns:1fr}}
 .aw-inv-card .tm-head{align-items:center}
 .aw-inv-card .tm-teams{font-size:1.08rem}
 .aw-inv-tag{font-family:var(--fm);font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:6px;margin-left:6px}
@@ -3937,6 +4047,7 @@ footer .brand svg{height:20px;width:auto}
 .today-picks{margin-top:14px}
 .today-picks .tp-title{font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
 .pick-groups{margin-top:4px}
+.aw-final-line{font-size:.72rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:2px 0 8px}
 .pick-groups .result-person b{max-width:none}
 .pick-groups .result-box.draw .rb-count{color:var(--gold)}
 .recent-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;color:var(--muted);font-size:.86rem}
@@ -5011,7 +5122,10 @@ function meBetBlockHtml(m){
     if(meSt.swing_down && meSt.worst_result){
       hints += `<div class="muted" style="font-size:.75rem;margin-top:2px">−${meSt.swing_down} ${L('si sale','if')} <b>${stakeResultLbl(meSt.worst_result)}</b></div>`;
     }
-    stakeHtml = `<div class="me-bet-stake">${L('En juego','At stake')}: ${L('hasta','up to')} +${meSt.max_pts} pts${parts.length ? ` · <span class="swing">${parts.join(' / ')}</span> ${L('puestos','places')}` : ''}${hints}</div>`;
+    const outriHint = st.outrights && st.outrights.length
+      ? `<div class="muted" style="font-size:.75rem;margin-top:4px">${L('Incluye lo que decide este partido','Includes what this match settles')}: ${st.outrights.map(o => `${L(o.label_es, o.label_en)} +${o.points}`).join(' · ')}</div>`
+      : '';
+    stakeHtml = `<div class="me-bet-stake">${L('En juego','At stake')}: ${L('hasta','up to')} +${meSt.max_pts} pts${parts.length ? ` · <span class="swing">${parts.join(' / ')}</span> ${L('puestos','places')}` : ''}${outriHint}${hints}</div>`;
   } else if(!st && m.result){
     const outcome = meTodayOutcome(m);
     if(outcome) stakeHtml = `<div class="me-bet-stake">${meResultStripText(outcome)}</div>`;
@@ -5070,9 +5184,15 @@ function koMatchStakeHtml(m){
         return `<b>${esc(p.name)}</b> ${mv.join(' · ')}`;
       }).join(' · ')}</div>`
     : '';
+  const perDetail = st.outrights && st.outrights.length
+    ? `(${L('incluye','includes')} ${st.outrights.map(o => `<b>${L(o.label_es, o.label_en)}</b> +${o.points}`).join(' · ')})`
+    : `(+${st.advance_points} ${L('por pase','per advance')})`;
+  const outriNote = st.outrights && st.outrights.length
+    ? `<div class="muted" style="font-size:.82rem;margin-top:6px">${L('Este partido también decide','This match also settles')}: ${st.outrights.map(o => `${o.key==='champion'?'🏆':o.key==='runner_up'?'🥈':'🥉'} <b>${L(o.label_es, o.label_en)}</b> +${o.points} pts`).join(' · ')}</div>`
+    : '';
   return `<div class="kp-stake tm-stake">
     <div><div style="font:800 1.05rem var(--fu)">${L('En juego (eliminatorias)','At stake (knockouts)')}</div>
-      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${st.max_one} ${L('pts/persona','pts/person')} (+${st.advance_points} ${L('por pase','per advance')}) · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div></div>
+      <div class="muted" style="font-size:.82rem">${L('Hasta','Up to')} +${st.max_one} ${L('pts/persona','pts/person')} ${perDetail} · ${st.picks}/${N} ${L('con apuesta','with a pick')}</div>${outriNote}</div>
     <div style="text-align:right">${stakeSwingHtml(st)}</div>
     ${swingHtml}
   </div>`;
@@ -5202,6 +5322,40 @@ function todayPicksHtml(picks, match){
   return `<div class="today-picks"><div class="tp-title">${L('Qué ha puesto cada uno','What everyone picked')}</div>${voidNote}<div class="result-groups pick-groups">${html}</div></div>`;
 }
 
+/* Solo la final: quién sigue vivo para campeón y subcampeón según quién gane.
+   Una apuesta muerta en el marcador puede seguir cobrando aquí. */
+function finalAwardsBoxesHtml(m){
+  if(!(m.code === 'FINAL' || m.key === 'final')) return '';
+  if(m.result && m.result.score) return '';
+  if(!m.home || !m.away || /^(W\d|RU)/.test(m.home) || /^(W\d|RU)/.test(m.away)) return '';
+  const outright = (D.knockout && D.knockout.outright) || {};
+  const champPts = (outright.champion && outright.champion.points) || 12;
+  const runnerPts = (outright.runner_up && outright.runner_up.points) || 8;
+  const nm = v => (v || '').toString().trim().toLowerCase();
+  const names = arr => arr.length
+    ? sortPeople(arr).map(p => `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b></span>`).join('')
+    : `<span class="muted">${L('Nadie','Nobody')}</span>`;
+  const sideBox = (winner, wflag, loser, lflag) => {
+    const wname = esc(team(winner));
+    const champs = (m.picks || []).filter(p => p.champion && nm(p.champion) === nm(winner));
+    const runners = (m.picks || []).filter(p => p.runner_up && nm(p.runner_up) === nm(loser));
+    return `<div class="result-box">
+      <div class="rb-title">${wflag || ''} ${L('Si gana ' + wname, 'If ' + wname + ' wins')}</div>
+      <div class="aw-final-line">🏆 ${L('Campeón','Champion')} +${champPts} <span class="rb-count">${champs.length}</span></div>
+      <div class="result-names">${names(champs)}</div>
+      <div class="aw-final-line" style="margin-top:12px">🥈 ${L('Subcampeón','Runner-up')} +${runnerPts} · ${lflag || ''} ${esc(team(loser))} <span class="rb-count">${runners.length}</span></div>
+      <div class="result-names">${names(runners)}</div>
+    </div>`;
+  };
+  return `<div class="today-picks">
+    <div class="tp-title">🏅 ${L('Quién cobra los premios de la final','Who collects the final\'s prizes')}</div>
+    <div class="muted" style="font-size:.78rem;margin:2px 0 6px">${L(
+      'Da igual el marcador (incluso con apuesta muerta): si tu campeón gana la final sumas +' + champPts + ', y si tu subcampeón la pierde, +' + runnerPts + '.',
+      'Your scoreline doesn\'t matter here (even a dead pick): your champion winning pays +' + champPts + ', your runner-up losing pays +' + runnerPts + '.')}</div>
+    <div class="result-groups pick-groups" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${sideBox(m.home, m.home_flag, m.away, m.away_flag)}${sideBox(m.away, m.away_flag, m.home, m.home_flag)}</div>
+  </div>`;
+}
+
 
 function hoyDateLabel(dateStr){
   const dateObj = new Date(dateStr + 'T12:00:00');
@@ -5293,6 +5447,7 @@ function buildHoy(){
         ${outcomeHtml}
         ${meBetBlockHtml(m)}
         ${koMatchStakeHtml(m)}
+        ${finalAwardsBoxesHtml(m)}
         ${picksHtml}
         ${m.home_trivia && m.home_trivia.es ? `<div class="trivia-block">
         <div class="trivia-item">
@@ -5353,6 +5508,11 @@ function buildHoyAwards(){
     {key:'ballon_dor', icon:'🏆', es:'Balón de Oro', en:"Ballon d'Or"},
     {key:'top_scorer', icon:'👟', es:'Pichichi', en:'Top scorer'},
   ].filter(o => meta[o.key]);
+  if(!order.length) return;
+  const s = section('hoy-premios', `🏅 ${L('Premios individuales','Individual awards')}`, L('¿A quién apostamos?','Who did we back?'),
+    L('Cada candidato y quién lo apostó. +8 pts para quien acierte. 💀 = ya no puede ganar el premio.',
+      'Each candidate and who backed them. +8 pts if you nail it. 💀 = can no longer win the award.'));
+  const cols = el('div','aw-two-col reveal');
   order.forEach(o => {
     const m = meta[o.key];
     // Vista inversa: para cada candidato, quién lo ha apostado.
@@ -5361,12 +5521,11 @@ function buildHoyAwards(){
       const bet = p.awards && p.awards[o.key];
       if(bet && bet.pick){ (groups[bet.pick] = groups[bet.pick] || []).push({name:p.name, dead:bet.dead, won:bet.won}); }
     });
-    const sub = m.decided
-      ? `${L('Ganador','Winner')}: <b>${m.resultFlag && m.resultFlag!=='🏳️' ? m.resultFlag+' ' : ''}${esc(m.result)}</b>. ${L('Cada candidato y quién lo apostó.','Each candidate and who backed them.')}`
-      : L('Cada candidato y quién lo apostó. +8 pts para quien acierte. 💀 = su selección ya no tiene más partidos.',
-          'Each candidate and who backed them. +8 pts if you nail it. 💀 = their team has no games left.');
-    const s = section('hoy-'+o.key, `${o.icon} ${L(o.es, o.en)}`, L('¿A quién apostamos?','Who did we back?'), sub);
-    const box = el('div','aw-inv-wrap reveal');
+    const win = m.decided
+      ? ` <span class="aw-col-win">· ${L('Ganador','Winner')}: <b>${m.resultFlag && m.resultFlag!=='🏳️' ? m.resultFlag+' ' : ''}${esc(m.result)}</b></span>` : '';
+    const col = el('div','aw-col');
+    col.appendChild(el('h3','aw-col-title', `${o.icon} ${L(o.es, o.en)}${win}`));
+    const box = el('div','aw-inv-wrap');
     (m.dist || []).forEach(d => {
       const list = sortPeople(groups[d.name] || []);
       const cls = 'today-match aw-inv-card' + (d.dead ? ' aw-inv-dead' : '') + (m.decided && d.won ? ' aw-inv-win' : '');
@@ -5383,8 +5542,10 @@ function buildHoyAwards(){
         </div>
         <div class="today-picks"><div class="result-names">${names}</div></div>`));
     });
-    s.appendChild(box);
+    col.appendChild(box);
+    cols.appendChild(col);
   });
+  s.appendChild(cols);
 }
 
 /* ---- ÚLTIMOS RESULTADOS ---- */
@@ -6220,7 +6381,7 @@ function koAwardRow(icon, label, bet){
   if(bet.decided) tail = bet.won
     ? `<span class="aw-res ok">✓ +${bet.points}</span>`
     : `<span class="aw-res ko">✗ 0</span>`;
-  else if(bet.dead) tail = `<span class="aw-res dead" title="${L('su selección ya no tiene más partidos','their team has no games left')}">💀 ${L('fuera','out')}</span>`;
+  else if(bet.dead) tail = `<span class="aw-res dead" title="${L('ya no puede ganar el premio','can no longer win the award')}">💀 ${L('fuera','out')}</span>`;
   else tail = `<span class="aw-pts" title="${L('puntos si acierta','points if it lands')}">+${bet.points} pts</span>`;
   const cntTitle = L('lo apuestan '+bet.count+' de '+N, bet.count+' of '+N+' back it');
   const wolf = bet.topShot ? ` <span class="aw-wolf" title="${L('el pick más arriesgado: casi nadie lo apuesta','the boldest pick: almost nobody backs it')}">🐺</span>` : '';
@@ -6238,8 +6399,8 @@ function buildKoAwardsBet(){
   const order = ['ballon_dor','top_scorer'].filter(kk => meta[kk]);
   const s = section('ko-awards', L('🏅 Premios individuales','🏅 Individual awards'),
     L('Las apuestas de paso 🎲','The side bets 🎲'),
-    L('El Balón de Oro y el Pichichi de cada uno, como una apuesta: <b>+8 puntos</b> si aciertas. Al lado ves <b>cuánta gente lo apuesta</b> (p. ej. 3/28): cuantos menos, más te la juegas. <b>🐺</b> = el pick más arriesgado del premio. <b>💀</b> = su selección ya no tiene más partidos.',
-      'Everyone\'s Ballon d\'Or and Top Scorer as a bet: <b>+8 pts</b> if you nail it. Next to it you see <b>how many back it</b> (e.g. 3/28): the fewer, the bolder. <b>🐺</b> = the boldest pick of that award. <b>💀</b> = their team has no games left.'));
+    L('El Balón de Oro y el Pichichi de cada uno, como una apuesta: <b>+8 puntos</b> si aciertas. Al lado ves <b>cuánta gente lo apuesta</b> (p. ej. 3/28): cuantos menos, más te la juegas. <b>🐺</b> = el pick más arriesgado del premio. <b>💀</b> = ya no puede ganar el premio.',
+      'Everyone\'s Ballon d\'Or and Top Scorer as a bet: <b>+8 pts</b> if you nail it. Next to it you see <b>how many back it</b> (e.g. 3/28): the fewer, the bolder. <b>🐺</b> = the boldest pick of that award. <b>💀</b> = can no longer win the award.'));
 
   // Héroes: quién se la juega más + consenso por premio.
   const heroes = order.map(kk => {
