@@ -1288,6 +1288,7 @@ def compute(data):
             m["stake"] = stake_for_group_match(m, data, matches, live["table"])
     recent_results = compute_recent_results(data, matches)
     knockout = compute_knockout(data, live["table"] if live else None, matches)
+    grand_finale = compute_grand_finale(live, cards, knockout, names, sim_pct) if live else None
 
     return {
         "es2en": ES2EN,
@@ -1314,6 +1315,7 @@ def compute(data):
         "today": today,
         "recent_results": recent_results,
         "knockout": knockout,
+        "final": grand_finale,
     }
 
 
@@ -2857,7 +2859,8 @@ def _ko_award_bets(awards, award_results, n):
         dist = []
         for pick, count in counts.most_common():
             team = _award_player_team(pick)
-            dead = _award_player_key(pick) in dead_picks
+            pick_key = _award_player_key(pick)
+            dead = pick_key in dead_picks or (decided and pick_key != result_key)
             dist.append({
                 "name": pick,
                 "count": count,
@@ -2892,7 +2895,8 @@ def _ko_award_bets(awards, award_results, n):
             pick = pick.strip()
             count = counts[pick]
             team = _award_player_team(pick)
-            dead = _award_player_key(pick) in dead_picks
+            pick_key = _award_player_key(pick)
+            dead = pick_key in dead_picks or (decided and pick_key != result_key)
             odds = round(filled / count, 2) if count else None
             bets[i][key] = {
                 "pick": pick,
@@ -3398,8 +3402,8 @@ def compute_live(data, matches):
                 {
                     "code": "KO-BONUS",
                     "date": progression[-1].get("date", last_date),
-                    "phase_es": "Premios KO",
-                    "phase_en": "KO awards",
+                    "phase_es": "Pichichi + Balón de Oro",
+                    "phase_en": "Top Scorer + Ballon d'Or",
                 },
                 bonus_rows_by_name,
             )
@@ -3742,6 +3746,374 @@ def compute_match_stake(match, results, live_table):
         points_for_name,
         _format_group_scenario,
     )
+
+
+# --------------------------------------------------------------------------
+# Gran Final — podio definitivo, campeón del mundo y logros personalizados
+# --------------------------------------------------------------------------
+
+def _snap_label(snap, en=False):
+    """Etiqueta corta de un paso de la progresión (partido o hito virtual)."""
+    home = snap.get("home_en" if en else "home")
+    away = snap.get("away_en" if en else "away")
+    res = snap.get("result") or {}
+    if home and res.get("home") is not None:
+        return f"{home} {res['home']}-{res['away']} {away}"
+    return (snap.get("label_en") if en else snap.get("label_es")) or ""
+
+
+def _grand_finale_prog_stats(progression, names, final_rank):
+    """Estadísticas de trayectoria por persona a partir de la progresión en vivo."""
+    stats = {
+        name: {
+            "leader": 0, "vol": 0, "best": len(names), "worst": 1,
+            "max_round": 0, "max_round_es": "", "max_round_en": "", "early": None,
+        }
+        for name in names
+    }
+    prev_rank = {}
+    leader_seq = []
+    for snap in progression:
+        for row in snap["table"]:
+            s = stats[row["name"]]
+            rank = row["rank"]
+            if rank == 1:
+                s["leader"] += 1
+            if row["name"] in prev_rank:
+                s["vol"] += abs(prev_rank[row["name"]] - rank)
+            s["best"] = min(s["best"], rank)
+            s["worst"] = max(s["worst"], rank)
+            if snap["idx"] == 12:
+                s["early"] = rank
+            # El cierre de grupos reparte el bonus a todos a la vez: no cuenta como "racha".
+            rp = 0 if snap.get("kind") == "standings" else (row.get("round_pts") or 0)
+            if rp > s["max_round"]:
+                s["max_round"] = rp
+                s["max_round_es"] = _snap_label(snap)
+                s["max_round_en"] = _snap_label(snap, en=True)
+        top = next(r["name"] for r in snap["table"] if r["rank"] == 1)
+        if not leader_seq or leader_seq[-1] != top:
+            leader_seq.append(top)
+        prev_rank = {row["name"]: row["rank"] for row in snap["table"]}
+    for name in names:
+        stats[name]["climb"] = stats[name]["worst"] - final_rank.get(name, stats[name]["worst"])
+    return stats, leader_seq
+
+
+def _grand_finale_podium(table):
+    podium = []
+    for i, row in enumerate(table[:3]):
+        nxt = table[i + 1]["pts"] if i + 1 < len(table) else None
+        prv = podium[i - 1]["pts"] if i > 0 else None
+        podium.append({
+            "name": row["name"], "rank": row["rank"], "pts": row["pts"],
+            "group_pts": row.get("group_pts", 0),
+            "bonus_pts": row.get("standings_pts", 0) + row.get("thirds_pts", 0),
+            "ko_pts": row.get("ko_pts", 0),
+            "exact": row.get("exact", 0) + row.get("ko_exact", 0),
+            "sign": row.get("sign", 0) + row.get("ko_outcomes", 0),
+            "tied": row["pts"] in (nxt, prv),
+        })
+    return podium
+
+
+def compute_grand_finale(live, cards, knockout, names, sim_pct):
+    """Datos de la vista Gran Final: podio, campeón y un logro único por persona."""
+    n = len(names)
+    table = live["table"]
+    progression = live["progression"]
+    grand = {row["name"]: row for row in table}
+    final_rank = {row["name"]: row["rank"] for row in table}
+    prog, leader_seq = _grand_finale_prog_stats(progression, names, final_rank)
+    card_by = {c["name"]: c for c in cards}
+    metrics = knockout.get("metrics") or {}
+    ppl = {p["name"]: p for p in (metrics.get("people") or [])}
+    rounds_meta = metrics.get("rounds") or []
+    name_idx = {name: i for i, name in enumerate(names)}
+    avg_sim = {
+        name: round(sum(v for j, v in enumerate(sim_pct[i]) if j != i) / max(n - 1, 1), 1)
+        for name, i in ((nm, name_idx[nm]) for nm in names)
+    }
+
+    # -- Campeón del mundo y finalistas --
+    final_match = next(
+        (m for m in (knockout.get("final_matches") or []) if m.get("key") == "final"), None
+    )
+    finalists, champion, runner_up = [], None, None
+    if final_match:
+        for side in ("home", "away"):
+            t = final_match.get(f"resolved_{side}")
+            if t:
+                finalists.append({
+                    "team": t, "team_en": ES2EN.get(t, t),
+                    "flag": final_match.get(f"resolved_{side}_flag") or "",
+                })
+        res = final_match.get("result") or {}
+        if res.get("winner"):
+            champion = {
+                "team": res["winner"], "team_en": ES2EN.get(res["winner"], res["winner"]),
+                "flag": res.get("winner_flag") or "",
+            }
+            others = [f for f in finalists if f["team"] != res["winner"]]
+            runner_up = others[0] if others else None
+
+    # -- Motor de logros: reglas en orden; cada una premia al mejor SIN logro aún --
+    assigned = {}
+
+    def give(name, icon, title_es, title_en, detail_es, detail_en):
+        assigned[name] = {
+            "name": name, "icon": icon, "title_es": title_es, "title_en": title_en,
+            "detail_es": detail_es, "detail_en": detail_en,
+            "rank": final_rank.get(name), "pts": grand[name]["pts"],
+        }
+
+    def best(metric, low=False, min_value=None):
+        pool = [(nm, metric(nm)) for nm in names if nm not in assigned]
+        pool = [(nm, v) for nm, v in pool if v is not None]
+        if not pool:
+            return None
+        nm, v = min(pool, key=lambda x: (x[1], final_rank[x[0]])) if low \
+            else max(pool, key=lambda x: (x[1], -final_rank[x[0]]))
+        if min_value is not None and v < min_value:
+            return None
+        return nm, v
+
+    def rule(icon, title_es, title_en, metric, detail, low=False, min_value=None):
+        got = best(metric, low=low, min_value=min_value)
+        if got:
+            nm, v = got
+            des, den = detail(nm, v)
+            give(nm, icon, title_es, title_en, des, den)
+
+    def g(name, key):
+        return grand[name].get(key, 0)
+
+    def c(name, key):
+        return card_by.get(name, {}).get(key)
+
+    def p(name, key):
+        return ppl.get(name, {}).get(key)
+
+    def round_name(idx, en=False):
+        if 0 <= idx < len(rounds_meta):
+            label = rounds_meta[idx]["en" if en else "es"]
+            if not en and label.lower() == "final":
+                return "la final"
+            return label
+        return "the final" if en else "la final"
+
+    # Reglas condicionadas al desenlace real (se activan al rellenar los resultados)
+    if champion:
+        rule("🏆", "El Visionario", "The Visionary",
+             lambda nm: 1 if (p(nm, "champ") or [None])[0] == champion["team"] else None,
+             lambda nm, v: (
+                 f"Eligió a {champion['flag']} {champion['team']} campeón desde el día uno. Chapeau.",
+                 f"Picked {champion['flag']} {champion['team_en']} as champions from day one. Chapeau.",
+             ))
+        if runner_up:
+            rule("🥈", "Ojo Clínico", "The Clinical Eye",
+                 lambda nm: 1 if (p(nm, "runner") or [None])[0] == runner_up["team"] else None,
+                 lambda nm, v: (
+                     f"Clavó al subcampeón: {runner_up['flag']} {runner_up['team']}.",
+                     f"Nailed the runner-up: {runner_up['flag']} {runner_up['team_en']}.",
+                 ))
+    for akey, icon, tes, ten in (
+        ("top_scorer", "🎩", "El Pichichi", "The Pichichi"),
+        ("ballon_dor", "✨", "El Clarividente", "The Clairvoyant"),
+    ):
+        rule(icon, tes, ten,
+             lambda nm, k=akey: 1 if (p(nm, "awards") or {}).get(k, {}).get("won") else None,
+             lambda nm, v, k=akey: (
+                 f"Acertó el premio individual: {(p(nm, 'awards') or {}).get(k, {}).get('pick', '')}.",
+                 f"Called the individual award: {(p(nm, 'awards') or {}).get(k, {}).get('pick', '')}.",
+             ))
+
+    # Escalera principal de méritos
+    rule("🎯", "El Francotirador", "The Sharpshooter",
+         lambda nm: g(nm, "exact") + g(nm, "ko_exact"),
+         lambda nm, v: (f"Clavó {v} marcadores exactos. Nadie afinó tanto la puntería.",
+                        f"Nailed {v} exact scores. Sharpest aim in the pool."))
+    rule("🧭", "La Brújula", "The Compass",
+         lambda nm: g(nm, "sign") + g(nm, "ko_outcomes"),
+         lambda nm, v: (f"Acertó {v} resultados. Su quiniela siempre apuntaba al norte.",
+                        f"Called {v} results right. That compass always pointed north."))
+    rule("🔮", "El Oráculo del Cuadro", "The Bracket Oracle",
+         lambda nm: g(nm, "ko_pts"),
+         lambda nm, v: (f"{v} puntos en eliminatorias: la mejor lectura del cuadro.",
+                        f"{v} knockout points: nobody read the bracket better."))
+    rule("📋", "El Ojeador", "The Scout",
+         lambda nm: g(nm, "standings_pts") + g(nm, "thirds_pts"),
+         lambda nm, v: (f"{v} puntos leyendo cómo quedarían los grupos antes de jugarse.",
+                        f"{v} points from calling the group tables before a ball was kicked."))
+    rule("👑", "El Regente", "The Regent",
+         lambda nm: prog[nm]["leader"], min_value=1,
+         detail=lambda nm, v: (f"Lideró la porra durante {v} jornadas. Se sentó en el trono y se le vio cómodo.",
+                               f"Led the pool for {v} rounds. Sat on the throne and looked comfortable."))
+    rule("🚀", "El Cohete", "The Rocket",
+         lambda nm: prog[nm]["climb"], min_value=3,
+         detail=lambda nm, v: (f"Del puesto {prog[nm]['worst']}º al {final_rank[nm]}º: la gran remontada de la porra.",
+                               f"From {prog[nm]['worst']}th up to {final_rank[nm]}th: the great comeback of the pool."))
+    rule("⚡", "Mano Caliente", "Hot Hand",
+         lambda nm: prog[nm]["max_round"], min_value=1,
+         detail=lambda nm, v: (f"{v} puntos de una tacada con {prog[nm]['max_round_es']}.",
+                               f"{v} points in one go on {prog[nm]['max_round_en']}."))
+    rule("🎢", "La Montaña Rusa", "The Rollercoaster",
+         lambda nm: prog[nm]["vol"],
+         lambda nm, v: (f"{v} saltos de puesto en total. Imposible apartar la vista.",
+                        f"{v} position changes overall. Impossible to look away."))
+    rule("🗿", "La Roca", "The Rock",
+         lambda nm: prog[nm]["vol"], low=True,
+         detail=lambda nm, v: (f"El ranking temblaba y su puesto apenas se movió ({v} saltos en todo el Mundial).",
+                               f"The table shook; this seat barely moved ({v} rank changes all tournament)."))
+    rule("🐺", "El Lobo Estepario", "The Lone Wolf",
+         lambda nm: c(nm, "lobo"), min_value=1,
+         detail=lambda nm, v: (f"{v} pronósticos que no se le ocurrieron a nadie más.",
+                               f"{v} picks nobody else even considered."))
+    rule("🃏", "El Rebelde", "The Maverick",
+         lambda nm: c(nm, "rebel_index"),
+         lambda nm, v: (f"Índice de rebeldía {v}: va por libre y le da igual el consenso.",
+                        f"Maverick index {v}: plays by their own rules."))
+    rule("🤝", "La Voz del Pueblo", "Voice of the People",
+         lambda nm: c(nm, "rebel_index"), low=True,
+         detail=lambda nm, v: (f"El pronóstico más sintonizado con la mayoría (índice {v}). Cuando habla, habla la porra.",
+                               f"The most in-tune with the crowd (index {v}). When they speak, the pool speaks."))
+    rule("💥", "El Optimista", "The Optimist",
+         lambda nm: c(nm, "avg_goals"),
+         lambda nm, v: (f"{v} goles por partido de media. El fútbol existe para ganarlo.",
+                        f"{v} goals per match on average. Football exists to be won."))
+    rule("🧤", "El Cerrojo", "The Padlock",
+         lambda nm: c(nm, "avg_goals"), low=True,
+         detail=lambda nm, v: (f"{v} goles por partido. Primero, no encajar; luego ya veremos.",
+                               f"{v} goals per match. First rule: keep it tight."))
+    rule("⚖️", "El Diplomático", "The Diplomat",
+         lambda nm: c(nm, "pct_draws"),
+         lambda nm, v: (f"{v}% de empates pronosticados: que nadie se enfade.",
+                        f"{v}% of picks were draws: nobody gets upset."))
+    rule("🎰", "El Kamikaze", "The Daredevil",
+         lambda nm: p(nm, "boldPct"), min_value=1,
+         detail=lambda nm, v: (f"Un {v}% de sus cruces fueron contra el favorito. Sin miedo al éxito.",
+                               f"{v}% of their bracket went against the favourite. Zero fear."))
+    rule("📖", "El Académico", "By the Book",
+         lambda nm: p(nm, "boldPct"), low=True,
+         detail=lambda nm, v: (f"Cuadro de manual ({v}% de riesgo): la teoría, dominada.",
+                               f"Textbook bracket ({v}% risk): theory, mastered."))
+    rule("🦅", "A Contracorriente", "Against the Tide",
+         lambda nm: p(nm, "vsPueblo"), min_value=1,
+         detail=lambda nm, v: (f"Acertó {v} cruces llevando la contraria a la mayoría.",
+                               f"Got {v} ties right while betting against the crowd."))
+    rule("💀", "El Romántico", "The Romantic",
+         lambda nm: p(nm, "fell") if (p(nm, "fell") is not None and p(nm, "fell") < 4) else None, low=True,
+         detail=lambda nm, v: (
+             f"Su campeón ({(p(nm, 'champ') or ['', ''])[1]} {(p(nm, 'champ') or [''])[0]}) cayó en {round_name(v).lower()} y siguió viniendo a mirar la tabla.",
+             f"Their champion pick ({(p(nm, 'champ') or ['', ''])[1]} {ES2EN.get((p(nm, 'champ') or [''])[0], (p(nm, 'champ') or [''])[0])}) fell in the {round_name(v, en=True).lower()} — and they still showed up every day.",
+         ))
+    rule("👯", "El Alma Gemela", "The Soulmate",
+         lambda nm: c(nm, "twin_pct"),
+         lambda nm, v: (f"Compartió el {v}% de su quiniela con {c(nm, 'twin')}. Conexión total.",
+                        f"Shared {v}% of their picks with {c(nm, 'twin')}. Total connection."))
+    rule("🦄", "El Inclasificable", "The Unclassifiable",
+         lambda nm: avg_sim.get(nm), low=True,
+         detail=lambda nm, v: (f"Afinidad media del {v}% con el resto: no piensa como nadie.",
+                               f"Average affinity of {v}% with everyone else: thinks like no one."))
+    rule("🎆", "A lo Grande", "Go Big or Go Home",
+         lambda nm: (c(nm, "biggest") or {}).get("goals"),
+         lambda nm, v: (
+             f"Se atrevió con un {(c(nm, 'biggest') or {}).get('score')} en {(c(nm, 'biggest') or {}).get('flags', '')} {(c(nm, 'biggest') or {}).get('home')}-{(c(nm, 'biggest') or {}).get('away')}.",
+             f"Dared to call {(c(nm, 'biggest') or {}).get('score')} in {(c(nm, 'biggest') or {}).get('flags', '')} {(c(nm, 'biggest') or {}).get('home_en')}-{(c(nm, 'biggest') or {}).get('away_en')}.",
+         ))
+    rule("🏁", "El Sprint Final", "The Closer",
+         lambda nm: round(100 * g(nm, "ko_pts") / grand[nm]["pts"]) if grand[nm]["pts"] else None,
+         lambda nm, v: (f"El {v}% de sus puntos llegaron en las eliminatorias. Diésel de los buenos.",
+                        f"{v}% of their points came in the knockouts. A proper diesel engine."))
+    rule("🌅", "El Madrugador", "The Early Bird",
+         lambda nm: prog[nm]["early"], low=True,
+         detail=lambda nm, v: (f"{v}º tras las primeras jornadas: salió como un tiro.",
+                               f"Sitting {v}th after the opening rounds: flew out of the blocks."))
+    rule("🌊", "El Superviviente", "The Survivor",
+         lambda nm: prog[nm]["worst"],
+         lambda nm, v: (f"Tocó fondo en el puesto {v}º y nunca dejó de remar.",
+                        f"Hit rock bottom in {v}th place and never stopped rowing."))
+    rule("🧨", "El Reventador", "The Giant-Killer",
+         lambda nm: p(nm, "reventador"), min_value=1,
+         detail=lambda nm, v: (f"Acertó {v} sorpresas apostando por el tapado.",
+                               f"Called {v} upsets backing the underdog."))
+    rule("🧿", "La Fe", "The Believer",
+         lambda nm: p(nm, "fell"),
+         lambda nm, v: (
+             f"Su apuesta de campeón ({(p(nm, 'champ') or ['', ''])[1]} {(p(nm, 'champ') or [''])[0]}) aguantó viva hasta {round_name(min(v, len(rounds_meta) - 2)).lower()}.",
+             f"Their champion pick ({(p(nm, 'champ') or ['', ''])[1]} {ES2EN.get((p(nm, 'champ') or [''])[0], (p(nm, 'champ') or [''])[0])}) stayed alive until the {round_name(min(v, len(rounds_meta) - 2), en=True).lower()}.",
+         ))
+    rule("💎", "El Orfebre", "The Goldsmith",
+         lambda nm: g(nm, "exact"),
+         lambda nm, v: (f"{v} marcadores exactos en la fase de grupos, cincelados a mano.",
+                        f"{v} exact scores in the group stage, hand-carved."))
+    rule("🛂", "Control de Pasaportes", "Passport Control",
+         lambda nm: g(nm, "ko_advance"),
+         lambda nm, v: (f"Acertó {v} clasificados de ronda. Por su aduana no pasa cualquiera.",
+                        f"Called {v} teams through to the next round. Nobody sneaks past."))
+    rule("🏟️", "Rey de los Grupos", "Group-Stage Royalty",
+         lambda nm: g(nm, "group_pts"),
+         lambda nm, v: (f"{v} puntos en la fase de grupos: su territorio natural.",
+                        f"{v} group-stage points: home turf."))
+    rule("📍", "El Escalador", "The Climber",
+         lambda nm: prog[nm]["best"], low=True,
+         detail=lambda nm, v: (f"Llegó a tocar el puesto {v}º. El campamento base ya es historia.",
+                               f"Reached {v}th at their peak. Base camp is history."))
+    rule("⏱️", "El Metrónomo", "The Metronome",
+         lambda nm: prog[nm]["worst"] - prog[nm]["best"], low=True,
+         detail=lambda nm, v: (f"Entre su mejor y su peor puesto solo hubo {v} escalones. Regularidad suiza.",
+                               f"Only {v} places between their best and worst rank. Swiss regularity."))
+    rule("🌡️", "Alto Voltaje", "High Voltage",
+         lambda nm: p(nm, "variance"),
+         lambda nm, v: (f"La quiniela con más varianza del KO ({v}): o gloria o drama.",
+                        f"The highest-variance bracket in the pool ({v}): glory or drama."))
+    rule("🕵️", "El Detective", "The Detective",
+         lambda nm: g(nm, "sign"),
+         lambda nm, v: (f"{v} resultados bien olfateados en la fase de grupos.",
+                        f"{v} group-stage results sniffed out correctly."))
+
+    # Red de seguridad: nadie se va de vacío
+    fallback_pool = [
+        ("🎖️", "El Incombustible", "The Unbreakable"),
+        ("🌟", "La Estrella Silenciosa", "The Quiet Star"),
+        ("🍀", "El Talismán", "The Lucky Charm"),
+        ("🔥", "El Competidor", "The Competitor"),
+        ("🎪", "El Alma de la Fiesta", "Life of the Party"),
+        ("🧡", "El Corazón de la Porra", "Heart of the Pool"),
+        ("🛡️", "El Guardián", "The Guardian"),
+        ("🎺", "El Animador", "The Cheerleader"),
+    ]
+    leftovers = [row["name"] for row in table if row["name"] not in assigned]
+    for i, nm in enumerate(leftovers):
+        icon, tes, ten = fallback_pool[i % len(fallback_pool)]
+        give(nm, icon, tes, ten,
+             f"{grand[nm]['pts']} puntos peleados hasta el final, con un pico de puesto {prog[nm]['best']}º.",
+             f"{grand[nm]['pts']} hard-fought points, peaking at {prog[nm]['best']}th place.")
+
+    achievements = sorted(assigned.values(), key=lambda a: a["rank"])
+    max_climb = max(prog.items(), key=lambda kv: kv[1]["climb"])
+    top_leader = max(prog.items(), key=lambda kv: kv[1]["leader"])
+
+    return {
+        "ready": bool(champion),
+        "champion": champion,
+        "runner_up": runner_up,
+        "finalists": finalists,
+        "final_date": final_match.get("date") if final_match else None,
+        "final_time": final_match.get("time_es") if final_match else None,
+        "podium": _grand_finale_podium(table),
+        "achievements": achievements,
+        "stats": {
+            "snapshots": len(progression),
+            "leader_changes": max(len(leader_seq) - 1, 0),
+            "distinct_leaders": len(set(leader_seq)),
+            "max_climb": {"name": max_climb[0], "places": max_climb[1]["climb"]},
+            "top_leader": {"name": top_leader[0], "rounds": top_leader[1]["leader"]},
+            "total_exact": sum(g(nm, "exact") + g(nm, "ko_exact") for nm in names),
+            "total_sign": sum(g(nm, "sign") + g(nm, "ko_outcomes") for nm in names),
+            "leader_gap": table[0]["pts"] - table[1]["pts"] if len(table) > 1 else 0,
+        },
+    }
 
 
 # --------------------------------------------------------------------------
@@ -4301,6 +4673,86 @@ footer .brand svg{height:20px;width:auto}
 .me-result-strip.sign{color:#c8d4ff;background:rgba(150,170,255,.08);border-color:rgba(150,170,255,.22)}
 .me-result-strip.voided{color:#d3b8ff;background:rgba(150,120,190,.1);border-color:rgba(160,130,200,.28)}
 .kp-scatter circle.is-me{stroke:#fff;stroke-width:2.5}
+/* ===================== GRAN FINAL ===================== */
+.finale-sec{position:relative;overflow:hidden}
+.fx-canvas{position:absolute;inset:0;pointer-events:none;z-index:0}
+.flagrain{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.flagrain span{position:absolute;top:-48px;will-change:transform;animation:flagfall var(--dur,6s) linear var(--delay,0s) forwards;opacity:.9}
+@keyframes flagfall{to{transform:translateY(120vh) rotate(var(--rot,340deg))}}
+.finale-sec .sec-head,.finale-sec .podium,.finale-sec .chips,.finale-sec .champ-banner{position:relative;z-index:1}
+.finale-sec .chips{max-width:none}
+@media(max-width:760px){.finale-sec .chips{grid-template-columns:repeat(2,1fr)}}
+.champ-banner{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 26px;padding:16px 22px;
+  background:linear-gradient(120deg,rgba(242,133,54,.14),rgba(108,232,105,.1));border:1px solid rgba(242,133,54,.35);
+  border-radius:16px;font-family:var(--fd);font-size:clamp(1.1rem,2.6vw,1.6rem)}
+.champ-banner .cb-flag{font-size:2.2rem;line-height:1}
+.champ-banner b{color:var(--gold)}
+.champ-banner.pending{border-color:var(--line);background:rgba(108,232,105,.06);font-size:clamp(.95rem,2vw,1.15rem)}
+/* Podio */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:16px;margin:30px auto 6px;max-width:760px}
+.pcol{flex:1;min-width:0;text-align:center;display:flex;flex-direction:column;justify-content:flex-end}
+.pcol .pmedal{font-size:2.6rem;margin-bottom:2px;transform:translateY(14px) scale(.4);opacity:0;transition:transform .7s cubic-bezier(.2,1.4,.3,1),opacity .5s}
+.pcol .pname{font-family:var(--fd);font-weight:700;font-size:clamp(1rem,2.4vw,1.5rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.pcol .ppts{font-family:var(--fm);color:var(--mint);font-weight:600;font-size:clamp(.9rem,2vw,1.15rem);margin:2px 0 10px}
+.pcol .ptie{display:inline-block;font:600 .66rem var(--fm);letter-spacing:.08em;text-transform:uppercase;color:var(--gold);
+  border:1px solid rgba(242,133,54,.45);border-radius:99px;padding:2px 9px;margin:0 auto 8px}
+.pcol .pblock{height:0;border-radius:16px 16px 0 0;position:relative;overflow:hidden;
+  transition:height 1.3s cubic-bezier(.2,.85,.25,1);display:flex;align-items:flex-start;justify-content:center;
+  background:linear-gradient(180deg,rgba(108,232,105,.30),rgba(108,232,105,.08));border:1px solid var(--line);border-bottom:none}
+.pcol .pblock .pplace{font-family:var(--fd);font-weight:700;font-size:2.4rem;color:rgba(255,255,255,.85);margin-top:14px}
+.pcol.pod1 .pblock{background:linear-gradient(180deg,rgba(242,133,54,.42),rgba(242,133,54,.10));border-color:rgba(242,133,54,.5)}
+.pcol.pod1 .ppts{color:var(--gold)}
+.pcol .pbreak{font-size:.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5}
+.podium.in .pod1 .pblock{height:210px}
+.podium.in .pod2 .pblock{height:150px}
+.podium.in .pod3 .pblock{height:108px}
+.podium.in .pmedal{transform:translateY(0) scale(1);opacity:1}
+.podium.in .pod2 .pmedal{transition-delay:.25s}
+.podium.in .pod1 .pmedal{transition-delay:.55s}
+.podium.in .pod3 .pmedal{transition-delay:.05s}
+.pcol.is-me .pname{color:var(--mint)}
+.podium-floor{height:1px;background:linear-gradient(90deg,transparent,rgba(108,232,105,.5),transparent);max-width:820px;margin:0 auto 30px;position:relative;z-index:1}
+@media(max-width:640px){.podium{gap:8px}.pcol .pblock .pplace{font-size:1.7rem}}
+/* Star graph */
+.stargraph-card{background:rgba(0,26,31,.34);border:1px solid var(--line);border-radius:18px;padding:18px 14px 8px;margin-top:14px}
+.stargraph{width:100%;height:auto;display:block;touch-action:pan-y}
+.sg-line{fill:none;stroke-width:1.3;opacity:.16;transition:opacity .25s,stroke-width .25s}
+.sg-line.on{stroke-width:2.8;opacity:1;filter:drop-shadow(0 0 6px rgba(0,0,0,.55))}
+.sg-line.hot{stroke-width:3.4;opacity:1}
+.sg-grid line{stroke:rgba(255,255,255,.07);stroke-width:1}
+.sg-phase line{stroke:rgba(108,232,105,.22);stroke-width:1;stroke-dasharray:3 4}
+.sg-phase text,.sg-axis text{font:500 11px var(--fm);fill:var(--muted)}
+.sg-endlab{font:700 11px var(--fu);}
+.sg-enddot{stroke:#03230a;stroke-width:1.5}
+.sg-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.sg-legend button{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  color:var(--muted);font:600 .74rem var(--fu);border-radius:99px;padding:4px 10px;cursor:pointer;transition:all .2s}
+.sg-legend button .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.sg-legend button.on{color:var(--text);background:rgba(108,232,105,.10);border-color:rgba(108,232,105,.4)}
+.sg-tip{position:fixed;z-index:60;pointer-events:none;background:#032106;border:1px solid rgba(108,232,105,.4);
+  border-radius:10px;padding:9px 12px;font:500 .78rem/1.5 var(--fu);box-shadow:0 12px 30px rgba(0,0,0,.5);
+  opacity:0;transition:opacity .12s;max-width:260px}
+.sg-tip b{font-size:.86rem}
+.sg-hint{font:500 .72rem var(--fm);color:var(--muted);margin-top:10px;letter-spacing:.03em}
+/* Logros */
+.logros-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.logros-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.logros-grid{grid-template-columns:1fr}}
+.logro{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;position:relative;
+  transition:transform .25s,border-color .25s}
+.logro:hover{transform:translateY(-3px);border-color:rgba(108,232,105,.45)}
+.logro .lg-ico{font-size:2rem;line-height:1;margin-bottom:10px}
+.logro .lg-title{font-family:var(--fd);font-weight:700;font-size:1.08rem;color:var(--mint)}
+.logro .lg-name{font:700 .92rem var(--fu);margin:2px 0 8px}
+.logro .lg-detail{font-size:.82rem;color:var(--muted);line-height:1.55}
+.logro .lg-rank{position:absolute;top:14px;right:16px;font:600 .7rem var(--fm);color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:3px 9px}
+.logro.is-me{border-color:rgba(108,232,105,.6);box-shadow:0 0 0 1px rgba(108,232,105,.3),0 14px 40px rgba(108,232,105,.10)}
+.logro.is-me .lg-rank{color:var(--mint);border-color:rgba(108,232,105,.5)}
+@media(prefers-reduced-motion:reduce){
+  .flagrain span{animation:none;display:none}
+  .pcol .pblock,.pcol .pmedal{transition:none}
+}
 """
 
 JS = r"""
@@ -5326,7 +5778,6 @@ function todayPicksHtml(picks, match){
    Una apuesta muerta en el marcador puede seguir cobrando aquí. */
 function finalAwardsBoxesHtml(m){
   if(!(m.code === 'FINAL' || m.key === 'final')) return '';
-  if(m.result && m.result.score) return '';
   if(!m.home || !m.away || /^(W\d|RU)/.test(m.home) || /^(W\d|RU)/.test(m.away)) return '';
   const outright = (D.knockout && D.knockout.outright) || {};
   const champPts = (outright.champion && outright.champion.points) || 12;
@@ -5335,6 +5786,28 @@ function finalAwardsBoxesHtml(m){
   const names = arr => arr.length
     ? sortPeople(arr).map(p => `<span class="result-person${meClass(p.name)}"><b>${esc(p.name)}</b></span>`).join('')
     : `<span class="muted">${L('Nadie','Nobody')}</span>`;
+  if(m.result && m.result.score && m.result.winner){
+    const isHomeWinner = nm(m.result.winner) === nm(m.home);
+    const winner = isHomeWinner ? m.home : m.away, wflag = isHomeWinner ? m.home_flag : m.away_flag;
+    const loser = isHomeWinner ? m.away : m.home, lflag = isHomeWinner ? m.away_flag : m.home_flag;
+    const champs = (m.picks || []).filter(p => p.champion && nm(p.champion) === nm(winner));
+    const runners = (m.picks || []).filter(p => p.runner_up && nm(p.runner_up) === nm(loser));
+    return `<div class="today-picks">
+      <div class="tp-title">🏅 ${L('Quién cobró los premios de la final','Who collected the final\'s prizes')}</div>
+      <div class="result-groups pick-groups" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+        <div class="result-box">
+          <div class="rb-title">${wflag || ''} ${L('Campeón','Champion')} · ${esc(team(winner))}</div>
+          <div class="aw-final-line">🏆 +${champPts} <span class="rb-count">${champs.length}</span></div>
+          <div class="result-names">${names(champs)}</div>
+        </div>
+        <div class="result-box">
+          <div class="rb-title">${lflag || ''} ${L('Subcampeón','Runner-up')} · ${esc(team(loser))}</div>
+          <div class="aw-final-line">🥈 +${runnerPts} <span class="rb-count">${runners.length}</span></div>
+          <div class="result-names">${names(runners)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
   const sideBox = (winner, wflag, loser, lflag) => {
     const wname = esc(team(winner));
     const champs = (m.picks || []).filter(p => p.champion && nm(p.champion) === nm(winner));
@@ -5967,6 +6440,340 @@ function buildAciertos(){
   buildLiveRanking(s);
 }
 
+/* ---- GRAN FINAL ---- */
+function buildGranFinal(){
+  const F = D.final;
+  if(!F || !D.live){
+    const s = section('final-podio', L('🏆 Gran Final','🏆 Grand Finale'),
+      L('Todavía no hay historia que contar','No story to tell yet'), '');
+    s.appendChild(el('div','card teaser reveal',
+      `<div class="em">🏆</div><p class="muted">${L('Cuando haya resultados, aquí saldrá el gran cierre de la porra.','Once there are results, the grand finale of the pool shows up here.')}</p>`));
+    return;
+  }
+  buildFinalPodio(F);
+  buildFinalEvolucion(F);
+  buildFinalLogros(F);
+}
+
+function buildFinalPodio(F){
+  const champ = F.champion;
+  const s = section('final-podio', L('🏆 Gran Final · Mundial 2026','🏆 Grand Finale · World Cup 2026'),
+    F.ready ? L('El podio definitivo 🎉','The final podium 🎉') : L('El podio, a falta de la final ⏳','The podium — one match to go ⏳'),
+    F.ready
+      ? L(F.stats.snapshots+' jornadas después, la porra ya tiene dueños. Gracias por jugar: esto ha sido un mes de gloria, drama y remontadas.',
+          F.stats.snapshots+' rounds later, the pool has its champions. Thanks for playing: a month of glory, drama and comebacks.')
+      : L('La clasificación puede saltar por los aires esta noche. Rellena el resultado de la final y regenera el dashboard para coronar al campeón.',
+          'Tonight the table can still blow up. Fill in the final result and regenerate the dashboard to crown the champion.'));
+  s.classList.add('finale-sec');
+  let banner;
+  if(champ){
+    banner = `<div class="champ-banner reveal"><span class="cb-flag">${champ.flag}</span>
+      <span>${esc(team(champ.team))} — <b>${L('Campeón del Mundo','World Champions')}</b></span><span class="cb-flag">🏆</span></div>`;
+  } else if(F.finalists && F.finalists.length === 2){
+    const [a,b] = F.finalists;
+    banner = `<div class="champ-banner pending reveal"><span class="cb-flag">${a.flag}</span>
+      <span>${esc(team(a.team))} — ${esc(team(b.team))} · ${L('la final, hoy','the final, today')}${F.final_time?' · '+F.final_time:''}</span>
+      <span class="cb-flag">${b.flag}</span></div>`;
+  }
+  if(banner) s.appendChild(el('div','',banner).firstElementChild);
+  const medals = {1:'🥇',2:'🥈',3:'🥉'};
+  const order = [F.podium[1], F.podium[0], F.podium[2]].filter(Boolean);
+  const pod = el('div','podium reveal');
+  pod.innerHTML = order.map(x => `
+    <div class="pcol pod${x.rank}${meClass(x.name)}">
+      <div class="pmedal">${medals[x.rank]||'🏅'}</div>
+      <div class="pname">${esc(x.name)}</div>
+      <div class="ppts"><span data-count="${x.pts}">0</span> ${L('pts','pts')}</div>
+      ${x.tied?`<span class="ptie">${L('empate','tied')}</span>`:''}
+      <div class="pbreak">${L('grupos','groups')} ${x.group_pts} · ${L('bonus','bonus')} ${x.bonus_pts} · KO ${x.ko_pts}<br>
+        ${x.exact} ${L('exactos','exact')} · ${x.sign} ${L('resultados','results')}</div>
+      <div class="pblock"><span class="pplace">${x.rank}</span></div>
+    </div>`).join('');
+  s.appendChild(pod);
+  s.appendChild(el('div','podium-floor'));
+  const st = F.stats;
+  const chipsRow = el('div','chips reveal');
+  chipsRow.innerHTML =
+    chip(st.snapshots, L('Jornadas de emoción','Rounds of drama')) +
+    chip(st.leader_changes, L('Cambios de líder','Lead changes')) +
+    chip(st.distinct_leaders, L('Líderes distintos','Different leaders')) +
+    chipText('+'+st.max_climb.places, L('Mayor remontada','Biggest climb')+' · '+esc(st.max_climb.name)) +
+    chip(st.total_exact, L('Exactos clavados entre todos','Exact scores nailed by the pool')) +
+    chip(st.total_sign, L('Resultados acertados','Results called right')) +
+    chip(st.top_leader.rounds, L('Jornadas en cabeza','Rounds on top')+' · '+esc(st.top_leader.name)) +
+    chipText((st.leader_gap>0?'+':'')+st.leader_gap, F.ready ? L('Ventaja del campeón','Winning margin') : L('Ventaja del líder','Leader’s cushion'));
+  s.appendChild(chipsRow);
+  startFinaleFx(s, F);
+}
+
+function startFinaleFx(sec, F){
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  const cv = el('canvas','fx-canvas'); cv.setAttribute('aria-hidden','true');
+  const rain = el('div','flagrain'); rain.setAttribute('aria-hidden','true');
+  sec.insertBefore(rain, sec.firstChild);
+  sec.insertBefore(cv, sec.firstChild);
+  const ctx = cv.getContext('2d');
+  const flags = F.champion ? [F.champion.flag] : (F.finalists||[]).map(f=>f.flag).filter(Boolean);
+  const drops = flags.length ? [...flags,...flags,...flags,'🏆','🎉','⚽'] : ['🏆','🎉','⚽'];
+  const HUES = [130,145,28,48,200];
+  const rockets = [], sparks = [];
+  let running = false, raf = null, fwTimer = null, flTimer = null;
+  function size(){
+    cv.width = sec.clientWidth || 1;
+    cv.height = sec.clientHeight || 1;
+  }
+  function launch(){
+    if(rockets.length > 6) return;
+    rockets.push({x:cv.width*(0.1+Math.random()*0.8), y:cv.height+8,
+      vy:-(cv.height*0.011+Math.random()*2.4), hue:HUES[Math.random()*HUES.length|0],
+      burstY:cv.height*(0.15+Math.random()*0.4)});
+  }
+  function burst(r){
+    const k = 34+(Math.random()*28|0);
+    for(let i=0;i<k;i++){
+      const a = Math.PI*2*i/k, sp = 1.3+Math.random()*2.8;
+      sparks.push({x:r.x,y:r.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,hue:r.hue,d:.011+Math.random()*.012});
+    }
+  }
+  function frame(){
+    if(!running) return;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.globalCompositeOperation = 'lighter';
+    for(let i=rockets.length-1;i>=0;i--){
+      const r = rockets[i]; r.y += r.vy; r.vy += 0.05;
+      ctx.fillStyle = `hsla(${r.hue} 90% 72% / .9)`;
+      ctx.fillRect(r.x-1.2, r.y, 2.4, 8);
+      if(r.y <= r.burstY || r.vy >= -0.6){ burst(r); rockets.splice(i,1); }
+    }
+    for(let i=sparks.length-1;i>=0;i--){
+      const p = sparks[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.03; p.vx *= .985; p.vy *= .985; p.life -= p.d;
+      if(p.life <= 0){ sparks.splice(i,1); continue; }
+      ctx.fillStyle = `hsla(${p.hue} 92% ${55+p.life*32}% / ${p.life})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.5+p.life*1.5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    raf = requestAnimationFrame(frame);
+  }
+  function drop(){
+    if(rain.childElementCount > 34) return;
+    const sp = document.createElement('span');
+    sp.textContent = drops[Math.random()*drops.length|0];
+    sp.style.left = (Math.random()*98)+'%';
+    sp.style.fontSize = (16+Math.random()*22)+'px';
+    sp.style.setProperty('--dur', (4.5+Math.random()*4).toFixed(2)+'s');
+    sp.style.setProperty('--rot', ((Math.random()<.5?-1:1)*(140+Math.random()*320)|0)+'deg');
+    sp.addEventListener('animationend', () => sp.remove());
+    rain.appendChild(sp);
+  }
+  function start(){
+    if(running) return;
+    running = true; size();
+    for(let i=0;i<3;i++) setTimeout(launch, 200+i*380);
+    fwTimer = setInterval(launch, 820);
+    flTimer = setInterval(drop, 300);
+    raf = requestAnimationFrame(frame);
+  }
+  function stop(){
+    running = false;
+    clearInterval(fwTimer); clearInterval(flTimer);
+    if(raf) cancelAnimationFrame(raf);
+    rockets.length = 0; sparks.length = 0;
+    ctx.clearRect(0,0,cv.width,cv.height);
+  }
+  new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? start() : stop()), {threshold:.12}).observe(sec);
+  window.addEventListener('resize', () => { if(running) size(); });
+}
+
+let _sgTip = null;
+function ensureSgTip(){
+  if(_sgTip) return _sgTip;
+  _sgTip = el('div','sg-tip');
+  document.body.appendChild(_sgTip);
+  return _sgTip;
+}
+
+function buildFinalEvolucion(F){
+  const hist = liveHistory();
+  if(!hist.length) return;
+  const s = section('final-evolucion', L('📈 La película del torneo','📈 The story of the tournament'),
+    L('La evolución de puntos, jornada a jornada 🎢','Points, round by round 🎢'),
+    L('Cada línea es una persona, cada escalón un partido. Pulsa los nombres para iluminar trayectorias y pasa el ratón por la gráfica para cotillear cualquier momento del Mundial.',
+      'Each line is a player, each step a match. Tap names to light up journeys and hover the chart to inspect any moment of the tournament.'));
+  const card = el('div','stargraph-card reveal');
+  s.appendChild(card);
+
+  const namesArr = D.live.table.map(r => r.name);
+  const M = hist.length;
+  const series = {};
+  namesArr.forEach(nm => { series[nm] = [0]; });
+  hist.forEach(sn => { sn.table.forEach(r => { series[r.name].push(r.pts); }); });
+  const ranksAt = hist.map(sn => { const m = {}; sn.table.forEach(r => m[r.name] = r.rank); return m; });
+  const yTop = Math.max(25, Math.ceil(Math.max(...D.live.table.map(r => r.pts))/25)*25);
+
+  const W=1060, H=560, mL=44, mR=118, mT=18, mB=44;
+  const xw = (W-mL-mR)/M;
+  const X = i => mL + i*xw;
+  const Y = p => mT + (1 - p/yTop)*(H-mT-mB);
+
+  const phaseKey = sn => sn.virtual ? (sn.kind === 'ko' ? sn.phase_es : 'CL') : 'GR';
+  const PH_ES = {GR:'Grupos', CL:'Clasif.', 'Dieciseisavos':'1/16', 'Octavos':'1/8', 'Cuartos':'1/4', 'Semifinales':'Semis', 'Tercer puesto':'3º', 'Final':'Final', 'Pichichi + Balón de Oro':'🏅'};
+  const PH_EN = {GR:'Groups', CL:'Tables', 'Dieciseisavos':'R32', 'Octavos':'R16', 'Cuartos':'QF', 'Semifinales':'SF', 'Tercer puesto':'3rd', 'Final':'Final', 'Pichichi + Balón de Oro':'🏅'};
+  const segs = [];
+  hist.forEach((sn,i) => {
+    const k = phaseKey(sn);
+    if(!segs.length || segs[segs.length-1].k !== k) segs.push({k, from:i+1});
+    segs[segs.length-1].to = i+1;
+  });
+
+  const focus = new Set((F.podium||[]).map(p => p.name));
+  if(ME) focus.add(ME);
+  const colors = personColorMap();
+
+  let svg = `<svg class="stargraph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('Evolución de puntos','Points evolution')}">`;
+  svg += '<g class="sg-grid sg-axis">';
+  for(let v=0; v<=yTop; v+=50){
+    svg += `<line x1="${mL}" y1="${Y(v)}" x2="${W-mR}" y2="${Y(v)}"/><text x="${mL-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;
+  }
+  svg += '</g><g class="sg-phase">';
+  // Etiquetas en dos filas escalonadas: las fases finales son muy estrechas y se pisan.
+  const rowEnd = [-1e9, -1e9];
+  segs.forEach(sg => {
+    if(sg.from > 1) svg += `<line x1="${X(sg.from-1).toFixed(1)}" y1="${mT}" x2="${X(sg.from-1).toFixed(1)}" y2="${H-mB}"/>`;
+    const lab = L(PH_ES[sg.k]||sg.k, PH_EN[sg.k]||sg.k);
+    const cx = (X(sg.from-1)+X(sg.to))/2, half = lab.length*3.4;
+    const row = (cx - half > rowEnd[0] + 8) ? 0 : 1;
+    rowEnd[row] = cx + half;
+    svg += `<text x="${cx.toFixed(1)}" y="${H-mB+18+row*13}" text-anchor="middle">${lab}</text>`;
+  });
+  svg += '</g><g class="sg-lines">';
+  namesArr.forEach(nm => {
+    const pts = series[nm];
+    let d = `M${X(0).toFixed(1)},${Y(0).toFixed(1)}`;
+    for(let i=1;i<=M;i++) d += `H${X(i).toFixed(1)}V${Y(pts[i]).toFixed(1)}`;
+    svg += `<path class="sg-line" data-nm="${esc(nm)}" d="${d}" stroke="${colors[nm]||personColor(nm)}"/>`;
+  });
+  svg += '</g><g class="sg-ends"></g></svg>';
+  card.innerHTML = svg +
+    `<div class="sg-legend"></div>
+     <div class="sg-hint">${L('· pulsa un nombre para encender/apagar su línea · doble clic en la gráfica para ver a todos','· tap a name to toggle their line · double-click the chart to light everyone up')}</div>`;
+
+  const svgEl = card.querySelector('svg');
+  const endsG = card.querySelector('.sg-ends');
+  const legend = card.querySelector('.sg-legend');
+  const pathBy = {};
+  svgEl.querySelectorAll('.sg-line').forEach(p => { pathBy[p.dataset.nm] = p; });
+
+  function paintEnds(){
+    const items = namesArr.filter(nm => focus.has(nm))
+      .map(nm => ({nm, ly:Y(series[nm][M]), pts:series[nm][M]}))
+      .sort((a,b) => a.ly - b.ly);
+    for(let i=1;i<items.length;i++) if(items[i].ly - items[i-1].ly < 15) items[i].ly = items[i-1].ly + 15;
+    endsG.innerHTML = items.map(it =>
+      `<circle class="sg-enddot" cx="${W-mR}" cy="${Y(it.pts).toFixed(1)}" r="4" fill="${colors[it.nm]}"/>
+       <text class="sg-endlab" x="${W-mR+9}" y="${(it.ly+4).toFixed(1)}" fill="${colors[it.nm]}">${esc(it.nm)} · ${it.pts}</text>`).join('');
+  }
+  function paintLegend(){
+    legend.innerHTML = namesArr.map(nm =>
+      `<button class="${focus.has(nm)?'on':''}" data-nm="${esc(nm)}"><span class="dot" style="background:${colors[nm]}"></span>${esc(nm)}</button>`).join('');
+  }
+  function paintFocus(){
+    namesArr.forEach(nm => pathBy[nm] && pathBy[nm].classList.toggle('on', focus.has(nm)));
+    paintEnds(); paintLegend();
+  }
+  paintFocus();
+
+  legend.addEventListener('click', e => {
+    const b = e.target.closest('button[data-nm]');
+    if(!b) return;
+    const nm = b.dataset.nm;
+    focus.has(nm) ? focus.delete(nm) : focus.add(nm);
+    paintFocus();
+  });
+  svgEl.addEventListener('dblclick', () => {
+    if(focus.size === namesArr.length){
+      focus.clear();
+      (F.podium||[]).forEach(p => focus.add(p.name));
+      if(ME) focus.add(ME);
+    } else {
+      namesArr.forEach(nm => focus.add(nm));
+    }
+    paintFocus();
+  });
+
+  const tip = ensureSgTip();
+  let hotNm = null;
+  function hideTip(){
+    tip.style.opacity = 0;
+    if(hotNm && pathBy[hotNm]) pathBy[hotNm].classList.remove('hot');
+    hotNm = null;
+  }
+  svgEl.addEventListener('mousemove', e => {
+    const r = svgEl.getBoundingClientRect();
+    const vx = (e.clientX - r.left)*W/r.width, vy = (e.clientY - r.top)*H/r.height;
+    if(vx < mL || vx > W-mR+40){ hideTip(); return; }
+    const i = Math.max(1, Math.min(M, Math.round((vx-mL)/xw)));
+    let bnm = null, bd = 1e9;
+    namesArr.forEach(nm => {
+      const d = Math.abs(Y(series[nm][i]) - vy) + (focus.has(nm) ? 0 : 8);
+      if(d < bd){ bd = d; bnm = nm; }
+    });
+    if(!bnm || bd > 46){ hideTip(); return; }
+    if(hotNm !== bnm){
+      if(hotNm && pathBy[hotNm]) pathBy[hotNm].classList.remove('hot');
+      hotNm = bnm; pathBy[bnm].classList.add('hot');
+    }
+    const snap = hist[i-1];
+    tip.innerHTML = `<b style="color:${colors[bnm]}">${esc(bnm)}</b> · ${series[bnm][i]} pts · ${ranksAt[i-1][bnm]}º<br>
+      <span class="muted">${matchTitle(snap)}</span>`;
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX+14, innerWidth-280)+'px';
+    tip.style.top = (e.clientY+14)+'px';
+  });
+  svgEl.addEventListener('mouseleave', hideTip);
+
+  if(!(window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches)){
+    requestAnimationFrame(() => {
+      svgEl.querySelectorAll('.sg-line.on').forEach(p => {
+        const len = p.getTotalLength();
+        p.style.strokeDasharray = len;
+        p.style.strokeDashoffset = len;
+        p.getBoundingClientRect();
+        p.style.transition = 'stroke-dashoffset 2.4s ease';
+        p.style.strokeDashoffset = 0;
+        setTimeout(() => { p.style.strokeDasharray=''; p.style.strokeDashoffset=''; p.style.transition=''; }, 2600);
+      });
+    });
+  }
+}
+
+function buildFinalLogros(F){
+  const s = section('final-logros', L('🎖️ Palmarés','🎖️ Honours'),
+    L('Un logro para cada uno 🏅','An achievement for everyone 🏅'),
+    L('El comité técnico de la porra ha revisado las '+N+' trayectorias y reparte un título único por cabeza. Nadie se va de vacío.',
+      'The pool technical committee reviewed all '+N+' journeys and hands out one unique title per player. Nobody goes home empty-handed.'));
+  const inp = el('input','search');
+  inp.placeholder = L('🔎 Busca tu nombre…','🔎 Search your name…');
+  s.appendChild(inp);
+  const grid = el('div','logros-grid reveal');
+  (F.achievements||[]).forEach(a => {
+    const card = el('div','logro'+meClass(a.name));
+    card.dataset.name = a.name.toLowerCase();
+    card.innerHTML = `
+      <div class="lg-rank">#${a.rank} · ${a.pts} ${L('pts','pts')}</div>
+      <div class="lg-ico">${a.icon}</div>
+      <div class="lg-title">${L(a.title_es, a.title_en)}</div>
+      <div class="lg-name">${esc(a.name)}</div>
+      <div class="lg-detail">${L(a.detail_es, a.detail_en)}</div>`;
+    grid.appendChild(card);
+  });
+  s.appendChild(grid);
+  inp.addEventListener('input', () => {
+    const q = inp.value.toLowerCase().trim();
+    grid.querySelectorAll('.logro').forEach(c => { c.style.display = c.dataset.name.includes(q) ? '' : 'none'; });
+  });
+}
+
 /* ---- FOOTER ---- */
 function buildFooter(){
   const f = el('footer');
@@ -5990,10 +6797,13 @@ function observeAll(){
    APP STRUCTURE — top tabs: En directo / Eliminatorias / Fase de grupos.
    View state lives in ?view=; default is the live (matchday) view.
    ============================================================ */
+/* La Gran Final se mantiene en secreto hasta que el resultado de la final
+   esté relleno: la pestaña ni existe antes (y ?view=final cae en 'live'). */
 const VIEWS = [
-  {key:'live',   es:'En directo',     en:'Live',        em:'⚽'},
-  {key:'ko',     es:'Eliminatorias',  en:'Knockouts',   em:'🧩'},
-  {key:'groups', es:'Fase de grupos', en:'Group stage', em:'📊'},
+  {key:'live',   es:'En directo',     en:'Live',         em:'⚽'},
+  ...(D.final && D.final.ready ? [{key:'final', es:'Gran Final', en:'Grand Finale', em:'🏆'}] : []),
+  {key:'ko',     es:'Eliminatorias',  en:'Knockouts',    em:'🧩'},
+  {key:'groups', es:'Fase de grupos', en:'Group stage',  em:'📊'},
 ];
 function currentView(){
   const r = new URLSearchParams(location.search).get('view');
@@ -6042,6 +6852,7 @@ function buildTopBar(activeView){
 }
 function renderView(view){
   if(view === 'ko') buildKnockouts();
+  else if(view === 'final') buildGranFinal();
   else if(view === 'groups'){
     buildHero(); buildRebeldia(); buildAfinidad(); buildEstilo();
     buildFavoritos(); buildPartidos(); buildLobo(); buildFichas(); buildPremios();
